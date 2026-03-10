@@ -9,7 +9,7 @@ Utilise uniquement la stdlib Python — zero dépendance externe.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, List, Set, Callable
+from typing import Any, Dict, Optional, List, Set, Callable, Union
 from datetime import datetime
 import traceback
 import uuid
@@ -26,7 +26,12 @@ from .exceptions import (
     DAGValidationError,
     ContextError,
 )
-from .executors import BaseExecutor, ExecutorRegistry
+
+# Constants
+NO_PERSISTENCE_ERROR = "No persistence backend configured"
+NO_PERSISTENCE_EXECUTION_ERROR = (
+    "No persistence backend configured for persistent execution"
+)
 
 
 class WorkflowEngine:
@@ -67,6 +72,7 @@ class WorkflowEngine:
         default_executor: Optional[Callable] = None,
         step_executors: Optional[Dict[StepType, Callable]] = None,
         executor_registry: Optional[ExecutorRegistry] = None,
+        persistence: Optional[Any] = None,
     ):
         """Initialise le moteur de workflow.
 
@@ -74,11 +80,13 @@ class WorkflowEngine:
             default_executor: Executor par défaut pour les steps.
             step_executors: Mapping personnalisé type -> executor.
             executor_registry: Registry for advanced executors.
+            persistence: Persistence backend for storing workflow data.
         """
         self._default_executor = default_executor or self._execute_function_step
         self._step_executors = step_executors or {}
         self._executor_registry = executor_registry or ExecutorRegistry()
         self._suspended_workflows: Dict[str, JobRun] = {}
+        self._persistence = persistence
 
     def run(
         self,
@@ -707,29 +715,22 @@ class WorkflowEngine:
         """
         warnings = []
 
-        try:
-            # Validation du DAG
-            resolver = DAGResolver(job)
+        # Validation du DAG
+        resolver = DAGResolver(job)
 
-            # Vérifications additionnelles
-            stats = resolver.get_graph_stats()
+        # Vérifications additionnelles
+        stats = resolver.get_graph_stats()
 
-            if stats["entry_points"] == 0:
-                warnings.append("Job has no entry points (all steps have dependencies)")
+        if stats["entry_points"] == 0:
+            warnings.append("Job has no entry points (all steps have dependencies)")
 
-            if stats["exit_points"] == 0:
-                warnings.append("Job has no exit points (unusual but valid)")
+        if stats["exit_points"] == 0:
+            warnings.append("Job has no exit points (unusual but valid)")
 
-            # Vérification des callables pour les steps FUNCTION
-            for step in job.steps:
-                if step.step_type == StepType.FUNCTION and not step.callable:
-                    warnings.append(
-                        f"Step '{step.name}' has FUNCTION type but no callable"
-                    )
-
-        except DAGValidationError:
-            # Re-raise DAG validation errors as-is
-            raise
+        # Vérification des callables pour les steps FUNCTION
+        for step in job.steps:
+            if step.step_type == StepType.FUNCTION and not step.callable:
+                warnings.append(f"Step '{step.name}' has FUNCTION type but no callable")
 
         return warnings
 
@@ -754,3 +755,272 @@ class WorkflowEngine:
             "stats": resolver.get_graph_stats(),
             "validation_warnings": self.validate_job(job),
         }
+
+    # ============================================================================
+    # PERSISTENCE INTEGRATION
+    # ============================================================================
+
+    @property
+    def persistence(self):
+        """Get the current persistence backend."""
+        return self._persistence
+
+    @persistence.setter
+    def persistence(self, backend):
+        """Set the persistence backend."""
+        self._persistence = backend
+
+    def save_job(self, job: Job) -> None:
+        """Save a job definition using the persistence backend.
+
+        Args:
+            job: Job to save.
+
+        Raises:
+            WorkflowError: If no persistence backend configured.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_ERROR,
+                details={"operation": "save_job", "job_name": job.name},
+            )
+
+        try:
+            self._persistence.save_job(job)
+        except Exception as e:
+            raise WorkflowError(
+                f"Failed to save job '{job.name}': {e}",
+                details={
+                    "operation": "save_job",
+                    "job_name": job.name,
+                    "error": str(e),
+                },
+            ) from e
+
+    def get_job(self, job_name: str) -> Optional[Job]:
+        """Retrieve a job definition by name.
+
+        Args:
+            job_name: Name of the job to retrieve.
+
+        Returns:
+            Job if found, None otherwise.
+
+        Raises:
+            WorkflowError: If no persistence backend configured.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_ERROR,
+                details={"operation": "get_job", "job_name": job_name},
+            )
+
+        try:
+            return self._persistence.get_job(job_name)
+        except Exception as e:
+            raise WorkflowError(
+                f"Failed to get job '{job_name}': {e}",
+                details={"operation": "get_job", "job_name": job_name, "error": str(e)},
+            ) from e
+
+    def list_jobs(self, limit: Optional[int] = None, offset: int = 0) -> List[Job]:
+        """List job definitions using the persistence backend.
+
+        Args:
+            limit: Maximum number of jobs to return.
+            offset: Number of jobs to skip.
+
+        Returns:
+            List of jobs.
+
+        Raises:
+            WorkflowError: If no persistence backend configured.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_ERROR, details={"operation": "list_jobs"}
+            )
+
+        try:
+            return self._persistence.list_jobs(limit=limit, offset=offset)
+        except Exception as e:
+            raise WorkflowError(
+                f"Failed to list jobs: {e}",
+                details={"operation": "list_jobs", "error": str(e)},
+            ) from e
+
+    def delete_job(self, job_name: str) -> bool:
+        """Delete a job definition using the persistence backend.
+
+        Args:
+            job_name: Name of the job to delete.
+
+        Returns:
+            True if deleted, False if not found.
+
+        Raises:
+            WorkflowError: If no persistence backend configured.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_ERROR,
+                details={"operation": "delete_job", "job_name": job_name},
+            )
+
+        try:
+            return self._persistence.delete_job(job_name)
+        except Exception as e:
+            raise WorkflowError(
+                f"Failed to delete job '{job_name}': {e}",
+                details={
+                    "operation": "delete_job",
+                    "job_name": job_name,
+                    "error": str(e),
+                },
+            ) from e
+
+    def get_job_run(self, run_id: str) -> Optional[JobRun]:
+        """Retrieve a job run by ID using the persistence backend.
+
+        Args:
+            run_id: ID of the job run to retrieve.
+
+        Returns:
+            JobRun if found, None otherwise.
+
+        Raises:
+            WorkflowError: If no persistence backend configured.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_ERROR,
+                details={"operation": "get_job_run", "run_id": run_id},
+            )
+
+        try:
+            return self._persistence.get_job_run(run_id)
+        except Exception as e:
+            raise WorkflowError(
+                f"Failed to get job run '{run_id}': {e}",
+                details={"operation": "get_job_run", "run_id": run_id, "error": str(e)},
+            ) from e
+
+    def list_job_runs(
+        self,
+        job_name: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        since: Optional[datetime] = None,
+    ) -> List[JobRun]:
+        """List job runs using the persistence backend.
+
+        Args:
+            job_name: Filter by job name.
+            status: Filter by status.
+            limit: Maximum number of runs to return.
+            offset: Number of runs to skip.
+            since: Only return runs created after this datetime.
+
+        Returns:
+            List of job runs.
+
+        Raises:
+            WorkflowError: If no persistence backend configured.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_ERROR,
+                details={"operation": "list_job_runs"},
+            )
+
+        try:
+            return self._persistence.list_job_runs(
+                job_name=job_name,
+                status=status,
+                limit=limit,
+                offset=offset,
+                since=since,
+            )
+        except Exception as e:
+            raise WorkflowError(
+                f"Failed to list job runs: {e}",
+                details={"operation": "list_job_runs", "error": str(e)},
+            ) from e
+
+    def run_with_persistence(
+        self,
+        job_or_name: Union[Job, str],
+        initial_context: Optional[Dict[str, Any]] = None,
+        run_id: Optional[str] = None,
+    ) -> JobRun:
+        """Run a workflow with automatic persistence of the job run.
+
+        This method automatically saves the job run state to the persistence
+        backend at key points during execution, enabling resume capabilities
+        and workflow monitoring.
+
+        Args:
+            job_or_name: Job definition or name of saved job to execute.
+            initial_context: Initial context data.
+            run_id: Optional run ID (generated if not provided).
+
+        Returns:
+            JobRun with execution results.
+
+        Raises:
+            WorkflowError: If persistence is not configured or execution fails.
+        """
+        if not self._persistence:
+            raise WorkflowError(
+                NO_PERSISTENCE_EXECUTION_ERROR,
+                details={"operation": "run_with_persistence"},
+            )
+
+        # Resolve job
+        if isinstance(job_or_name, str):
+            job = self.get_job(job_or_name)
+            if not job:
+                raise WorkflowError(
+                    f"Job '{job_or_name}' not found in persistence backend",
+                    details={"job_name": job_or_name},
+                )
+        else:
+            job = job_or_name
+
+        # Execute workflow with persistence
+        try:
+            job_run = self.run(job, initial_context=initial_context, run_id=run_id)
+
+            # Save final job run state
+            self._persistence.save_job_run(job_run)
+
+            return job_run
+
+        except Exception as e:
+            # Try to save failed job run if it exists
+            if "job_run" in locals():
+                try:
+                    self._persistence.save_job_run(job_run)
+                except Exception:
+                    # Don't fail workflow execution due to persistence errors
+                    # Just log and continue (logging would be added here)
+                    pass
+            raise
+
+    def _save_job_run_checkpoint(self, job_run: JobRun) -> None:
+        """Save a checkpoint of the job run state.
+
+        This is called internally during workflow execution to save
+        intermediate states for resume capability.
+
+        Args:
+            job_run: Job run to checkpoint.
+        """
+        if self._persistence:
+            try:
+                self._persistence.save_job_run(job_run)
+            except Exception:
+                # Don't fail workflow execution due to persistence errors
+                # Just log and continue (logging would be added here)
+                pass

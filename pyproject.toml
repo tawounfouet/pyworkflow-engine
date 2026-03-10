@@ -31,9 +31,13 @@ dependencies = []
 django = ["django>=4.2", "djangorestframework>=3.14"]
 fastapi = ["fastapi>=0.100", "uvicorn>=0.20"]
 celery = ["celery>=5.3"]
-sqlalchemy = ["sqlalchemy>=2.0"]
 streamlit = ["streamlit>=1.30"]
 structlog = ["structlog>=24.0"]
+
+# Persistence backends (optional)
+sqlalchemy = ["sqlalchemy>=2.0"]
+postgresql = ["sqlalchemy>=2.0", "psycopg2-binary>=2.9"]
+mysql = ["sqlalchemy>=2.0", "PyMySQL>=1.0"]
 
 # CLI
 cli = ["click>=8.0", "rich>=13.0"]
@@ -56,7 +60,7 @@ docs = [
 
 # Tout installer
 all = [
-    "ias-workflow-engine[django,fastapi,celery,sqlalchemy,streamlit,structlog,cli]",
+    "ias-workflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,streamlit,structlog,cli]",
 ]
 
 [project.scripts]
