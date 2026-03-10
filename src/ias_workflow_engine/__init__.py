@@ -61,6 +61,7 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         "LogLevel": (".core.models.enums", "LogLevel"),
         # Engine
         "WorkflowEngine": (".core.engine", "WorkflowEngine"),
+        "WorkflowContext": (".core.context", "WorkflowContext"),
         # Exceptions
         "WorkflowError": (".core.exceptions", "WorkflowError"),
         "WorkflowSuspended": (".core.exceptions", "WorkflowSuspended"),
@@ -108,6 +109,7 @@ __all__ = [
     "LogLevel",
     # Engine
     "WorkflowEngine",
+    "WorkflowContext",
     # Exceptions
     "WorkflowError",
     "WorkflowSuspended",
