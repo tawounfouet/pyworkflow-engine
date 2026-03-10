@@ -69,8 +69,12 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         "StepTimeout": (".core.exceptions", "StepTimeout"),
         "DAGCycleError": (".core.exceptions", "DAGCycleError"),
         # Executors
+        "ThreadPoolStepExecutor": (".core.executors", "ThreadPoolStepExecutor"),
+        "ProcessPoolStepExecutor": (".core.executors", "ProcessPoolStepExecutor"),
+        "AsyncStepExecutor": (".core.executors", "AsyncStepExecutor"),
+        "RetryableExecutor": (".core.executors", "RetryableExecutor"),
+        "ExecutorRegistry": (".core.executors", "ExecutorRegistry"),
         "LocalExecutor": (".executors.local", "LocalExecutor"),
-        "ExecutorRegistry": (".executors.registry", "ExecutorRegistry"),
         # Persistence
         "InMemoryPersistence": (".persistence.memory", "InMemoryPersistence"),
         "BasePersistence": (".persistence.base", "BasePersistence"),
@@ -119,6 +123,10 @@ __all__ = [
     # Built-in executors
     "LocalExecutor",
     "ExecutorRegistry",
+    "ThreadPoolStepExecutor",
+    "ProcessPoolStepExecutor",
+    "AsyncStepExecutor",
+    "RetryableExecutor",
     # Built-in persistence
     "InMemoryPersistence",
     "BasePersistence",

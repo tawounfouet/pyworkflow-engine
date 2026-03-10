@@ -66,6 +66,8 @@ logs/
 temp/
 tmp/
 
+_archives/
+
 # Runtime data
 pids
 *.pid

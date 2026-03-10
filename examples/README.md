@@ -44,6 +44,44 @@ Data processing pipeline with parallel analytics:
 
 **Run:** `uv run python examples/parallel_processing.py`
 
+### 5. Retry Mechanisms (`simple_retry_test.py`)
+Demonstrates automatic retry functionality for handling transient failures:
+- Configurable retry count and delays
+- Automatic retry on step failures
+- Retry exhaustion handling
+- Context preservation across retries
+- Performance timing validation
+
+**Run:** `uv run python examples/simple_retry_test.py`
+
+### 6. Timeout Handling and Advanced Executors (`timeout_and_executors.py`)
+**NEW in Phase 1 Week 4:** Advanced execution features:
+
+**Timeout Management:**
+- Step-level timeout configuration
+- Thread-based timeout enforcement
+- Timeout error handling and cleanup
+
+**Advanced Executors:**
+- **ThreadPoolExecutor**: I/O-bound concurrent operations
+- **ProcessPoolExecutor**: CPU-intensive multiprocessing tasks  
+- **AsyncExecutor**: Async/await function integration
+- **RetryableExecutor**: Advanced retry with exponential backoff and jitter
+- **ExecutorRegistry**: Managing multiple executors
+
+**Features Demonstrated:**
+- Timeout success and failure scenarios
+- Concurrent I/O operations with thread pools
+- CPU-intensive tasks with process pools
+- Async function execution with proper timeout handling
+- Advanced retry strategies with backoff
+- Complex workflows mixing multiple executor types
+- Executor lifecycle management
+
+**Run:** `uv run python examples/timeout_and_executors.py`
+
+**Architecture:** Pure Python implementation with zero external dependencies, using only stdlib modules (threading, multiprocessing, asyncio, concurrent.futures).
+
 ## Key Features Demonstrated
 
 ### ✅ Working Features
@@ -52,6 +90,7 @@ Data processing pipeline with parallel analytics:
 - **Context Management**: Data sharing between steps
 - **Execution Planning**: DAG analysis and optimization
 - **Error Handling**: Graceful failure management
+- **Retry Mechanisms**: Automatic retry with configurable delays
 - **Step Outputs**: Accessing results from completed steps
 - **Workflow Validation**: Job and step validation
 - **Performance Tracking**: Duration and progress monitoring
@@ -96,6 +135,8 @@ uv run python examples/simple_examples.py
 uv run python examples/basic_etl.py  
 uv run python examples/parallel_processing.py
 uv run python examples/human_approval.py
+uv run python examples/simple_retry_test.py
+uv run python examples/timeout_and_executors.py
 
 # Run tests to verify engine stability
 uv run pytest -v --cov=src --cov-report=term-missing

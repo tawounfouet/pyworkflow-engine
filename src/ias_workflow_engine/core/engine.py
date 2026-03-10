@@ -17,6 +17,7 @@ import uuid
 from .models import Job, Step, JobRun, StepRun, StepLog, RunStatus, StepType
 from .dag import DAGResolver
 from .context import WorkflowContext
+from .executors import BaseExecutor, ExecutorRegistry
 from .exceptions import (
     WorkflowError,
     WorkflowSuspended,
@@ -25,6 +26,7 @@ from .exceptions import (
     DAGValidationError,
     ContextError,
 )
+from .executors import BaseExecutor, ExecutorRegistry
 
 
 class WorkflowEngine:
@@ -64,15 +66,18 @@ class WorkflowEngine:
         self,
         default_executor: Optional[Callable] = None,
         step_executors: Optional[Dict[StepType, Callable]] = None,
+        executor_registry: Optional[ExecutorRegistry] = None,
     ):
         """Initialise le moteur de workflow.
 
         Args:
             default_executor: Executor par défaut pour les steps.
             step_executors: Mapping personnalisé type -> executor.
+            executor_registry: Registry for advanced executors.
         """
         self._default_executor = default_executor or self._execute_function_step
         self._step_executors = step_executors or {}
+        self._executor_registry = executor_registry or ExecutorRegistry()
         self._suspended_workflows: Dict[str, JobRun] = {}
 
     def run(
@@ -184,35 +189,9 @@ class WorkflowEngine:
         job_run = self._suspended_workflows[run_id]
 
         try:
-            # Applique les sorties fournies
-            if step_outputs:
-                for step_name, output in step_outputs.items():
-                    step_run = self._find_step_run(job_run, step_name)
-                    if step_run and step_run.status == RunStatus.SUSPENDED:
-                        step_run.complete_success(output)
-
-            # Continue l'exécution depuis la suspension
-            context = WorkflowContext(job_run)
-
-            # Restaurer les sorties des steps déjà complétées dans le contexte
-            for step_run in job_run.step_runs:
-                if step_run.status == RunStatus.SUCCESS and step_run.output_data:
-                    context.set_step_output(step_run.step_name, step_run.output_data)
-
-            resolver = DAGResolver(job_run.job)
-
-            # Trouve les steps non encore exécutés
-            completed_steps = {
-                sr.step_name
-                for sr in job_run.step_runs
-                if sr.status == RunStatus.SUCCESS
-            }
-
-            remaining_order = [
-                step_name
-                for step_name in resolver.get_execution_order()
-                if step_name not in completed_steps
-            ]
+            self._apply_resume_outputs(job_run, step_outputs)
+            context = self._restore_workflow_context(job_run)
+            remaining_order = self._calculate_remaining_steps(job_run)
 
             # Reprend l'exécution
             job_run.status = RunStatus.RUNNING
@@ -232,6 +211,7 @@ class WorkflowEngine:
             del self._suspended_workflows[run_id]
 
             if isinstance(e, WorkflowError):
+                # Re-raise WorkflowError as-is
                 raise
             else:
                 raise WorkflowFailed(
@@ -279,6 +259,93 @@ class WorkflowEngine:
             Liste des IDs des workflows en cours de suspension.
         """
         return list(self._suspended_workflows.keys())
+
+    def register_executor(self, name: str, executor: BaseExecutor) -> None:
+        """Register an advanced executor.
+
+        Args:
+            name: Executor name.
+            executor: Executor instance.
+        """
+        self._executor_registry.register(name, executor)
+
+    def get_executor(self, name: str) -> Optional[BaseExecutor]:
+        """Get registered executor by name.
+
+        Args:
+            name: Executor name.
+
+        Returns:
+            Executor instance or None if not found.
+        """
+        return self._executor_registry.get(name)
+
+    def list_executors(self) -> List[str]:
+        """List all registered executor names.
+
+        Returns:
+            List of executor names.
+        """
+        return self._executor_registry.list_executors()
+
+    def shutdown_executors(self) -> None:
+        """Shutdown all registered executors."""
+        self._executor_registry.shutdown_all()
+
+    def _apply_resume_outputs(
+        self, job_run: JobRun, step_outputs: Optional[Dict[str, Any]]
+    ) -> None:
+        """Applique les sorties fournies lors de la reprise.
+
+        Args:
+            job_run: JobRun en cours de reprise.
+            step_outputs: Sorties à appliquer.
+        """
+        if step_outputs:
+            for step_name, output in step_outputs.items():
+                step_run = self._find_step_run(job_run, step_name)
+                if step_run and step_run.status == RunStatus.SUSPENDED:
+                    step_run.complete_success(output)
+
+    def _restore_workflow_context(self, job_run: JobRun) -> WorkflowContext:
+        """Restaure le contexte de workflow depuis les étapes complétées.
+
+        Args:
+            job_run: JobRun à restaurer.
+
+        Returns:
+            Contexte de workflow restauré.
+        """
+        context = WorkflowContext(job_run)
+
+        # Restaurer les sorties des steps déjà complétées dans le contexte
+        for step_run in job_run.step_runs:
+            if step_run.status == RunStatus.SUCCESS and step_run.output_data:
+                context.set_step_output(step_run.step_name, step_run.output_data)
+
+        return context
+
+    def _calculate_remaining_steps(self, job_run: JobRun) -> List[str]:
+        """Calcule les steps restants à exécuter lors d'une reprise.
+
+        Args:
+            job_run: JobRun en cours de reprise.
+
+        Returns:
+            Liste ordonnée des steps restants.
+        """
+        resolver = DAGResolver(job_run.job)
+
+        # Trouve les steps non encore exécutés
+        completed_steps = {
+            sr.step_name for sr in job_run.step_runs if sr.status == RunStatus.SUCCESS
+        }
+
+        return [
+            step_name
+            for step_name in resolver.get_execution_order()
+            if step_name not in completed_steps
+        ]
 
     def _execute_steps(
         self, job_run: JobRun, execution_order: List[str], context: WorkflowContext
@@ -337,9 +404,11 @@ class WorkflowEngine:
 
                 # Gestion des retry
                 if step.retry_count > 0:
-                    # Retry sera implémenté dans une version future
-                    # Pour l'instant, on ne fait pas de retry automatique
-                    pass
+                    # Implémenter le retry avec une approche simple
+                    retry_success = self._retry_step_execution(step, step_run, context)
+                    if retry_success:
+                        continue  # Le retry a réussi, passer au step suivant
+                    # Si le retry a échoué, continuer avec l'erreur originale
 
                 # Propage l'erreur
                 raise StepExecutionError(
@@ -369,16 +438,86 @@ class WorkflowEngine:
             StepExecutionError: Si l'exécution échoue.
             WorkflowSuspended: Si le step demande une suspension.
         """
-        # Sélection de l'executor
+        # Check for custom executor name in step configuration
+        if hasattr(step, "executor_name") and step.executor_name:
+            advanced_executor = self._executor_registry.get(step.executor_name)
+            if advanced_executor:
+                return advanced_executor.execute(step, context)
+
+        # Sélection de l'executor standard
         executor = self._step_executors.get(step.step_type, self._default_executor)
 
         # Exécution avec timeout si spécifié
         if step.timeout:
-            # Timeout sera géré dans une version future
-            # Pour l'instant, pas de timeout automatique
-            pass
+            return self._execute_with_timeout(step, context, executor)
+        else:
+            return executor(step, context)
 
-        return executor(step, context)
+    def _execute_with_timeout(
+        self, step: Step, context: WorkflowContext, executor: Callable
+    ) -> Any:
+        """Exécute un step avec timeout.
+
+        Args:
+            step: Step à exécuter.
+            context: Contexte d'exécution.
+            executor: Executor à utiliser.
+
+        Returns:
+            Résultat de l'exécution.
+
+        Raises:
+            StepExecutionError: Si l'exécution échoue ou timeout.
+        """
+        import threading
+        import time
+        from queue import Queue, Empty
+
+        result_queue = Queue()
+        exception_queue = Queue()
+
+        def target():
+            """Thread target pour l'exécution du step."""
+            try:
+                result = executor(step, context)
+                result_queue.put(result)
+            except Exception as e:
+                exception_queue.put(e)
+
+        # Démarrer l'exécution dans un thread séparé
+        thread = threading.Thread(target=target, daemon=True)
+        thread.start()
+
+        # Attendre avec timeout
+        timeout_seconds = step.timeout.total_seconds()
+        thread.join(timeout_seconds)
+
+        if thread.is_alive():
+            # Timeout atteint
+            raise StepExecutionError(
+                f"Step '{step.name}' timed out after {timeout_seconds} seconds",
+                details={
+                    "step_name": step.name,
+                    "timeout_seconds": timeout_seconds,
+                    "error_type": "TimeoutError",
+                },
+                step_name=step.name,
+            )
+
+        # Vérifier le résultat
+        if not exception_queue.empty():
+            # Une exception s'est produite
+            raise exception_queue.get()
+
+        if not result_queue.empty():
+            # Succès
+            return result_queue.get()
+
+        # Cas imprévu - ni résultat ni exception
+        raise StepExecutionError(
+            f"Step '{step.name}' completed unexpectedly without result",
+            step_name=step.name,
+        )
 
     def _execute_function_step(self, step: Step, context: WorkflowContext) -> Any:
         """Executor par défaut pour les steps FUNCTION.
@@ -457,6 +596,63 @@ class WorkflowEngine:
                 return step_run
         return None
 
+    def _retry_step_execution(
+        self, step: Step, step_run: StepRun, context: WorkflowContext
+    ) -> bool:
+        """Tente de réexécuter un step avec retry.
+
+        Args:
+            step: Step à réexécuter.
+            step_run: StepRun associé.
+            context: Contexte de workflow.
+
+        Returns:
+            True si le retry a réussi, False sinon.
+        """
+        import time
+
+        for _ in range(step.retry_count):
+            # Attendre le délai de retry
+            if step.retry_delay.total_seconds() > 0:
+                time.sleep(step.retry_delay.total_seconds())
+
+            # Incrémenter le compteur de retry
+            step_run.retry_count += 1
+
+            # Log de la tentative
+            step_run.add_log(
+                "INFO",
+                f"Retrying step - attempt {step_run.retry_count}/{step.retry_count}",
+            )
+
+            # Réinitialiser pour retry
+            step_run.status = RunStatus.RUNNING
+            step_run.error = None
+
+            try:
+                # Tenter l'exécution
+                output = self._execute_step(step, context)
+                step_run.complete_success(output)
+                context.set_step_output(step.name, output)
+                return True  # Succès!
+
+            except Exception as retry_error:
+                # Échec du retry
+                step_run.add_log(
+                    "ERROR", f"Retry {step_run.retry_count} failed: {retry_error}"
+                )
+
+                # Si c'est la dernière tentative, garder l'erreur
+                if step_run.retry_count >= step.retry_count:
+                    step_run.complete_failure(str(retry_error))
+                    self._log_step_error(step_run, retry_error)
+                    return False
+
+                # Sinon, continuer à la tentative suivante
+                continue
+
+        return False  # Tous les retries ont échoué
+
     def _log_workflow_error(self, job: Job, job_run: JobRun, error: Exception) -> None:
         """Log une erreur au niveau workflow.
 
@@ -532,6 +728,7 @@ class WorkflowEngine:
                     )
 
         except DAGValidationError:
+            # Re-raise DAG validation errors as-is
             raise
 
         return warnings
