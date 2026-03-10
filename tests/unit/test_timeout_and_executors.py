@@ -6,9 +6,9 @@ import time
 from datetime import timedelta
 from unittest.mock import Mock, patch
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType, RunStatus
-from ias_workflow_engine.core.exceptions import StepExecutionError
-from ias_workflow_engine.core.executors import (
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, RunStatus
+from pyworkflow_engine.core.exceptions import StepExecutionError
+from pyworkflow_engine.core.executors import (
     ThreadPoolStepExecutor,
     ProcessPoolStepExecutor,
     AsyncStepExecutor,
@@ -20,8 +20,8 @@ from ias_workflow_engine.core.executors import (
 # Add helper function for creating context
 def create_test_context():
     """Create a test WorkflowContext with minimal JobRun."""
-    from ias_workflow_engine.core.context import WorkflowContext
-    from ias_workflow_engine import JobRun
+    from pyworkflow_engine.core.context import WorkflowContext
+    from pyworkflow_engine import JobRun
 
     job_run = JobRun(job_name="test_job")
     return WorkflowContext(job_run)

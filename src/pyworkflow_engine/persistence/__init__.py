@@ -13,8 +13,8 @@ Architecture:
     - SQLAlchemyPersistence: Advanced SQL storage via optional SQLAlchemy
 
 Usage:
-    from ias_workflow_engine.persistence import InMemoryPersistence
-    from ias_workflow_engine import WorkflowEngine
+    from pyworkflow_engine.persistence import InMemoryPersistence
+    from pyworkflow_engine import WorkflowEngine
 
     persistence = InMemoryPersistence()
     engine = WorkflowEngine(persistence=persistence)

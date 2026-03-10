@@ -3,7 +3,7 @@ Logger principal — stdlib logging uniquement, zero dépendance.
 
 Suit les best practices pour les bibliothèques Python (PEP 282) :
 - NullHandler par défaut → la lib est silencieuse sauf configuration explicite
-- Namespace hiérarchique → ``ias_workflow_engine.core.engine``
+- Namespace hiérarchique → ``pyworkflow_engine.core.engine``
 - Compatible structlog si installé (voir adapters/structlog/)
 
 Design :
@@ -23,7 +23,7 @@ from .config import LoggingConfig
 from .formatters import StructuredFormatter, JSONFormatter
 
 # ── Namespace racine du package ──────────────────────────────────────────────
-_ROOT_LOGGER_NAME = "ias_workflow_engine"
+_ROOT_LOGGER_NAME = "pyworkflow_engine"
 _root_logger = logging.getLogger(_ROOT_LOGGER_NAME)
 
 # PEP 282 best practice : NullHandler par défaut pour les libraries
@@ -35,7 +35,7 @@ _queue_listener: logging.handlers.QueueListener | None = None
 
 
 def get_logger(name: str | None = None) -> logging.Logger:
-    """Obtient un logger dans le namespace ``ias_workflow_engine``.
+    """Obtient un logger dans le namespace ``pyworkflow_engine``.
 
     Args:
         name: Sous-namespace du logger. Si None, retourne le logger racine.
@@ -47,11 +47,11 @@ def get_logger(name: str | None = None) -> logging.Logger:
     Examples:
         >>> logger = get_logger("core.engine")
         >>> logger.name
-        'ias_workflow_engine.core.engine'
+        'pyworkflow_engine.core.engine'
 
         >>> logger = get_logger()
         >>> logger.name
-        'ias_workflow_engine'
+        'pyworkflow_engine'
     """
     if name is None:
         return _root_logger

@@ -12,15 +12,15 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Type, List, Dict, Any
 
-from ias_workflow_engine.persistence.base import (
+from pyworkflow_engine.persistence.base import (
     BasePersistence,
     PersistenceError,
     JobNotFoundError,
 )
-from ias_workflow_engine.persistence.memory import InMemoryPersistence
-from ias_workflow_engine.persistence.json_file import JSONFilePersistence
-from ias_workflow_engine.persistence.sqlite import SQLitePersistence
-from ias_workflow_engine.core.models import (
+from pyworkflow_engine.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.persistence.json_file import JSONFilePersistence
+from pyworkflow_engine.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.core.models import (
     Job,
     JobRun,
     StepRun,
@@ -655,7 +655,7 @@ class TestSQLAlchemyPersistence(TestPersistenceBase):
     @pytest.fixture
     def persistence(self):
         """Create a SQLAlchemy persistence instance with in-memory SQLite."""
-        from ias_workflow_engine.persistence.sqlalchemy import SQLAlchemyPersistence
+        from pyworkflow_engine.persistence.sqlalchemy import SQLAlchemyPersistence
 
         return SQLAlchemyPersistence("sqlite:///:memory:")
 
@@ -817,8 +817,8 @@ class TestPersistenceIntegration:
 
     def test_engine_integration(self):
         """Test persistence integration with WorkflowEngine."""
-        from ias_workflow_engine import WorkflowEngine
-        from ias_workflow_engine.persistence import InMemoryPersistence
+        from pyworkflow_engine import WorkflowEngine
+        from pyworkflow_engine.persistence import InMemoryPersistence
 
         persistence = InMemoryPersistence()
         engine = WorkflowEngine(persistence=persistence)

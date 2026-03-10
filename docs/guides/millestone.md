@@ -67,4 +67,4 @@ B) FastAPI Adapter implementation
 C) Persistence layer (SQLAlchemy/Django ORM)
 D) Review/refactor current implementation
 
-(.venv) ➜  ias-workflow-engine git:(main) 
+(.venv) ➜  pyworkflow-engine git:(main) 

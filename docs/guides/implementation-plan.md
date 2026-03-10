@@ -1,4 +1,4 @@
-# Plan d'Implémentation : Package Python Pur `ias-workflow-engine`
+# Plan d'Implémentation : Package Python Pur `pyworkflow-engine`
 
 **Date**: 10 mars 2026  
 **Status**: Plan d'exécution (Logging Module: ✅ **COMPLETED**)  
@@ -18,11 +18,11 @@
 **Architecture**:
 - **Layer 1 (Core)**: `stdlib.logging` - `get_logger()`, JSON formatter, structured formatter
 - **Layer 2 (Advanced)**: `stdlib` handlers - SQLiteLogHandler, QueueHandler for async  
-- **Layer 3 (Adapters)**: Optional structlog via `pip install ias-workflow-engine[structlog]`
+- **Layer 3 (Adapters)**: Optional structlog via `pip install pyworkflow-engine[structlog]`
 
 **Files Created**:
-- `src/ias_workflow_engine/logging/` - Complete logging module
-- `src/ias_workflow_engine/adapters/structlog/` - Optional structlog integration
+- `src/pyworkflow_engine/logging/` - Complete logging module
+- `src/pyworkflow_engine/adapters/structlog/` - Optional structlog integration
 - `tests/unit/test_logging.py` - Comprehensive test suite (52 tests)
 - `docs/guides/logging.md` - Full documentation
 
@@ -49,8 +49,8 @@
 - **Utilities**: ID generation, timestamp helpers, status checking
 
 **Files Created**:
-- `src/ias_workflow_engine/core/models/` - Complete models package
-- `src/ias_workflow_engine/core/__init__.py` - Clean public API
+- `src/pyworkflow_engine/core/models/` - Complete models package
+- `src/pyworkflow_engine/core/__init__.py` - Clean public API
 - `tests/unit/test_core_models.py` - Comprehensive test suite (60 tests)
 - `scripts/validate.py` - Integration validation script
 
@@ -68,7 +68,7 @@
 
 ## 🎯 Vue d'Ensemble
 
-Ce document détaille le plan d'implémentation pour migrer l'application Django `django-workflows` vers un package Python pur `ias-workflow-engine` suivant la stratégie "Library-first, Framework-second".
+Ce document détaille le plan d'implémentation pour migrer l'application Django `django-workflows` vers un package Python pur `pyworkflow-engine` suivant la stratégie "Library-first, Framework-second".
 
 ### Objectifs SMART
 
@@ -87,8 +87,8 @@ Ce document détaille le plan d'implémentation pour migrer l'application Django
 ```
 📂 Développement Parallèle
 ├── django-workflows/          # App existante (maintenance uniquement)
-└── ias-workflow-engine/       # Nouveau package (développement actif)
-    ├── src/ias_workflow_engine/
+└── pyworkflow-engine/       # Nouveau package (développement actif)
+    ├── src/pyworkflow_engine/
     ├── tests/
     ├── examples/
     └── docs/
@@ -109,8 +109,8 @@ Pour commencer le développement :
 
 ```bash
 # Clone et setup
-git clone <repository-url> ias-workflow-engine
-cd ias-workflow-engine
+git clone <repository-url> pyworkflow-engine
+cd pyworkflow-engine
 
 # Install dependencies avec uv
 uv sync --group dev
@@ -133,7 +133,7 @@ python -m pytest
 #### Semaine 1 : Structure & Modèles
 
 **Jour 1-2 : Setup Projet** ✅ **DONE**
-- [x] Initialiser le repository `ias-workflow-engine`
+- [x] Initialiser le repository `pyworkflow-engine`
 - [x] Configurer `pyproject.toml` avec dependencies = []
 - [x] Setup CI/CD (GitHub Actions)
 - [x] Configuration développement (ruff, mypy, pre-commit)
@@ -162,7 +162,7 @@ python -m pytest
 **Critères d'Acceptance Phase 1** :
 ```python
 # Ce code doit fonctionner sans aucune dépendance externe
-from ias_workflow_engine.core import Job, Step, WorkflowEngine
+from pyworkflow_engine.core import Job, Step, WorkflowEngine
 
 def hello_world():
     return {"message": "Hello World!"}
@@ -217,14 +217,14 @@ assert result.result["step_0"]["message"] == "Hello World!"
 **Critères d'Acceptance Phase 2** :
 ```python
 # Persistence pluggable
-from ias_workflow_engine import Job, WorkflowEngine
-from ias_workflow_engine.persistence import SQLitePersistence
+from pyworkflow_engine import Job, WorkflowEngine
+from pyworkflow_engine.persistence import SQLitePersistence
 
 persistence = SQLitePersistence("workflows.db")
 engine = WorkflowEngine(persistence=persistence)
 
 # Executors pluggables
-from ias_workflow_engine.executors import ThreadExecutor
+from pyworkflow_engine.executors import ThreadExecutor
 job = Job(name="Parallel Job", steps=[...])
 result = engine.run(job, executor_type="thread")
 
@@ -276,18 +276,18 @@ assert resumed.status == "success"
 **Critères d'Acceptance Phase 3** :
 ```python
 # Adapter Django fonctionne
-pip install ias-workflow-engine[django]
+pip install pyworkflow-engine[django]
 # Les modèles Django wrappent les dataclasses core
 # L'admin Django affiche les workflows
 # L'API DRF expose les endpoints
 
 # Adapter Celery fonctionne
-pip install ias-workflow-engine[celery]
+pip install pyworkflow-engine[celery]
 # Les tâches sont dispatchées à Celery
 # Celery Beat déclenche les workflows schedulés
 
 # Adapter FastAPI fonctionne
-pip install ias-workflow-engine[fastapi]
+pip install pyworkflow-engine[fastapi]
 # Routes FastAPI exposent l'API
 # WebSocket diffuse les changements d'état
 ```
@@ -394,7 +394,7 @@ matrix:
 ```toml
 # Packages séparés pour éviter la confusion
 [project]
-name = "ias-workflow-engine"        # Package principal
+name = "pyworkflow-engine"        # Package principal
 # vs
 name = "django-workflows"           # App Django existante (deprecated)
 
@@ -402,9 +402,9 @@ name = "django-workflows"           # App Django existante (deprecated)
 # Installation granulaire
 minimal = []                        # Core seulement
 django = ["django>=4.2", "djangorestframework>=3.14"]
-web = ["ias-workflow-engine[django,fastapi]"]
-async = ["ias-workflow-engine[celery,fastapi]"] 
-full = ["ias-workflow-engine[django,fastapi,celery,sqlalchemy,streamlit,cli]"]
+web = ["pyworkflow-engine[django,fastapi]"]
+async = ["pyworkflow-engine[celery,fastapi]"] 
+full = ["pyworkflow-engine[django,fastapi,celery,sqlalchemy,streamlit,cli]"]
 ```
 
 ### Rétrocompatibilité
@@ -413,17 +413,17 @@ full = ["ias-workflow-engine[django,fastapi,celery,sqlalchemy,streamlit,cli]"]
 # Migration bridge temporaire
 # django_workflows/core.py (deprecated)
 import warnings
-from ias_workflow_engine import Job, WorkflowEngine
+from pyworkflow_engine import Job, WorkflowEngine
 
 warnings.warn(
-    "django_workflows is deprecated. Use 'ias-workflow-engine[django]' instead.",
+    "django_workflows is deprecated. Use 'pyworkflow-engine[django]' instead.",
     DeprecationWarning,
     stacklevel=2
 )
 
 # Proxy classes pour rétrocompatibilité
 class LegacyJob(Job):
-    """Deprecated: Use ias_workflow_engine.Job directly"""
+    """Deprecated: Use pyworkflow_engine.Job directly"""
     pass
 ```
 
@@ -441,7 +441,7 @@ USE_NEW_WORKFLOW_ENGINE = os.getenv('USE_NEW_WORKFLOW_ENGINE', 'false').lower() 
 
 # views.py
 if settings.USE_NEW_WORKFLOW_ENGINE:
-    from ias_workflow_engine.adapters.django import DjangoWorkflowEngine
+    from pyworkflow_engine.adapters.django import DjangoWorkflowEngine
     engine = DjangoWorkflowEngine()
 else:
     from django_workflows.engine import WorkflowEngine
@@ -665,9 +665,9 @@ Chaque phase a des critères de passage stricts :
 #### ✅ Phase 1 Complete
 ```bash
 # Core fonctionne sans dépendances
-pip install ./ias-workflow-engine  # 0 dependencies
-python -c "from ias_workflow_engine import Job, WorkflowEngine; print('✅ Core OK')"
-pytest tests/unit/ --cov=ias_workflow_engine.core --cov-report=term --cov-fail-under=90
+pip install ./pyworkflow-engine  # 0 dependencies
+python -c "from pyworkflow_engine import Job, WorkflowEngine; print('✅ Core OK')"
+pytest tests/unit/ --cov=pyworkflow_engine.core --cov-report=term --cov-fail-under=90
 ```
 
 #### ✅ Phase 2 Complete  
@@ -681,7 +681,7 @@ python examples/sqlite_persistence.py  # Persistence fonctionne
 #### ✅ Phase 3 Complete
 ```bash
 # Adapters fonctionnels
-pip install ./ias-workflow-engine[django,fastapi,celery]
+pip install ./pyworkflow-engine[django,fastapi,celery]
 python examples/django_integration.py
 python examples/fastapi_integration.py
 python examples/celery_integration.py

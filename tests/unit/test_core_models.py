@@ -12,7 +12,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from dataclasses import FrozenInstanceError
 
-from ias_workflow_engine.core.models import (
+from pyworkflow_engine.core.models import (
     # Enums
     TriggerType,
     StepType,

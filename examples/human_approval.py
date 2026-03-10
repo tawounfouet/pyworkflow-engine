@@ -5,7 +5,7 @@ This example demonstrates a workflow that requires human approval,
 showcasing the suspension and resumption capabilities.
 """
 
-from ias_workflow_engine import (
+from pyworkflow_engine import (
     WorkflowEngine,
     Job,
     Step,

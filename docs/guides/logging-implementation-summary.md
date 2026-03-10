@@ -9,7 +9,7 @@
 
 ## 🎯 Implementation Overview
 
-Successfully implemented a comprehensive 3-layer logging system for the `ias-workflow-engine` project that maintains the "zero dependency" principle while providing advanced logging capabilities through optional adapters.
+Successfully implemented a comprehensive 3-layer logging system for the `pyworkflow-engine` project that maintains the "zero dependency" principle while providing advanced logging capabilities through optional adapters.
 
 ## 📐 Architecture Decision
 
@@ -27,7 +27,7 @@ Successfully implemented a comprehensive 3-layer logging system for the `ias-wor
 
 ```python
 # All functionality using only stdlib
-from ias_workflow_engine.logging import get_logger, configure_logging, LoggingConfig
+from pyworkflow_engine.logging import get_logger, configure_logging, LoggingConfig
 
 config = LoggingConfig(level='DEBUG', json_output=True, log_file='app.log')
 configure_logging(config)
@@ -47,8 +47,8 @@ logger.info('Operation completed', extra={'user_id': 42, 'duration_ms': 150})
 ### Optional Integrations
 
 ```python
-# Optional: pip install ias-workflow-engine[structlog] 
-from ias_workflow_engine.adapters.structlog import configure_structlog
+# Optional: pip install pyworkflow-engine[structlog] 
+from pyworkflow_engine.adapters.structlog import configure_structlog
 configure_structlog()  # Enhances stdlib logging with structlog processors
 ```
 
@@ -70,7 +70,7 @@ Module Coverage:
 
 ### Core Module
 ```
-src/ias_workflow_engine/logging/
+src/pyworkflow_engine/logging/
 ├── __init__.py           # Public API (3 functions)
 ├── config.py            # LoggingConfig dataclass
 ├── logger.py            # get_logger() + configure_logging()
@@ -80,7 +80,7 @@ src/ias_workflow_engine/logging/
 
 ### Adapters
 ```
-src/ias_workflow_engine/adapters/
+src/pyworkflow_engine/adapters/
 └── structlog/
     ├── __init__.py      # Public API
     └── setup.py         # configure_structlog()
@@ -129,4 +129,4 @@ The implementation successfully demonstrates the "Library-first, Framework-secon
 
 **✅ Logging Module: IMPLEMENTATION COMPLETE**
 
-The logging system fully delivers on the requirements while maintaining architectural integrity and providing a solid foundation for the broader `ias-workflow-engine` project.
+The logging system fully delivers on the requirements while maintaining architectural integrity and providing a solid foundation for the broader `pyworkflow-engine` project.

@@ -4,7 +4,7 @@ Simple Workflow Examples: Demonstrating Core Features
 Collection of simple examples showing the basic features of the IAS Workflow Engine.
 """
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
 import time
 
 

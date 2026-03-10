@@ -10,9 +10,9 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ias_workflow_engine import WorkflowEngine
-from ias_workflow_engine.core.models import Job, Step
-from ias_workflow_engine.persistence import (
+from pyworkflow_engine import WorkflowEngine
+from pyworkflow_engine.core.models import Job, Step
+from pyworkflow_engine.persistence import (
     InMemoryPersistence,
     JSONFilePersistence,
     SQLitePersistence,
@@ -20,7 +20,7 @@ from ias_workflow_engine.persistence import (
 
 # Try to import SQLAlchemy persistence (optional)
 try:
-    from ias_workflow_engine.persistence import SQLAlchemyPersistence
+    from pyworkflow_engine.persistence import SQLAlchemyPersistence
     HAS_SQLALCHEMY = True
 except ImportError:
     HAS_SQLALCHEMY = False
@@ -261,7 +261,7 @@ def demo_sqlite_persistence():
         print(f"✓ Saved job: {job.name}")
         
         # Create some job runs with different statuses
-        from ias_workflow_engine.core.models import JobRun, JobRunStatus
+        from pyworkflow_engine.core.models import JobRun, JobRunStatus
         
         statuses = [JobRunStatus.COMPLETED, JobRunStatus.FAILED, JobRunStatus.RUNNING]
         now = datetime.utcnow()
@@ -413,7 +413,7 @@ def demo_sqlalchemy_persistence():
     persistence.save_job(job)
     
     # Create many job runs to test performance
-    from ias_workflow_engine.core.models import JobRun, JobRunStatus
+    from pyworkflow_engine.core.models import JobRun, JobRunStatus
     
     start_time = time.time()
     job_runs = []

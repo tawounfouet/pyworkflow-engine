@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ias-workflow-engine"
-version = "0.1.0"
-description = "Moteur d'orchestration de workflows Python pur — zero dépendance framework"
+name = "pyworkflow-engine"
+version = "0.2.0"
+description = "PyWorkflow Engine - Library-first workflow orchestration with zero framework dependencies"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
@@ -60,19 +60,19 @@ docs = [
 
 # Tout installer
 all = [
-    "ias-workflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,streamlit,structlog,cli]",
+    "pyworkflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,streamlit,structlog,cli]",
 ]
 
 [project.scripts]
-workflow = "ias_workflow_engine.cli.main:cli"
+workflow = "pyworkflow_engine.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/ias/ias-workflow-engine"
-Documentation = "https://ias.github.io/ias-workflow-engine"
-Repository = "https://github.com/ias/ias-workflow-engine"
+Homepage = "https://github.com/awf/pyworkflow-engine"
+Documentation = "https://awf.github.io/pyworkflow-engine"
+Repository = "https://github.com/awf/pyworkflow-engine"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ias_workflow_engine"]
+packages = ["src/pyworkflow_engine"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -80,7 +80,7 @@ asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
     "--strict-config", 
-    "--cov=ias_workflow_engine",
+    "--cov=pyworkflow_engine",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",

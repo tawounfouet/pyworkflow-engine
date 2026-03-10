@@ -24,7 +24,7 @@ def configure_structlog(
     """Configure structlog comme processeur des logs stdlib du core.
 
     Cette fonction branche structlog sur le ``logging`` stdlib :
-    - Les logs émis via ``logging.getLogger("ias_workflow_engine.*")``
+    - Les logs émis via ``logging.getLogger("pyworkflow_engine.*")``
       sont interceptés et formatés par structlog.
     - Le core reste blissfully unaware de structlog.
 
@@ -100,7 +100,7 @@ def configure_structlog(
     )
 
     # Appliquer le formatter structlog au logger racine du package
-    root_logger = logging.getLogger("ias_workflow_engine")
+    root_logger = logging.getLogger("pyworkflow_engine")
     root_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     # Remplacer les handlers existants par un handler avec formatter structlog

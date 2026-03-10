@@ -9,14 +9,14 @@ Architecture en 3 couches respectant le principe zero-dépendance :
 
 Usage basique (zero dépendance) :
 
-    from ias_workflow_engine.logging import get_logger
+    from pyworkflow_engine.logging import get_logger
 
     logger = get_logger("my_workflow")
     logger.info("Workflow started", extra={"job_id": "abc-123"})
 
 Usage avancé avec configuration :
 
-    from ias_workflow_engine.logging import configure_logging, LoggingConfig
+    from pyworkflow_engine.logging import configure_logging, LoggingConfig
 
     configure_logging(LoggingConfig(
         level="DEBUG",

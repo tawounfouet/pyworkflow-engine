@@ -7,7 +7,7 @@ from datetime import timedelta
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType
 
 
 def unstable_function():

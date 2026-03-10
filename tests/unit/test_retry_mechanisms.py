@@ -4,8 +4,8 @@ import pytest
 from datetime import timedelta
 from unittest.mock import Mock
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType, RunStatus
-from ias_workflow_engine.core.exceptions import StepExecutionError
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, RunStatus
+from pyworkflow_engine.core.exceptions import StepExecutionError
 
 
 class TestRetryMechanisms:

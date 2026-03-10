@@ -5,7 +5,7 @@ This example demonstrates parallel execution capabilities with multiple
 concurrent data processing steps.
 """
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
 import time
 import random
 

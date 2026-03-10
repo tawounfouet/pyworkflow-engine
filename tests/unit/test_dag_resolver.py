@@ -6,9 +6,9 @@ tri topologique et analyse du graphe de workflow.
 """
 
 import pytest
-from ias_workflow_engine.core.models import Job, Step, StepType
-from ias_workflow_engine.core.dag import DAGResolver
-from ias_workflow_engine.core.exceptions import DAGValidationError
+from pyworkflow_engine.core.models import Job, Step, StepType
+from pyworkflow_engine.core.dag import DAGResolver
+from pyworkflow_engine.core.exceptions import DAGValidationError
 
 
 class TestDAGResolver:

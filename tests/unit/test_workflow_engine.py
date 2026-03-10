@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-from ias_workflow_engine.core import (
+from pyworkflow_engine.core import (
     WorkflowEngine,
     Job,
     Step,

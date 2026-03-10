@@ -5,7 +5,7 @@ This example demonstrates a basic ETL (Extract, Transform, Load) workflow
 using the IAS Workflow Engine.
 """
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
 import json
 
 

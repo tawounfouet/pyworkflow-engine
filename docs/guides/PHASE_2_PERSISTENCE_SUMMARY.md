@@ -54,24 +54,24 @@ Successfully implemented the comprehensive persistence layer for the IAS Workflo
 
 ### Basic Installation
 ```bash
-pip install ias-workflow-engine
+pip install pyworkflow-engine
 ```
 
 ### With Persistence Backends
 ```bash
 # SQLAlchemy support
-pip install ias-workflow-engine[sqlalchemy]
+pip install pyworkflow-engine[sqlalchemy]
 
 # Database-specific support
-pip install ias-workflow-engine[postgresql]
-pip install ias-workflow-engine[mysql]
+pip install pyworkflow-engine[postgresql]
+pip install pyworkflow-engine[mysql]
 ```
 
 ### Quick Start Example
 ```python
-from ias_workflow_engine.persistence import InMemoryPersistence
-from ias_workflow_engine.core.models import Job, Step, StepType
-from ias_workflow_engine import WorkflowEngine
+from pyworkflow_engine.persistence import InMemoryPersistence
+from pyworkflow_engine.core.models import Job, Step, StepType
+from pyworkflow_engine import WorkflowEngine
 
 # Create job with steps
 job = Job(
@@ -201,15 +201,15 @@ The persistence layer foundation is now complete and ready for:
 ## Files Created/Modified
 
 ### Core Persistence Module
-- `/src/ias_workflow_engine/persistence/__init__.py` - Module with lazy imports
-- `/src/ias_workflow_engine/persistence/base.py` - Base interface (66 lines)
-- `/src/ias_workflow_engine/persistence/memory.py` - In-memory backend (130 lines)  
-- `/src/ias_workflow_engine/persistence/json_file.py` - JSON file backend (254 lines)
-- `/src/ias_workflow_engine/persistence/sqlite.py` - SQLite backend (246 lines)
-- `/src/ias_workflow_engine/persistence/sqlalchemy.py` - SQLAlchemy backend (265 lines)
+- `/src/pyworkflow_engine/persistence/__init__.py` - Module with lazy imports
+- `/src/pyworkflow_engine/persistence/base.py` - Base interface (66 lines)
+- `/src/pyworkflow_engine/persistence/memory.py` - In-memory backend (130 lines)  
+- `/src/pyworkflow_engine/persistence/json_file.py` - JSON file backend (254 lines)
+- `/src/pyworkflow_engine/persistence/sqlite.py` - SQLite backend (246 lines)
+- `/src/pyworkflow_engine/persistence/sqlalchemy.py` - SQLAlchemy backend (265 lines)
 
 ### Integration & Configuration
-- `/src/ias_workflow_engine/core/engine.py` - Updated with persistence support
+- `/src/pyworkflow_engine/core/engine.py` - Updated with persistence support
 - `/pyproject.toml` - Updated with persistence optional dependencies
 
 ### Examples & Documentation

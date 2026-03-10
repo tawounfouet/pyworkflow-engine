@@ -38,7 +38,7 @@ class LoggingConfig:
     enable_queue: bool = False
     extra_fields: dict[str, Any] = field(default_factory=dict)
     propagate: bool = False
-    logger_name: str = "ias_workflow_engine"
+    logger_name: str = "pyworkflow_engine"
 
     def with_overrides(self, **kwargs: Any) -> LoggingConfig:
         """Crée une nouvelle config avec des valeurs surchargées.

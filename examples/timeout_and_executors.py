@@ -17,8 +17,8 @@ from datetime import timedelta
 # Add the source directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ias_workflow_engine import WorkflowEngine, Job, Step, StepType
-from ias_workflow_engine.core.executors import (
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType
+from pyworkflow_engine.core.executors import (
     ThreadPoolStepExecutor,
     ProcessPoolStepExecutor,
     AsyncStepExecutor,

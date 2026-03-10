@@ -14,7 +14,7 @@ def test_core_imports():
     """Test que les imports de base fonctionnent."""
     print("🧪 Testing core imports...")
     try:
-        from ias_workflow_engine.logging import (
+        from pyworkflow_engine.logging import (
             get_logger,
             configure_logging,
             LoggingConfig,
@@ -22,12 +22,12 @@ def test_core_imports():
 
         print("  ✅ Logging module imports OK")
 
-        from ias_workflow_engine.adapters.structlog import configure_structlog
+        from pyworkflow_engine.adapters.structlog import configure_structlog
 
         print("  ✅ Structlog adapter imports OK")
 
         # Test des nouveaux modèles core
-        from ias_workflow_engine.core import (
+        from pyworkflow_engine.core import (
             Job,
             Step,
             StepType,
@@ -50,7 +50,7 @@ def test_logging_functionality():
     """Test la fonctionnalité de base du logging."""
     print("\n🧪 Testing logging functionality...")
     try:
-        from ias_workflow_engine.logging import (
+        from pyworkflow_engine.logging import (
             get_logger,
             configure_logging,
             LoggingConfig,
@@ -80,8 +80,8 @@ def test_sqlite_persistence():
     """Test la persistence SQLite."""
     print("\n🧪 Testing SQLite persistence...")
     try:
-        from ias_workflow_engine.logging.handlers import SQLiteLogHandler
-        from ias_workflow_engine.logging import get_logger
+        from pyworkflow_engine.logging.handlers import SQLiteLogHandler
+        from pyworkflow_engine.logging import get_logger
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
@@ -115,10 +115,10 @@ def test_package_info():
     """Test les métadonnées du package."""
     print("\n🧪 Testing package info...")
     try:
-        import ias_workflow_engine
+        import pyworkflow_engine
 
         print(
-            f"  ✅ Package version: {getattr(ias_workflow_engine, '__version__', 'dev')}"
+            f"  ✅ Package version: {getattr(pyworkflow_engine, '__version__', 'dev')}"
         )
 
         # Test des dépendances (doit être zéro pour le core)
@@ -153,7 +153,7 @@ def test_core_models_functionality():
     """Test la fonctionnalité de base des modèles core."""
     print("\n🧪 Testing core models functionality...")
     try:
-        from ias_workflow_engine.core import (
+        from pyworkflow_engine.core import (
             Job,
             Step,
             StepType,

@@ -35,8 +35,8 @@ class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
 
-        # Nom court : enlever le prefix "ias_workflow_engine."
-        name = record.name.removeprefix("ias_workflow_engine.")
+        # Nom court : enlever le prefix "pyworkflow_engine."
+        name = record.name.removeprefix("pyworkflow_engine.")
 
         parts = [
             f"{timestamp} [{record.levelname:<8}] {name} — {record.getMessage()}",

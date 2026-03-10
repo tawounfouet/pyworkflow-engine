@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WorkflowEngine with DAG resolution
 - Zero-dependency core implementation
 - **Logging module** : stdlib-based structured logging (zero dépendance)
-  - `get_logger()` with hierarchical namespace (`ias_workflow_engine.*`)
+  - `get_logger()` with hierarchical namespace (`pyworkflow_engine.*`)
   - `LoggingConfig` dataclass for immutable configuration
   - `StructuredFormatter` (console) and `JSONFormatter` (NDJSON)
   - `SQLiteLogHandler` with batch mode and query API

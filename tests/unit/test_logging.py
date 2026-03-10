@@ -16,20 +16,20 @@ from unittest.mock import patch
 
 import pytest
 
-from ias_workflow_engine.logging import (
+from pyworkflow_engine.logging import (
     LoggingConfig,
     configure_logging,
     get_logger,
 )
-from ias_workflow_engine.logging.formatters import (
+from pyworkflow_engine.logging.formatters import (
     JSONFormatter,
     StructuredFormatter,
 )
-from ias_workflow_engine.logging.handlers import (
+from pyworkflow_engine.logging.handlers import (
     SQLiteLogHandler,
     create_queue_handler,
 )
-from ias_workflow_engine.logging.logger import (
+from pyworkflow_engine.logging.logger import (
     _ROOT_LOGGER_NAME,
     _cleanup,
     shutdown_logging,
@@ -75,7 +75,7 @@ class TestLoggingConfig:
         assert config.enable_queue is False
         assert config.extra_fields == {}
         assert config.propagate is False
-        assert config.logger_name == "ias_workflow_engine"
+        assert config.logger_name == "pyworkflow_engine"
 
     def test_custom_values(self):
         config = LoggingConfig(
@@ -242,7 +242,7 @@ class TestStructuredFormatter:
     def test_basic_format(self):
         formatter = StructuredFormatter()
         record = logging.LogRecord(
-            name="ias_workflow_engine.core.engine",
+            name="pyworkflow_engine.core.engine",
             level=logging.INFO,
             pathname="engine.py",
             lineno=42,
@@ -258,7 +258,7 @@ class TestStructuredFormatter:
     def test_extra_fields(self):
         formatter = StructuredFormatter(extra_fields={"service": "test"})
         record = logging.LogRecord(
-            name="ias_workflow_engine.test",
+            name="pyworkflow_engine.test",
             level=logging.WARNING,
             pathname="test.py",
             lineno=1,
@@ -272,7 +272,7 @@ class TestStructuredFormatter:
     def test_record_extra_fields(self):
         formatter = StructuredFormatter()
         record = logging.LogRecord(
-            name="ias_workflow_engine.test",
+            name="pyworkflow_engine.test",
             level=logging.INFO,
             pathname="test.py",
             lineno=1,
@@ -287,7 +287,7 @@ class TestStructuredFormatter:
     def test_strips_root_prefix(self):
         formatter = StructuredFormatter()
         record = logging.LogRecord(
-            name="ias_workflow_engine.executors.thread",
+            name="pyworkflow_engine.executors.thread",
             level=logging.DEBUG,
             pathname="thread.py",
             lineno=1,
@@ -297,7 +297,7 @@ class TestStructuredFormatter:
         )
         output = formatter.format(record)
         assert "executors.thread" in output
-        assert "ias_workflow_engine.executors" not in output
+        assert "pyworkflow_engine.executors" not in output
 
     def test_exception_formatting(self):
         formatter = StructuredFormatter()
@@ -309,7 +309,7 @@ class TestStructuredFormatter:
             exc_info = sys.exc_info()
 
         record = logging.LogRecord(
-            name="ias_workflow_engine.test",
+            name="pyworkflow_engine.test",
             level=logging.ERROR,
             pathname="test.py",
             lineno=1,
@@ -331,7 +331,7 @@ class TestJSONFormatter:
     def test_produces_valid_json(self):
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="ias_workflow_engine.core",
+            name="pyworkflow_engine.core",
             level=logging.INFO,
             pathname="core.py",
             lineno=1,
@@ -343,7 +343,7 @@ class TestJSONFormatter:
         data = json.loads(output)
         assert data["level"] == "INFO"
         assert data["message"] == "Test message"
-        assert data["logger"] == "ias_workflow_engine.core"
+        assert data["logger"] == "pyworkflow_engine.core"
         assert "timestamp" in data
 
     def test_extra_fields_in_json(self):
@@ -465,7 +465,7 @@ class TestSQLiteLogHandler:
     def test_emit_single_record(self, tmp_db_path: Path):
         handler = SQLiteLogHandler(db_path=tmp_db_path)
         record = logging.LogRecord(
-            name="ias_workflow_engine.test",
+            name="pyworkflow_engine.test",
             level=logging.INFO,
             pathname="test.py",
             lineno=42,
@@ -480,7 +480,7 @@ class TestSQLiteLogHandler:
         assert len(logs) == 1
         assert logs[0]["message"] == "Test log message"
         assert logs[0]["level"] == "INFO"
-        assert logs[0]["logger"] == "ias_workflow_engine.test"
+        assert logs[0]["logger"] == "pyworkflow_engine.test"
         handler.close()
 
     def test_emit_with_extras(self, tmp_db_path: Path):
@@ -585,7 +585,7 @@ class TestSQLiteLogHandler:
     def test_query_by_logger_name(self, tmp_db_path: Path):
         handler = SQLiteLogHandler(db_path=tmp_db_path)
 
-        for name in ["ias_workflow_engine.core", "ias_workflow_engine.executors"]:
+        for name in ["pyworkflow_engine.core", "pyworkflow_engine.executors"]:
             record = logging.LogRecord(
                 name=name,
                 level=logging.INFO,

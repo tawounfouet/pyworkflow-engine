@@ -7,7 +7,7 @@
 
 ### 🎯 Major Features Implemented
 
-#### 1. **Timeout Handling System** (`src/ias_workflow_engine/core/engine.py`)
+#### 1. **Timeout Handling System** (`src/pyworkflow_engine/core/engine.py`)
 - **Thread-based timeout execution**: Using `threading.Thread` and `Queue` for clean timeout management
 - **Step-level timeout configuration**: Added timeout support to `Step` model with `timedelta` specification  
 - **Proper cleanup and error handling**: Graceful thread termination and timeout error reporting
@@ -23,7 +23,7 @@ step = Step(
 )
 ```
 
-#### 2. **Advanced Executor System** (`src/ias_workflow_engine/core/executors.py`)
+#### 2. **Advanced Executor System** (`src/pyworkflow_engine/core/executors.py`)
 Complete executor architecture with **zero external dependencies**:
 
 - **`BaseExecutor`**: Abstract base class for all executors
@@ -35,7 +35,7 @@ Complete executor architecture with **zero external dependencies**:
 
 ```python
 # Example usage  
-from ias_workflow_engine import WorkflowEngine, ThreadPoolStepExecutor, RetryableExecutor
+from pyworkflow_engine import WorkflowEngine, ThreadPoolStepExecutor, RetryableExecutor
 
 engine = WorkflowEngine()
 
@@ -81,7 +81,7 @@ Comprehensive demonstration showcasing:
 - Complex workflows with mixed executor types
 - Proper executor lifecycle management
 
-#### 6. **API Enhancement** (`src/ias_workflow_engine/__init__.py`)
+#### 6. **API Enhancement** (`src/pyworkflow_engine/__init__.py`)
 New public exports via lazy import system:
 - `ThreadPoolStepExecutor`
 - `ProcessPoolStepExecutor` 

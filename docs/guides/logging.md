@@ -1,4 +1,4 @@
-# Guide Logging : `ias-workflow-engine`
+# Guide Logging : `pyworkflow-engine`
 
 **Date**: 10 mars 2026  
 **Status**: Implémenté  
@@ -25,7 +25,7 @@ Le système de logging suit le même principe que le reste du package : **stdlib
 ├──────────────────────────────────────────────────────────────┤
 │  COUCHE 3 — Adapters (extras pip)                            │
 │  adapters/                                                   │
-│  └── structlog/        # pip install ias-workflow-engine[structlog] │
+│  └── structlog/        # pip install pyworkflow-engine[structlog] │
 │      ├── __init__.py                                         │
 │      └── setup.py      # configure_structlog()               │
 └──────────────────────────────────────────────────────────────┘
@@ -53,7 +53,7 @@ Le système de logging suit le même principe que le reste du package : **stdlib
 ### Basique (zero config)
 
 ```python
-from ias_workflow_engine.logging import get_logger
+from pyworkflow_engine.logging import get_logger
 
 # La lib est silencieuse par défaut (NullHandler, PEP 282)
 logger = get_logger("my_module")
@@ -63,7 +63,7 @@ logger.info("This goes nowhere until configured")
 ### Configuration console
 
 ```python
-from ias_workflow_engine.logging import configure_logging, LoggingConfig
+from pyworkflow_engine.logging import configure_logging, LoggingConfig
 
 # Format structuré lisible
 configure_logging(LoggingConfig(level="DEBUG"))
@@ -86,7 +86,7 @@ configure_logging(LoggingConfig(
 logger = get_logger("core.engine")
 logger.info("Workflow started", extra={"job_id": "abc-123"})
 # → {"timestamp": "2026-03-10T14:30:00+00:00", "level": "INFO", 
-#     "logger": "ias_workflow_engine.core.engine", "message": "Workflow started",
+#     "logger": "pyworkflow_engine.core.engine", "message": "Workflow started",
 #     "service": "workflow-engine", "env": "production", "job_id": "abc-123"}
 ```
 
@@ -118,8 +118,8 @@ configure_logging(LoggingConfig(
 
 ```python
 import logging
-from ias_workflow_engine.logging import configure_logging, get_logger, LoggingConfig
-from ias_workflow_engine.logging.handlers import SQLiteLogHandler
+from pyworkflow_engine.logging import configure_logging, get_logger, LoggingConfig
+from pyworkflow_engine.logging.handlers import SQLiteLogHandler
 
 configure_logging(LoggingConfig(level="DEBUG"))
 
@@ -142,7 +142,7 @@ logs = db_handler.query_logs(logger_name="core", since=datetime(2026, 3, 10))
 ### Queue async + SQLite (production)
 
 ```python
-from ias_workflow_engine.logging.handlers import SQLiteLogHandler, create_queue_handler
+from pyworkflow_engine.logging.handlers import SQLiteLogHandler, create_queue_handler
 
 # Handler SQLite
 sqlite_handler = SQLiteLogHandler("production_logs.db", batch_size=50)
@@ -164,17 +164,17 @@ sqlite_handler.close()
 ### Adapter structlog (opt-in)
 
 ```bash
-pip install ias-workflow-engine[structlog]
+pip install pyworkflow-engine[structlog]
 ```
 
 ```python
-from ias_workflow_engine.adapters.structlog import configure_structlog
+from pyworkflow_engine.adapters.structlog import configure_structlog
 
 # Branche structlog sur le logging du core
 configure_structlog(level="DEBUG", json_output=False)
 
 # Tous les logs du core passent maintenant par structlog
-from ias_workflow_engine.logging import get_logger
+from pyworkflow_engine.logging import get_logger
 logger = get_logger("core.engine")
 logger.info("workflow started", extra={"job_id": "abc-123"})
 # → Formaté par structlog avec couleurs, contexte, etc.
@@ -188,9 +188,9 @@ logger.info("workflow started", extra={"job_id": "abc-123"})
 
 ```python
 # core/engine.py
-from ias_workflow_engine.logging import get_logger
+from pyworkflow_engine.logging import get_logger
 
-logger = get_logger(__name__)  # → ias_workflow_engine.core.engine
+logger = get_logger(__name__)  # → pyworkflow_engine.core.engine
 
 class WorkflowEngine:
     def run(self, job, context=None):
@@ -211,7 +211,7 @@ class WorkflowEngine:
 
 ```python
 # settings.py
-from ias_workflow_engine.logging import configure_logging, LoggingConfig
+from pyworkflow_engine.logging import configure_logging, LoggingConfig
 
 configure_logging(LoggingConfig(
     level="INFO",
@@ -225,7 +225,7 @@ configure_logging(LoggingConfig(
 ### Dans un notebook Jupyter
 
 ```python
-from ias_workflow_engine.logging import configure_logging, LoggingConfig
+from pyworkflow_engine.logging import configure_logging, LoggingConfig
 
 configure_logging(LoggingConfig(level="DEBUG"))
 # → Logs visibles dans le notebook en mode structuré
@@ -234,7 +234,7 @@ configure_logging(LoggingConfig(level="DEBUG"))
 ### Dans un script CLI
 
 ```python
-from ias_workflow_engine.logging import configure_logging, LoggingConfig
+from pyworkflow_engine.logging import configure_logging, LoggingConfig
 
 configure_logging(LoggingConfig(
     level="DEBUG" if verbose else "INFO",
@@ -265,7 +265,7 @@ configure_logging(LoggingConfig(
 pytest tests/unit/test_logging.py -v
 
 # Avec couverture
-pytest tests/unit/test_logging.py -v --cov=ias_workflow_engine.logging
+pytest tests/unit/test_logging.py -v --cov=pyworkflow_engine.logging
 ```
 
 Les tests sont 100% stdlib — pas de base de données externe, pas de broker, exécution < 1s.

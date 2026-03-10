@@ -5,7 +5,7 @@ Un package zero-dépendance pour créer, exécuter et gérer des workflows compl
 dans n'importe quel environnement Python.
 
 Usage basique:
-    from ias_workflow_engine import Job, Step, WorkflowEngine
+    from pyworkflow_engine import Job, Step, WorkflowEngine
 
     def hello_world():
         return {"message": "Hello World!"}
@@ -40,7 +40,7 @@ __email__ = "dev@ias.com"
 def __getattr__(name: str):  # PEP 562 – module-level __getattr__
     """Import paresseux des symboles du package.
 
-    Permet ``from ias_workflow_engine import Job`` dès que le module
+    Permet ``from pyworkflow_engine import Job`` dès que le module
     ``core.models.design_time`` existe, tout en évitant un crash si le
     module n'a pas encore été créé.
     """

@@ -8,7 +8,7 @@
 
 ## 🎯 Objectif de la Migration
 
-Transformer l'application Django `django-workflows` existante en un **package Python pur** (`ias-workflow-engine`) utilisable dans n'importe quel environnement : scripts, notebooks, CLI, GUI, frameworks web (Django, FastAPI, Streamlit), etc.
+Transformer l'application Django `django-workflows` existante en un **package Python pur** (`pyworkflow-engine`) utilisable dans n'importe quel environnement : scripts, notebooks, CLI, GUI, frameworks web (Django, FastAPI, Streamlit), etc.
 
 ### Vision
 
@@ -93,14 +93,14 @@ Time-to-market          ★★★★☆         ★★☆☆☆ (réécriture)
 ### Structure du Package
 
 ```
-ias_workflow_engine/
+pyworkflow_engine/
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
 ├── CHANGELOG.md
 │
 ├── src/
-│   └── ias_workflow_engine/
+│   └── pyworkflow_engine/
 │       ├── __init__.py                    # API publique
 │       ├── py.typed                       # Type checking
 │       │
@@ -168,7 +168,7 @@ ias_workflow_engine/
 │       │# ADAPTERS — Intégrations framework (extras pip)
 │       ├── adapters/
 │       │   ├── __init__.py
-│       │   ├── django/                   # pip install ias-workflow-engine[django]
+│       │   ├── django/                   # pip install pyworkflow-engine[django]
 │       │   │   ├── __init__.py
 │       │   │   ├── models.py             # Modèles Django wrappant dataclasses core
 │       │   │   ├── persistence.py        # DjangoORMPersistence(BasePersistence)
@@ -177,21 +177,21 @@ ias_workflow_engine/
 │       │   │   ├── views.py              # Vues DRF
 │       │   │   ├── urls.py               # Routes API
 │       │   │   └── apps.py               # AppConfig Django
-│       │   ├── fastapi/                  # pip install ias-workflow-engine[fastapi]
+│       │   ├── fastapi/                  # pip install pyworkflow-engine[fastapi]
 │       │   │   ├── __init__.py
 │       │   │   ├── routes.py             # APIRouter FastAPI
 │       │   │   ├── dependencies.py       # Injection de dépendances
 │       │   │   └── websocket.py          # WS pour suivi temps réel
-│       │   ├── celery/                   # pip install ias-workflow-engine[celery]
+│       │   ├── celery/                   # pip install pyworkflow-engine[celery]
 │       │   │   ├── __init__.py
 │       │   │   ├── executor.py           # CeleryExecutor(BaseExecutor)
 │       │   │   ├── tasks.py              # Tâches Celery génériques
 │       │   │   └── schedule.py           # Celery Beat → ScheduleTrigger bridge
-│       │   ├── sqlalchemy/               # pip install ias-workflow-engine[sqlalchemy]
+│       │   ├── sqlalchemy/               # pip install pyworkflow-engine[sqlalchemy]
 │       │   │   ├── __init__.py
 │       │   │   ├── models.py             # Tables SQLAlchemy
 │       │   │   └── persistence.py        # SQLAlchemyPersistence(BasePersistence)
-│       │   └── streamlit/                # pip install ias-workflow-engine[streamlit]
+│       │   └── streamlit/                # pip install pyworkflow-engine[streamlit]
 │       │       ├── __init__.py
 │       │       ├── components.py         # Widgets workflow
 │       │       └── dashboard.py          # Dashboard pré-construit
@@ -223,7 +223,7 @@ ias_workflow_engine/
 | **Les `adapters/` importent core + framework** | Sens unique : `adapter → core`, jamais l'inverse |
 | **Les executors built-in utilisent stdlib uniquement** | `local`, `thread`, `process`, `human` = zéro dépendance |
 | **Les extras pip contrôlent les dépendances** | Installation modulaire selon les besoins |
-| **API publique via `__init__.py`** | Import simple : `from ias_workflow_engine import Job, WorkflowEngine` |
+| **API publique via `__init__.py`** | Import simple : `from pyworkflow_engine import Job, WorkflowEngine` |
 | **Tests core sans dépendances** | `pytest tests/unit/` → < 2s, zéro DB, zéro broker |
 
 ---
@@ -238,7 +238,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ias-workflow-engine"
+name = "pyworkflow-engine"
 version = "0.1.0"
 description = "Moteur d'orchestration de workflows Python pur — zero dépendance framework"
 readme = "README.md"
@@ -289,19 +289,19 @@ docs = [
 
 # Tout installer
 all = [
-    "ias-workflow-engine[django,fastapi,celery,sqlalchemy,streamlit,cli]",
+    "pyworkflow-engine[django,fastapi,celery,sqlalchemy,streamlit,cli]",
 ]
 
 [project.scripts]
-workflow = "ias_workflow_engine.cli.main:cli"
+workflow = "pyworkflow_engine.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/ias/ias-workflow-engine"
-Documentation = "https://ias.github.io/ias-workflow-engine"
-Repository = "https://github.com/ias/ias-workflow-engine"
+Homepage = "https://github.com/ias/pyworkflow-engine"
+Documentation = "https://ias.github.io/pyworkflow-engine"
+Repository = "https://github.com/ias/pyworkflow-engine"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ias_workflow_engine"]
+packages = ["src/pyworkflow_engine"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -562,7 +562,7 @@ class InMemoryPersistence(BasePersistence):
 ```python
 """
 Adapter Django — rebranche l'ancien système sur le nouveau core.
-Usage: pip install ias-workflow-engine[django]
+Usage: pip install pyworkflow-engine[django]
 """
 from __future__ import annotations
 from typing import Any, TYPE_CHECKING
@@ -608,7 +608,7 @@ class DjangoORMPersistence(BasePersistence):
 
 ```python
 # Exemple : dans un notebook Jupyter
-from ias_workflow_engine import Job, Step, StepType, WorkflowEngine
+from pyworkflow_engine import Job, Step, StepType, WorkflowEngine
 
 def fetch_data(source: str = "", **kw):
     return {"records": [1, 2, 3], "count": 3}
@@ -636,7 +636,7 @@ print(result.result)   # {'fetch': {...}, 'transform': {...}, 'load': {...}}
 
 #### Migration Progressive de l'Existant
 
-1. **Installer le nouveau package** : `pip install ias-workflow-engine[django]`
+1. **Installer le nouveau package** : `pip install pyworkflow-engine[django]`
 2. **Créer un adapter bridge** : Wrapper qui convertit les modèles Django existants
 3. **Tests parallèles** : Valider que les deux systèmes produisent les mêmes résultats
 4. **Migration graduelle** : Feature flag pour basculer progressivement
@@ -650,7 +650,7 @@ print(result.result)   # {'fetch': {...}, 'transform': {...}, 'load': {...}}
 
 | Bénéfice | Impact |
 |---|---|
-| **Zero setup** | `pip install ias-workflow-engine` → ready to go |
+| **Zero setup** | `pip install pyworkflow-engine` → ready to go |
 | **Testabilité** | Tests du core < 2s, pas de DB, pas de Docker |
 | **Prototypage rapide** | Notebook → Production sans changement de code |
 | **Type safety** | Dataclasses + mypy = erreurs caught à l'écriture |
