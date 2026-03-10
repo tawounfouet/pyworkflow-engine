@@ -110,7 +110,7 @@ python -m pytest
 - [ ] Setup CI/CD (GitHub Actions)
 - [ ] Configuration développement (ruff, mypy, pre-commit)
 
-**Jour 3-5 : Modèles Core**
+**Jour 3-5 : Modèles Core** 🚀 **NEXT UP**
 - [ ] `core/models/enums.py` : TriggerType, StepType, ExecutorType, RunStatus
 - [ ] `core/models/design_time.py` : Job, Step, SubJob (dataclasses)
 - [ ] `core/models/runtime.py` : JobRun, StepRun, StepLog (dataclasses)
