@@ -170,8 +170,11 @@ class Job:
         if not self.name:
             raise ValueError("Job name cannot be empty")
 
-        if not self.name.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Job name must be alphanumeric (with _ and - allowed)")
+        # Validation basique - accepter les caractères alphanumériques, espaces et quelques signes
+        if not self.name.replace("_", "").replace("-", "").replace(" ", "").isalnum():
+            raise ValueError(
+                "Job name must contain only alphanumeric characters, spaces, _ and -"
+            )
 
         # Vérifier l'unicité des noms de steps
         step_names = [step.name for step in self.steps]

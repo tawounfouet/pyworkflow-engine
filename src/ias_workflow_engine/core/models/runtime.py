@@ -235,6 +235,7 @@ class JobRun:
     """
 
     job_run_id: str = field(default_factory=generate_id)
+    job: Optional[Job] = None  # Job definition for this run
     job_name: str = ""
     job_version: str = "1.0.0"
     status: RunStatus = RunStatus.PENDING

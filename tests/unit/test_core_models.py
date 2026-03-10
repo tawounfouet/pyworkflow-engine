@@ -331,7 +331,9 @@ class TestJob:
 
     def test_job_validation_invalid_name(self):
         """Test validation : nom invalide."""
-        with pytest.raises(ValueError, match="Job name must be alphanumeric"):
+        with pytest.raises(
+            ValueError, match="Job name must contain only alphanumeric characters"
+        ):
             Job(name="invalid name with spaces!")
 
     def test_job_valid_names(self):

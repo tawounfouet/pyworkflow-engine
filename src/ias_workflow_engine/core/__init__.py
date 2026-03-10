@@ -23,12 +23,24 @@ from __future__ import annotations
 # Réexporter tous les modèles
 from .models import *
 
-# Note: L'engine sera importé quand il sera implémenté
-# from .engine import WorkflowEngine
+# Importer les composants du moteur
+from .engine import WorkflowEngine
+from .dag import DAGResolver
+from .context import WorkflowContext
+from .exceptions import *
 
 __all__ = [
     # Réexporter tout depuis models
     *models.__all__,
-    # Engine sera ajouté plus tard
-    # "WorkflowEngine",
+    # Composants du moteur
+    "WorkflowEngine",
+    "DAGResolver",
+    "WorkflowContext",
+    # Exceptions principales
+    "WorkflowError",
+    "WorkflowSuspended",
+    "WorkflowFailed",
+    "StepExecutionError",
+    "DAGValidationError",
+    "ContextError",
 ]

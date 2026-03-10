@@ -36,6 +36,34 @@
 - ✅ Optional structlog integration
 - ✅ Comprehensive documentation
 
+### Core Models (Completed - March 2026)
+
+**Status**: Production-ready ✅  
+**Coverage**: 99-100% test coverage, 60 tests passed  
+**Dependencies**: Zero core dependencies (stdlib only: dataclasses, enum, datetime, uuid)
+
+**Architecture**:
+- **Enums**: TriggerType, StepType, ExecutorType, RunStatus, Priority + helper functions
+- **Design-time**: Job, Step, SubJob (immutable frozen dataclasses)
+- **Runtime**: JobRun, StepRun, StepLog (mutable execution tracking)
+- **Utilities**: ID generation, timestamp helpers, status checking
+
+**Files Created**:
+- `src/ias_workflow_engine/core/models/` - Complete models package
+- `src/ias_workflow_engine/core/__init__.py` - Clean public API
+- `tests/unit/test_core_models.py` - Comprehensive test suite (60 tests)
+- `scripts/validate.py` - Integration validation script
+
+**Features Delivered**:
+- ✅ Complete enum system with helper functions
+- ✅ Immutable workflow definitions (Job, Step, SubJob)
+- ✅ Mutable execution tracking (JobRun, StepRun, StepLog)
+- ✅ DAG analysis: cycle detection, entry/exit points
+- ✅ Comprehensive validation with helpful error messages
+- ✅ Status management lifecycle
+- ✅ Type-safe APIs with full documentation
+- ✅ Zero external dependencies
+
 ---
 
 ## 🎯 Vue d'Ensemble
@@ -104,22 +132,22 @@ python -m pytest
 
 #### Semaine 1 : Structure & Modèles
 
-**Jour 1-2 : Setup Projet**
-- [ ] Initialiser le repository `ias-workflow-engine`
-- [ ] Configurer `pyproject.toml` avec dependencies = []
-- [ ] Setup CI/CD (GitHub Actions)
-- [ ] Configuration développement (ruff, mypy, pre-commit)
+**Jour 1-2 : Setup Projet** ✅ **DONE**
+- [x] Initialiser le repository `ias-workflow-engine`
+- [x] Configurer `pyproject.toml` avec dependencies = []
+- [x] Setup CI/CD (GitHub Actions)
+- [x] Configuration développement (ruff, mypy, pre-commit)
 
-**Jour 3-5 : Modèles Core** 🚀 **NEXT UP**
-- [ ] `core/models/enums.py` : TriggerType, StepType, ExecutorType, RunStatus
-- [ ] `core/models/design_time.py` : Job, Step, SubJob (dataclasses)
-- [ ] `core/models/runtime.py` : JobRun, StepRun, StepLog (dataclasses)
-- [ ] `core/models/__init__.py` : API publique
-- [ ] Tests unitaires pour tous les modèles
+**Jour 3-5 : Modèles Core** ✅ **DONE**
+- [x] `core/models/enums.py` : TriggerType, StepType, ExecutorType, RunStatus
+- [x] `core/models/design_time.py` : Job, Step, SubJob (dataclasses)
+- [x] `core/models/runtime.py` : JobRun, StepRun, StepLog (dataclasses)
+- [x] `core/models/__init__.py` : API publique
+- [x] Tests unitaires pour tous les modèles
 
 #### Semaine 2 : Moteur d'Exécution
 
-**Jour 1-3 : WorkflowEngine**
+**Jour 1-3 : WorkflowEngine** 🚀 **NEXT UP**
 - [ ] `core/engine.py` : WorkflowEngine principal
 - [ ] `core/dag.py` : DAGResolver (résolution graphe de dépendances)
 - [ ] `core/context.py` : WorkflowContext (passage I/O)
