@@ -10,7 +10,7 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [
-    { name = "IAS", email = "dev@ias.com" },
+    { name = "Thomas AWOUNFOUET", email = "dev@awounfouet.com" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -69,7 +69,7 @@ workflow = "pyworkflow_engine.cli.main:cli"
 [project.urls]
 Homepage = "https://github.com/awf/pyworkflow-engine"
 Documentation = "https://awf.github.io/pyworkflow-engine"
-Repository = "https://github.com/awf/pyworkflow-engine"
+Repository = "https://github.com/ias/ias-workflow-engine"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyworkflow_engine"]
