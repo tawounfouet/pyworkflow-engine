@@ -1,0 +1,131 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ias-workflow-engine"
+version = "0.1.0"
+description = "Moteur d'orchestration de workflows Python pur — zero dépendance framework"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+    { name = "IAS", email = "dev@ias.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+
+# ⚠️ ZERO dépendance obligatoire pour le core
+dependencies = []
+
+[project.optional-dependencies]
+# Adapters — chaque intégration est opt-in
+django = ["django>=4.2", "djangorestframework>=3.14"]
+fastapi = ["fastapi>=0.100", "uvicorn>=0.20"]
+celery = ["celery>=5.3"]
+sqlalchemy = ["sqlalchemy>=2.0"]
+streamlit = ["streamlit>=1.30"]
+structlog = ["structlog>=24.0"]
+
+# CLI
+cli = ["click>=8.0", "rich>=13.0"]
+
+# Dev / Tests
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.0",
+    "uv>=0.1.0",
+]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.24",
+]
+
+# Tout installer
+all = [
+    "ias-workflow-engine[django,fastapi,celery,sqlalchemy,streamlit,structlog,cli]",
+]
+
+[project.scripts]
+workflow = "ias_workflow_engine.cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/ias/ias-workflow-engine"
+Documentation = "https://ias.github.io/ias-workflow-engine"
+Repository = "https://github.com/ias/ias-workflow-engine"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ias_workflow_engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+    "--strict-config", 
+    "--cov=ias_workflow_engine",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "TCH", "C4", "PIE"]
+ignore = ["E501"]  # Line too long (handled by formatter)
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = ["S101"]  # Allow assert statements in tests
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+show_error_codes = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[dependency-groups]
+dev = [
+    "structlog>=25.5.0",
+]

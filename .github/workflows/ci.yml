@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        extras: 
+          - '' # Core seulement
+          - 'django'
+          - 'fastapi'
+          - 'celery'
+          - 'dev'
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        uv sync --extra dev
+        if [ "${{ matrix.extras }}" != "" ]; then
+          uv sync --extra "${{ matrix.extras }}"
+        fi
+      shell: bash
+    
+    - name: Lint with ruff
+      run: |
+        uv run ruff check .
+        uv run ruff format --check .
+    
+    - name: Type check with mypy  
+      run: uv run mypy src/
+    
+    - name: Test with pytest
+      run: |
+        # Test core seulement (zero dépendance)
+        uv run pytest tests/unit/ -v --cov=ias_workflow_engine.core --cov-fail-under=90
+        
+        # Test executors et persistence
+        uv run pytest tests/executors/ tests/persistence/ -v --cov-fail-under=85
+        
+        # Test adapters si extras installés
+        if [ "${{ matrix.extras }}" == "django" ]; then
+          uv run pytest tests/adapters/test_django_adapter.py -v
+        elif [ "${{ matrix.extras }}" == "fastapi" ]; then
+          uv run pytest tests/adapters/test_fastapi_adapter.py -v
+        elif [ "${{ matrix.extras }}" == "celery" ]; then
+          uv run pytest tests/adapters/test_celery_adapter.py -v
+        fi
+      shell: bash
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  # Job séparé pour tester l'installation sans dépendances
+  test-zero-deps:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+    
+    - name: Set up Python 3.11
+      run: uv python install 3.11
+    
+    - name: Build package
+      run: uv build
+    
+    - name: Test installation sans dépendances
+      run: |
+        # Créer un environnement vierge
+        uv venv test-env
+        source test-env/bin/activate
+        
+        # Installer le package
+        uv pip install dist/*.whl
+        
+        # Vérifier zero dépendance
+        deps=$(uv pip list | grep -v "ias-workflow-engine" | wc -l)
+        if [ $deps -gt 1 ]; then
+          echo "❌ Le package a des dépendances non attendues!"
+          uv pip list
+          exit 1
+        fi
+        
+        # Test d'import
+        python -c "from ias_workflow_engine import Job, Step, WorkflowEngine; print('✅ Import OK')"
+        
+        echo "✅ Package installable sans dépendances !"
