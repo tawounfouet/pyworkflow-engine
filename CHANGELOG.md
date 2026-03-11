@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-03-11
+
+### Added
+
+#### 📝 **Logging Utilities (from database_logger.py analysis)**
+- **`logged_operation`**: Context manager for automatic operation tracing (start, duration, success/failure)
+- **`StepLogBridge`**: `logging.Handler` bridging stdlib logging → `StepRun.add_log()` (dual-logging connected)
+- **`LoggingConfigBuilder`**: Fluent builder API for constructing `LoggingConfig`
+- **`SnowflakeLogHandler`** adapter: `logging.Handler` for Snowflake persistence with batching (`pip install pyworkflow-engine[snowflake]`)
+- **ANSI color support** in `StructuredFormatter` with auto-detection (TTY) or explicit `colorize=True/False`
+- **Example scripts**: `logging_basics.py` (6 examples) and `logging_advanced.py` (9 examples)
+- **32 new tests** in `test_logging_utils.py` (logged_operation, StepLogBridge, LoggingConfigBuilder)
+
+### Changed
+- **Log format**: Pipe-separated columns — `2026-03-11 20:42:17 | INFO | core.engine | message`
+- **Date format**: Simplified to `YYYY-MM-DD HH:MM:SS` (was ISO 8601 with timezone)
+- **`engine.py`**: Now uses `get_logger("core.engine")` with module-level logger (was inline `logging.getLogger(__name__)`)
+- **`basic_etl.py`**: Integrated logging system (replaced `print()` with `logger` + `logged_operation`)
+- **`logging/__init__.py`**: Exports updated to 7 items (`shutdown_logging`, `logged_operation`, `StepLogBridge`, `LoggingConfigBuilder`)
+- **Documentation**: Updated `logging.md` and `logging-implementation-summary.md` with new format, utilities, and examples
+
+### Tests
+- **111 tests passing** across logging (52), logging utils (32), and engine (27) — 0 regressions
+
+---
+
 ## [0.2.0] - 2026-03-10
 
 ### Added
