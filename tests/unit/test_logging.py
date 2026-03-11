@@ -251,7 +251,7 @@ class TestStructuredFormatter:
             exc_info=None,
         )
         output = formatter.format(record)
-        assert "[INFO    ]" in output
+        assert "| INFO |" in output
         assert "core.engine" in output
         assert "Workflow started" in output
 

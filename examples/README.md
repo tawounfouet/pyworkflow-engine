@@ -82,6 +82,29 @@ Demonstrates automatic retry functionality for handling transient failures:
 
 **Architecture:** Pure Python implementation with zero external dependencies, using only stdlib modules (threading, multiprocessing, asyncio, concurrent.futures).
 
+### 7. Logging Basics (`logging_basics.py`)
+Demonstrates the core logging system:
+- **Zero Config**: NullHandler silence (PEP 282)
+- **Structured Console**: Human-readable format with ANSI colors
+- **JSON Console**: Machine-parseable output for log collectors
+- **Extra Fields**: Global fields injected in every log entry
+- **File Rotation**: Console + JSON file with automatic rotation
+- **Level Filtering**: Only logs >= configured level are emitted
+
+**Run:** `uv run python examples/logging_basics.py`
+
+### 8. Logging Advanced (`logging_advanced.py`)
+Advanced logging patterns and utilities:
+- **LoggingConfigBuilder**: Fluent API for building logging configuration
+- **logged_operation**: Context manager for automatic duration/success/failure tracing
+- **StepLogBridge**: Bridge between stdlib logging and StepRun.logs (dual-logging)
+- **SQLiteLogHandler**: Persistent logs in SQLite with query API
+- **Queue Handler**: Async non-blocking logging via QueueHandler
+- **Production Pattern**: Queue + SQLite combined for production use
+- **Nested Operations**: Pipeline tracing with nested logged_operation
+
+**Run:** `uv run python examples/logging_advanced.py`
+
 ## Key Features Demonstrated
 
 ### ✅ Working Features
@@ -137,6 +160,8 @@ uv run python examples/parallel_processing.py
 uv run python examples/human_approval.py
 uv run python examples/simple_retry_test.py
 uv run python examples/timeout_and_executors.py
+uv run python examples/logging_basics.py
+uv run python examples/logging_advanced.py
 
 # Run tests to verify engine stability
 uv run pytest -v --cov=src --cov-report=term-missing

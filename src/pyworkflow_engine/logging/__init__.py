@@ -25,11 +25,16 @@ Usage avancé avec configuration :
     ))
 """
 
-from .logger import get_logger, configure_logging
+from .logger import get_logger, configure_logging, shutdown_logging
 from .config import LoggingConfig
+from .utils import logged_operation, StepLogBridge, LoggingConfigBuilder
 
 __all__ = [
     "get_logger",
     "configure_logging",
+    "shutdown_logging",
     "LoggingConfig",
+    "logged_operation",
+    "StepLogBridge",
+    "LoggingConfigBuilder",
 ]

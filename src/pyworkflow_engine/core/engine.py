@@ -26,6 +26,10 @@ from .exceptions import (
     DAGValidationError,
     ContextError,
 )
+from ..logging import get_logger
+
+# Module-level logger — dans le namespace pyworkflow_engine.core.engine
+_logger = get_logger("core.engine")
 
 # Constants
 NO_PERSISTENCE_ERROR = "No persistence backend configured"
@@ -669,11 +673,10 @@ class WorkflowEngine:
             job_run: JobRun en erreur.
             error: Exception capturée.
         """
-        # Intégrer avec le système de logging
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.error(f"WORKFLOW ERROR [{job_run.job_run_id}] {job.name}: {error}")
+        _logger.error(
+            "WORKFLOW ERROR [%s] %s: %s",
+            job_run.job_run_id, job.name, error,
+        )
 
     def _log_step_error(self, step_run: StepRun, error: Exception) -> None:
         """Log une erreur au niveau step.
@@ -682,11 +685,7 @@ class WorkflowEngine:
             step_run: StepRun en erreur.
             error: Exception capturée.
         """
-        # Intégrer avec le système de logging
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.error(f"STEP ERROR [{step_run.step_name}]: {error}")
+        _logger.error("STEP ERROR [%s]: %s", step_run.step_name, error)
 
     def _log_condition_error(self, step: Step, error: Exception) -> None:
         """Log une erreur de condition.
@@ -695,11 +694,7 @@ class WorkflowEngine:
             step: Step avec la condition en erreur.
             error: Exception capturée.
         """
-        # Intégrer avec le système de logging
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.error(f"CONDITION ERROR [{step.name}]: {error}")
+        _logger.error("CONDITION ERROR [%s]: %s", step.name, error)
 
     def validate_job(self, job: Job) -> List[str]:
         """Valide un job sans l'exécuter.
