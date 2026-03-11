@@ -255,6 +255,11 @@ class JobRun:
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
+    @property
+    def id(self) -> str:
+        """Alias for job_run_id for backward compatibility with persistence backends."""
+        return self.job_run_id
+
     def start_execution(self) -> None:
         """Marque le début de l'exécution du workflow."""
         self.status = RunStatus.RUNNING

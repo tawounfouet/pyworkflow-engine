@@ -86,130 +86,232 @@ class JSONFilePersistence(BasePersistence):
         return {
             "name": job.name,
             "description": job.description,
-            "parameters": job.parameters,
+            "input_schema": job.input_schema,
+            "output_schema": job.output_schema,
             "steps": [
                 {
                     "name": step.name,
-                    "type": step.type,
-                    "function": step.function,
-                    "parameters": step.parameters,
-                    "depends_on": list(step.depends_on),
-                    "timeout": step.timeout,
+                    "step_type": step.step_type.value,
+                    "callable": str(step.callable) if step.callable else None,
+                    "config": step.config,
+                    "dependencies": step.dependencies,
+                    "executor_type": step.executor_type.value,
+                    "timeout": step.timeout.total_seconds() if step.timeout else None,
+                    "retry_count": step.retry_count,
+                    "retry_delay": step.retry_delay.total_seconds(),
+                    "metadata": step.metadata,
                 }
                 for step in job.steps
             ],
+            "sub_jobs": [
+                {
+                    "job_name": sub_job.job_name,
+                    "input_mapping": sub_job.input_mapping,
+                    "output_mapping": sub_job.output_mapping,
+                    "inherit_context": sub_job.inherit_context,
+                }
+                for sub_job in job.sub_jobs
+            ],
+            "triggers": [trigger.value for trigger in job.triggers],
+            "default_executor": job.default_executor.value,
+            "priority": job.priority.value,
+            "timeout": job.timeout.total_seconds() if job.timeout else None,
+            "max_concurrent_steps": job.max_concurrent_steps,
+            "tags": job.tags,
             "metadata": job.metadata,
+            "version": job.version,
+            "enabled": job.enabled,
         }
 
     def _deserialize_job(self, data: Dict[str, Any]) -> Job:
         """Deserialize a job from JSON format."""
-        from ..core.models import Step
+        from ..core.models import Step, SubJob
+        from ..core.models.enums import StepType, ExecutorType, TriggerType, Priority
+        from datetime import timedelta
 
         steps = []
         for step_data in data["steps"]:
             step = Step(
                 name=step_data["name"],
-                type=step_data["type"],
-                function=step_data["function"],
-                parameters=step_data.get("parameters", {}),
-                depends_on=set(step_data.get("depends_on", [])),
-                timeout=step_data.get("timeout"),
+                step_type=StepType(step_data["step_type"]),
+                callable=None,  # Cannot restore callable from JSON
+                config=step_data.get("config", {}),
+                dependencies=step_data.get("dependencies", []),
+                executor_type=ExecutorType(step_data.get("executor_type", "local")),
+                timeout=(
+                    timedelta(seconds=step_data["timeout"])
+                    if step_data.get("timeout")
+                    else None
+                ),
+                retry_count=step_data.get("retry_count", 0),
+                retry_delay=timedelta(seconds=step_data.get("retry_delay", 1)),
+                metadata=step_data.get("metadata", {}),
             )
             steps.append(step)
+
+        sub_jobs = []
+        for sub_job_data in data.get("sub_jobs", []):
+            sub_job = SubJob(
+                job_name=sub_job_data["job_name"],
+                input_mapping=sub_job_data.get("input_mapping", {}),
+                output_mapping=sub_job_data.get("output_mapping", {}),
+                inherit_context=sub_job_data.get("inherit_context", True),
+            )
+            sub_jobs.append(sub_job)
 
         return Job(
             name=data["name"],
             description=data.get("description", ""),
-            parameters=data.get("parameters", {}),
             steps=steps,
+            sub_jobs=sub_jobs,
+            triggers=[TriggerType(t) for t in data.get("triggers", ["manual"])],
+            default_executor=ExecutorType(data.get("default_executor", "local")),
+            priority=Priority(data.get("priority", "normal")),
+            timeout=timedelta(seconds=data["timeout"]) if data.get("timeout") else None,
+            max_concurrent_steps=data.get("max_concurrent_steps", 10),
+            input_schema=data.get("input_schema"),
+            output_schema=data.get("output_schema"),
+            tags=data.get("tags", []),
             metadata=data.get("metadata", {}),
+            version=data.get("version", "1.0.0"),
+            enabled=data.get("enabled", True),
         )
 
     def _serialize_job_run(self, job_run: JobRun) -> Dict[str, Any]:
         """Serialize a job run to JSON-compatible format."""
         return {
             "id": job_run.id,
+            "job_run_id": job_run.job_run_id,
             "job_name": job_run.job_name,
+            "job_version": job_run.job_version,
             "status": job_run.status.value,
-            "created_at": job_run.created_at.isoformat(),
-            "started_at": (
-                job_run.started_at.isoformat() if job_run.started_at else None
+            "input_data": job_run.input_data,
+            "output_data": job_run.output_data,
+            "context": job_run.context,
+            "error": job_run.error,
+            "start_time": (
+                job_run.start_time.isoformat() if job_run.start_time else None
             ),
-            "completed_at": (
-                job_run.completed_at.isoformat() if job_run.completed_at else None
-            ),
-            "parameters": job_run.parameters,
+            "end_time": job_run.end_time.isoformat() if job_run.end_time else None,
+            "duration_ms": job_run.duration_ms,
+            "triggered_by": job_run.triggered_by,
+            "trigger_data": job_run.trigger_data,
+            "priority": job_run.priority,
+            "executor_config": job_run.executor_config,
             "metadata": job_run.metadata,
+            "created_at": job_run.created_at.isoformat(),
+            "updated_at": job_run.updated_at.isoformat(),
             "step_runs": [
-                {
-                    "id": step_run.id,
-                    "job_run_id": step_run.job_run_id,
-                    "step_name": step_run.step_name,
-                    "status": step_run.status.value,
-                    "created_at": step_run.created_at.isoformat(),
-                    "started_at": (
-                        step_run.started_at.isoformat() if step_run.started_at else None
-                    ),
-                    "completed_at": (
-                        step_run.completed_at.isoformat()
-                        if step_run.completed_at
-                        else None
-                    ),
-                    "input_data": step_run.input_data,
-                    "output_data": step_run.output_data,
-                    "error_message": step_run.error_message,
-                    "metadata": step_run.metadata,
-                }
-                for step_run in job_run.step_runs
+                self._serialize_step_run(step_run) for step_run in job_run.step_runs
             ],
+        }
+
+    def _serialize_step_run(self, step_run: StepRun) -> Dict[str, Any]:
+        """Serialize a step run to JSON-compatible format."""
+        return {
+            "step_run_id": step_run.step_run_id,
+            "job_run_id": step_run.job_run_id,
+            "step_name": step_run.step_name,
+            "status": step_run.status.value,
+            "executor_type": step_run.executor_type.value,
+            "input_data": step_run.input_data,
+            "output_data": step_run.output_data,
+            "error": step_run.error,
+            "start_time": (
+                step_run.start_time.isoformat() if step_run.start_time else None
+            ),
+            "end_time": step_run.end_time.isoformat() if step_run.end_time else None,
+            "duration_ms": step_run.duration_ms,
+            "retry_count": step_run.retry_count,
+            "executor_info": step_run.executor_info,
+            "logs": [
+                {
+                    "timestamp": log.timestamp.isoformat(),
+                    "level": log.level,
+                    "message": log.message,
+                    "data": log.data,
+                    "source": log.source,
+                }
+                for log in step_run.logs
+            ],
+            "metadata": step_run.metadata,
         }
 
     def _deserialize_job_run(self, data: Dict[str, Any]) -> JobRun:
         """Deserialize a job run from JSON format."""
-        from ..core.models import JobRunStatus, StepRunStatus
+        from ..core.models import JobRun, StepRun, StepLog
+        from ..core.models.enums import RunStatus, ExecutorType
+        from datetime import datetime
 
+        # Deserialize step runs
         step_runs = []
         for step_data in data.get("step_runs", []):
+            logs = []
+            for log_data in step_data.get("logs", []):
+                log = StepLog(
+                    timestamp=datetime.fromisoformat(log_data["timestamp"]),
+                    level=log_data["level"],
+                    message=log_data["message"],
+                    data=log_data.get("data", {}),
+                    source=log_data.get("source", "step"),
+                )
+                logs.append(log)
+
             step_run = StepRun(
-                id=step_data["id"],
-                job_run_id=step_data["job_run_id"],
+                step_run_id=step_data["step_run_id"],
                 step_name=step_data["step_name"],
-                status=StepRunStatus(step_data["status"]),
-                created_at=datetime.fromisoformat(step_data["created_at"]),
-                started_at=(
-                    datetime.fromisoformat(step_data["started_at"])
-                    if step_data["started_at"]
+                job_run_id=step_data["job_run_id"],
+                status=RunStatus(step_data["status"]),
+                executor_type=ExecutorType(step_data.get("executor_type", "local")),
+                input_data=step_data.get("input_data", {}),
+                output_data=step_data.get("output_data", {}),
+                error=step_data.get("error"),
+                start_time=(
+                    datetime.fromisoformat(step_data["start_time"])
+                    if step_data.get("start_time")
                     else None
                 ),
-                completed_at=(
-                    datetime.fromisoformat(step_data["completed_at"])
-                    if step_data["completed_at"]
+                end_time=(
+                    datetime.fromisoformat(step_data["end_time"])
+                    if step_data.get("end_time")
                     else None
                 ),
-                input_data=step_data.get("input_data"),
-                output_data=step_data.get("output_data"),
-                error_message=step_data.get("error_message"),
+                duration_ms=step_data.get("duration_ms"),
+                retry_count=step_data.get("retry_count", 0),
+                executor_info=step_data.get("executor_info", {}),
+                logs=logs,
                 metadata=step_data.get("metadata", {}),
             )
             step_runs.append(step_run)
 
+        # Deserialize job run
         return JobRun(
-            id=data["id"],
+            job_run_id=data["job_run_id"],
             job_name=data["job_name"],
-            status=JobRunStatus(data["status"]),
-            created_at=datetime.fromisoformat(data["created_at"]),
-            started_at=(
-                datetime.fromisoformat(data["started_at"])
-                if data["started_at"]
+            job_version=data.get("job_version", "1.0.0"),
+            status=RunStatus(data["status"]),
+            input_data=data.get("input_data", {}),
+            output_data=data.get("output_data", {}),
+            context=data.get("context", {}),
+            error=data.get("error"),
+            start_time=(
+                datetime.fromisoformat(data["start_time"])
+                if data.get("start_time")
                 else None
             ),
-            completed_at=(
-                datetime.fromisoformat(data["completed_at"])
-                if data["completed_at"]
+            end_time=(
+                datetime.fromisoformat(data["end_time"])
+                if data.get("end_time")
                 else None
             ),
-            parameters=data.get("parameters", {}),
+            duration_ms=data.get("duration_ms"),
+            triggered_by=data.get("triggered_by", "manual"),
+            trigger_data=data.get("trigger_data", {}),
+            priority=data.get("priority", 5),
+            executor_config=data.get("executor_config", {}),
             metadata=data.get("metadata", {}),
+            created_at=datetime.fromisoformat(data["created_at"]),
+            updated_at=datetime.fromisoformat(data["updated_at"]),
             step_runs=step_runs,
         )
 
