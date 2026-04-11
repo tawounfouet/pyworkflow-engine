@@ -13,9 +13,12 @@
 #   ./scripts/bash/rename_persistence_to_storage.sh
 #
 # Prérequis :
-#   - Être à la racine du projet (ou ajuster PROJECT_ROOT ci-dessous)
+#   - macOS bash 3.2+ ou zsh compatible
 #   - Avoir git disponible dans le PATH
 #   - macOS : utilise sed -i '' (BSD sed). Sur Linux, remplacer par sed -i
+#
+# Note : ce script utilise bash mais s'exécute aussi via zsh grâce à l'absence
+#        de mapfile (bash 4+) — remplacé par while+read compatibles bash 3.2.
 # =============================================================================
 set -euo pipefail
 
@@ -131,7 +134,11 @@ grep -rni "persistence" \
 # ---------------------------------------------------------------------------
 log_step "Étape 1b : Fichiers et dossiers à renommer"
 
-mapfile -t FILES_TO_RENAME < <(
+# Compatible bash 3.2 / macOS (pas de mapfile)
+FILES_TO_RENAME=()
+while IFS= read -r line; do
+    FILES_TO_RENAME+=("${line}")
+done < <(
     find . -type f -name "*persistence*" \
         -not -path "./.git/*" \
         -not -path "./.venv/*" \
@@ -141,7 +148,10 @@ mapfile -t FILES_TO_RENAME < <(
     | sort
 )
 
-mapfile -t DIRS_TO_RENAME < <(
+DIRS_TO_RENAME=()
+while IFS= read -r line; do
+    DIRS_TO_RENAME+=("${line}")
+done < <(
     find . -type d -name "*persistence*" \
         -not -path "./.git/*" \
         -not -path "./.venv/*" \
@@ -185,6 +195,8 @@ CONTENT_FILES=$(
     -not -path "./htmlcov/*" \
     -not -path "./.mypy_cache/*" \
     -not -path "./.ruff_cache/*" \
+    -not -path "./docs/changelog/*" \
+    -not -name "CHANGELOG.md" \
     -not -name "$(basename "$0")" \
     2>/dev/null
 )
