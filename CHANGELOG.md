@@ -5,11 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — ADR-004 en cours
+
+### Planned (prochaine itération)
+
+- **Imports absolus** — migration de tous les imports relatifs (`from .module import …`) vers les imports absolus (`from pyworkflow_engine.module import …`) dans l'ensemble de `src/pyworkflow_engine/` · règle ruff `TID252`
+- **Module `config/`** — introduction de `WorkflowConfig`, `EngineConfig`, `ExecutorConfig`, `LoggingConfig` (dataclasses `frozen=True`) · point d'entrée unique de configuration
+- **`WorkflowEngine(config=…)`** — nouveau paramètre `config: WorkflowConfig | None` avec rétrocompatibilité des paramètres existants (`parallel`, `max_workers`)
+
+> Voir [ADR-004](docs/changelog/2026-04-11-import-style-and-config-module.md) pour le détail des décisions.
+
+---
+
+## [0.4.0] - 2026-04-11
+
+### Breaking Changes
+
+- **`core/` supprimé** (suite v0.3.0) — rupture nette, aucun shim de compatibilité maintenu
+- **Nouveau point d'entrée public** : `from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, ManualTrigger, ScheduleTrigger, CronExpression`
+
+### Added
+
+#### 🎯 Triggers — `ManualTrigger`, `ScheduleTrigger`, `CronExpression`
+
+- **`triggers/base.py`** — `BaseTrigger` (ABC), `TriggerState` (enum : IDLE / RUNNING / STOPPED)
+- **`triggers/manual.py`** — `ManualTrigger` : déclenchement explicite par code, callbacks `on_run_complete` / `on_run_error`
+- **`triggers/schedule.py`** — `ScheduleTrigger` : déclenchement par expression cron via thread d'arrière-plan, `initial_context_factory`, `on_run_complete` / `on_run_error`, méthode `fire()` directe
+- **`triggers/schedule.py`** — `CronExpression` : parser cron stdlib (5 champs), `matches(dt)`, `next_occurrence(after)` — zéro dépendance externe
+- **`examples/triggers.py`** — 4 démos : ManualTrigger, CronExpression, ScheduleTrigger (thread), ScheduleTrigger (callback d'erreur)
+
+#### 🔀 ParallelRunner
+
+- **`engine/parallel_runner.py`** — `ParallelRunner(WorkflowRunner)` : exécution concurrente des steps sans dépendances mutuelles via `concurrent.futures.ThreadPoolExecutor`
+- `WorkflowEngine(parallel=True, max_workers=N)` active `ParallelRunner`
+- `DAGResolver.get_parallel_groups()` expose les groupes de steps parallélisables
+
+#### 📝 Documentation architecturale (ADR)
+
+- `docs/changelog/README.md` — index du journal des décisions
+- `docs/changelog/2026-04-10-naming-decision.md` — ADR-001 : nommage du package
+- `docs/changelog/2026-04-10-architecture-refactoring-proposal.md` — ADR-002 : God Object → couches modulaires
+- `docs/changelog/2026-04-10-architecture-critique-integration.md` — ADR-003 : intégration de l'analyse critique
+- `docs/changelog/2026-04-11-import-style-and-config-module.md` — ADR-004 : imports absolus + module `config/` *(décision prise, implémentation à venir)*
+- `docs/architecture.md`, `docs/architecture_critique.md`, `docs/architecture_critique_v2.md`
+- `docs/project_status.md`, `docs/guides/implementation-plan-v2.md`
+
+### Changed
+
+- `WorkflowEngine.__init__` : accepte désormais `parallel: bool` et `max_workers: int | None` pour router vers `ParallelRunner`
+- `run_with_persistence()` : checkpoints step-by-step (sauvegarde après chaque step individuel)
+
+### Tests
+
+- `tests/integration/test_parallel_runner.py` — nouveau
+- `tests/integration/test_persistence_roundtrip.py` — nouveau
+- `tests/unit/test_coverage_boost.py` — nouveau
+- **338 passed**, 15 skipped, 0 failed, 0 errors
+
+---
+
 ## [0.3.0] - 2026-04-10
 
 ### Breaking Changes
 
-- **`core/` supprimé** — les imports `from pyworkflow_engine.core import ...` ne fonctionnent plus. Utiliser l'API publique : `from pyworkflow_engine import ...`
+- **`core/` déprécié** — début du refactoring, les imports publics sont migrés vers la racine du package. Suppression effective en v0.4.0.
 - **`StepRun.timeout()` → `mark_timeout()`** — évite la collision avec le champ `Step.timeout`
 
 ### Added
