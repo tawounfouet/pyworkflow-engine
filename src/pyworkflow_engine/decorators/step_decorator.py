@@ -36,7 +36,11 @@ class StepSpec:
         retry_delay: Délai en secondes entre les tentatives.
         timeout: Timeout d'exécution en secondes (None = pas de timeout).
         executor_type: Nom de l'executor à utiliser (None = executor par défaut).
-        tags: Métadonnées arbitraires (labels, équipe, etc.).
+        tags: Labels arbitraires (paires clé/valeur de type string).
+        condition: Prédicat optionnel — ``condition(context_data: dict) -> bool``.
+            Si la condition retourne ``False``, le step est ignoré à l'exécution.
+        metadata: Métadonnées arbitraires (valeurs de tout type), transmises
+            telles quelles au champ ``Step.metadata``.
     """
 
     name: str
@@ -47,6 +51,10 @@ class StepSpec:
     timeout: float | None = None
     executor_type: str | None = None
     tags: dict[str, str] = field(default_factory=dict)
+    condition: Callable[[dict[str, Any]], bool] | None = field(
+        default=None, compare=False, hash=False
+    )
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def step(
@@ -59,6 +67,8 @@ def step(
     timeout: float | None = None,
     executor_type: str | None = None,
     tags: dict[str, str] | None = None,
+    condition: Callable[[dict[str, Any]], bool] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Callable:
     """Décorateur qui marque une fonction comme step de workflow.
 
@@ -74,7 +84,12 @@ def step(
         retry_delay: Délai entre les tentatives (secondes). Par défaut : 1.0.
         timeout: Timeout d'exécution (secondes). Par défaut : None.
         executor_type: Nom de l'executor personnalisé. Par défaut : None.
-        tags: Métadonnées arbitraires. Par défaut : {}.
+        tags: Labels arbitraires (paires clé/valeur de type string). Par défaut : {}.
+        condition: Prédicat optionnel ``(context_data: dict) -> bool``. Si la
+            condition retourne ``False``, le step est ignoré à l'exécution.
+            Par défaut : None (toujours exécuté).
+        metadata: Métadonnées arbitraires (valeurs de tout type). Transmises
+            telles quelles à ``Step.metadata``. Par défaut : {}.
 
     Returns:
         La fonction originale, inchangée fonctionnellement, avec ``__step_spec__``
@@ -121,6 +136,8 @@ def step(
             timeout=timeout,
             executor_type=executor_type,
             tags=dict(tags or {}),
+            condition=condition,
+            metadata=dict(metadata or {}),
         )
         return _attach_spec(fn, spec)
 

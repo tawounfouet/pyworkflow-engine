@@ -25,7 +25,7 @@ Architecture modulaire:
     - Adapters: Intégrations framework-spécifiques (Django, FastAPI, Celery, etc.)
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __author__ = "PyWorkflow Contributors"
 __email__ = "dev@pyworkflow.dev"
 

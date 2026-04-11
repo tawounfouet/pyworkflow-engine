@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyworkflow-engine"
-version = "0.4.0"
+version = "0.5.0"
 description = "PyWorkflow Engine - Library-first workflow orchestration with zero framework dependencies"
 readme = "README.md"
 license = { text = "MIT" }

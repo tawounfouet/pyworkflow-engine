@@ -4,53 +4,67 @@ Moteur d'orchestration de workflows Python pur — zero dépendance framework.
 
 ## Vision
 
-Transformer les workflows complexes en code Python simple et portable :
+Deux APIs cohabitent pour s'adapter à tous les styles :
+
+### API déclarative — `@step` / `@job` *(v0.5.0+, recommandée)*
+
+```python
+from pyworkflow_engine import step, job, WorkflowEngine
+
+@step(name="fetch", timeout=30.0)
+def fetch_data(source: str = "api") -> dict:
+    # Fonction pure — testable sans aucun mock
+    return {"records": [1, 2, 3], "source": source}
+
+@step(name="transform", dependencies=["fetch"])
+def transform(records: list | None = None) -> dict:
+    # `records` est injecté automatiquement depuis la sortie de "fetch"
+    return {"transformed": [r * 10 for r in (records or [])]}
+
+@job(name="ETL Pipeline")
+def etl_pipeline():
+    fetch_data()
+    transform()
+
+engine = WorkflowEngine()
+result = engine.run(etl_pipeline.build(), initial_context={"source": "db"})
+print(result.status)       # RunStatus.SUCCESS
+print(result.output_data)  # {"transformed": [10, 20, 30]}
+```
+
+> **Injection automatique** : paramètres résolus dans l'ordre — sorties des dépendances › contexte initial › valeur par défaut › `None`.
+> Les fonctions restent **testables unitairement** sans runner : `fetch_data(source="test")`.
+
+### API impérative — `Job` / `Step` *(toujours supportée, sans breaking change)*
 
 ```python
 from pyworkflow_engine import Job, Step, StepType, WorkflowEngine
 from pyworkflow_engine.config import WorkflowConfig, EngineConfig
 
 def fetch_data(context):
-    # Accès au contexte initial ou intermédiaire
     return {"records": [1, 2, 3], "count": 3}
 
 def transform(context):
-    # Récupération des données du step précédent
     records = context.get_step_output("fetch", {}).get("records", [])
     return {"transformed": [r * 10 for r in records]}
 
-# Définir le workflow
 etl = Job(
-    name="ETL Pipeline", 
+    name="ETL Pipeline",
     steps=[
-        Step(
-            name="fetch", 
-            step_type=StepType.FUNCTION, 
-            handler=fetch_data
-        ),
-        Step(
-            name="transform", 
-            step_type=StepType.FUNCTION, 
-            handler=transform, 
-            dependencies=["fetch"]
-        ),
-    ]
+        Step(name="fetch", step_type=StepType.FUNCTION, handler=fetch_data),
+        Step(name="transform", step_type=StepType.FUNCTION, handler=transform, dependencies=["fetch"]),
+    ],
 )
 
-# Configuration de l'exécution (Optionnelle)
 cfg = WorkflowConfig(engine=EngineConfig(parallel=True, max_workers=2))
-
-# Exécuter
 engine = WorkflowEngine(config=cfg)
 result = engine.run(etl, initial_context={"source": "api"})
-
-print(result.status)  # RunStatus.SUCCESS
-print(result.output_data)
 ```
 
 ## Caractéristiques
 
 - **🚀 Zero dépendance** : Le core fonctionne avec la stdlib uniquement.
+- **🎨 Double API** : Décorateurs `@step`/`@job` *(v0.5.0)* + API impérative `Job`/`Step` — cohabitation sans breaking change.
 - **🔧 Pluggable** : Executors, triggers, et persistence modulaires.
 - **🌐 Universal** : Fonctionne dans notebooks, scripts, Django, FastAPI, CLI.
 - **⚡ Performant** : Exécution optimisée, possibilité d'exécution concurrente (`ParallelRunner`).
@@ -73,17 +87,20 @@ pip install pyworkflow-engine[all]         # Tout installer
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│              pyworkflow-engine (pure Python)     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │  Models  │  │  Engine  │  │   Executors  │  │
-│  │(dataclass)  │  (DAG)   │  │  (pluggable) │  │
-│  └──────────┘  └──────────┘  └──────────────┘  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │ Triggers │  │ Context  │  │ Persistence  │  │
-│  │(pluggable)  │  (I/O)   │  │ (pluggable)  │  │
-│  └──────────┘  └──────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│              pyworkflow-engine (pure Python)      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │  Models  │  │  Engine  │  │   Executors  │   │
+│  │(dataclass)  │  (DAG)   │  │  (pluggable) │   │
+│  └──────────┘  └──────────┘  └──────────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │ Triggers │  │ Context  │  │ Persistence  │   │
+│  │(pluggable)  │  (I/O)   │  │ (pluggable)  │   │
+│  └──────────┘  └──────────┘  └──────────────┘   │
+│  ┌────────────────────────────────────────────┐  │
+│  │  Decorators — @step / @job  (v0.5.0)       │  │
+│  └────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────┘
         │               │               │
    ┌────▼────┐    ┌─────▼─────┐   ┌─────▼──────┐
    │ Django  │    │  FastAPI  │   │  Notebook  │
@@ -93,7 +110,7 @@ pip install pyworkflow-engine[all]         # Tout installer
 
 ## Status
 
-🚧 **En développement actif** - Version 0.4.0
+🚀 **Version 0.5.0** — API décorateurs `@step`/`@job` disponible.
 
 Cette librairie est née de la volonté d'extraire la logique métier d'orchestration d'anciennes applications monolithiques pour fournir un package Python pur et découplé.
 

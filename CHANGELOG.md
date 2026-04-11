@@ -5,17 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — ADR-004 / ADR-005 en cours
+## [Unreleased]
 
-### Planned (prochaine itération)
+_(aucun changement planifié pour l'instant)_
 
-- **Imports absolus** — migration de tous les imports relatifs (`from .module import …`) vers les imports absolus (`from pyworkflow_engine.module import …`) dans l'ensemble de `src/pyworkflow_engine/` · règle ruff `TID252`
-- **Module `config/`** — introduction de `WorkflowConfig`, `EngineConfig`, `ExecutorConfig`, `LoggingConfig` (dataclasses `frozen=True`) · point d'entrée unique de configuration
-- **`WorkflowEngine(config=…)`** — nouveau paramètre `config: WorkflowConfig | None` avec rétrocompatibilité des paramètres existants (`parallel`, `max_workers`)
-- **API décorateurs `@step` / `@job`** — API déclarative alternative pour définir les workflows · fonctions pures sans dépendance à `WorkflowContext` · injection automatique des paramètres · cohabitation avec l'API impérative existante
+---
 
-> Voir [ADR-004](docs/changelog/2026-04-11-import-style-and-config-module.md) pour les imports absolus et le module config.
-> Voir [ADR-005](docs/changelog/2026-04-11-decorator-api.md) pour l'API décorateurs.
+## [0.5.0] - 2026-04-11
+
+> Voir [ADR-005](docs/changelog/2026-04-11-decorator-api.md) pour le contexte architectural complet.
+
+### Added
+
+#### 🎨 API déclarative — `@step` / `@job` (ADR-005)
+
+- **`decorators/step_decorator.py`** — `@step` : décore une fonction Python comme step de workflow
+  - `StepSpec` (frozen dataclass) : `name`, `step_type`, `dependencies`, `retry_count`, `retry_delay`, `timeout`, `executor_type`, `tags`, `condition`, `metadata`
+  - Usage sans parenthèses (`@step`) et avec paramètres (`@step(name=..., timeout=...)`)
+  - La fonction décorée reste **appelable normalement** — aucun mock nécessaire dans les tests unitaires
+  - Métadonnées stockées dans `fn.__step_spec__`, fonction originale accessible via `fn.__wrapped_fn__`
+- **`decorators/job_decorator.py`** — `@job` : compose des fonctions `@step` en `Job`
+  - Retourne un `JobBuilder` — appelable comme la fonction originale + méthode `build()` → `Job`
+  - **Mode implicite** : `build()` inspecte le bytecode (`co_names` + `__globals__`) pour collecter automatiquement les steps référencés
+  - **Mode explicite** : `@job(steps=[fn1, fn2])` — robuste pour les steps importés dynamiquement
+  - Support closures via `co_freevars` + `__closure__` (steps définis en scope local / tests)
+  - `_make_context_adapter` : injection automatique des paramètres (dépendances > contexte global > défaut > `None`) sans `__wrapped__` pour ne pas tromper `WorkflowRunner`
+  - Mode legacy : `fn(context)` passthrough transparent pour la compatibilité avec l'API impérative
+- **`decorators/__init__.py`** — re-exports publics : `step`, `job`, `StepSpec`, `JobBuilder`
+- **`examples/decorator_api.py`** — 8 exemples end-to-end
+
+#### 🔢 Exports publics
+
+- `from pyworkflow_engine import step, job, StepSpec, JobBuilder` désormais disponibles
+
+### Tests
+
+- **`tests/unit/test_decorators.py`** — 67 tests unitaires (métadonnées, injection, mode legacy, closure edge-cases, condition/metadata)
+- **`tests/integration/test_decorator_workflow.py`** — 21 tests d'intégration (workflows end-to-end avec `WorkflowEngine`)
+- **540 passed**, 0 failed, 0 errors
+- Couverture `decorators/` : **96 %** (`job_decorator.py`) · **95 %** (`step_decorator.py`) · **100 %** (`__init__.py`)
+
+### Changed
+
+- `__version__` : `0.4.0` → `0.5.0`
 
 ---
 

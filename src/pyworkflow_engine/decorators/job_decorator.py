@@ -260,6 +260,8 @@ def _spec_to_step(fn: Callable, spec: StepSpec) -> Step:
 
     Crée un context-adapter autour de ``fn`` afin que ``WorkflowRunner``
     puisse l'appeler avec la signature standard ``handler(context)``.
+    Les champs ``condition`` et ``metadata`` de ``StepSpec`` sont transmis
+    tels quels à ``Step``.
     """
     timeout_td = timedelta(seconds=spec.timeout) if spec.timeout is not None else None
     retry_delay_td = timedelta(seconds=spec.retry_delay)
@@ -272,6 +274,8 @@ def _spec_to_step(fn: Callable, spec: StepSpec) -> Step:
         retry_count=spec.retry_count,
         retry_delay=retry_delay_td,
         timeout=timeout_td,
+        condition=spec.condition,
+        metadata=dict(spec.metadata),
     )
 
 
