@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from ..facade import WorkflowEngine
-    from ..models import Job, JobRun
+    from pyworkflow_engine.facade import WorkflowEngine
+    from pyworkflow_engine.models import Job, JobRun
 
 
 class TriggerState(Enum):

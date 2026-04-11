@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-from .config import LoggingConfig
+from pyworkflow_engine.logging.config import LoggingConfig
 
 
 @contextmanager
@@ -102,7 +102,7 @@ class StepLogBridge(logging.Handler):
         """Convertit un LogRecord stdlib en StepLog et l'ajoute au StepRun."""
         try:
             # Extraire les données extra du record
-            from .formatters import _STANDARD_LOG_RECORD_KEYS
+            from pyworkflow_engine.logging.formatters import _STANDARD_LOG_RECORD_KEYS
 
             data: dict[str, Any] = {}
             for key, value in record.__dict__.items():

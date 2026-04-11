@@ -22,6 +22,7 @@ YYYY-MM-DD-<slug>.md
 | [2026-04-10-architecture-critique-integration.md](./2026-04-10-architecture-critique-integration.md) | ADR-003 — Intégration de l'analyse critique dans le plan de refactoring | 10 avril 2026 | 🔵 Proposition |
 | [2026-04-10-action-plan-v030.md](./2026-04-10-action-plan-v030.md) | Plan d'action v0.3.0 — 5 sprints de stabilisation et refactoring | 10 avril 2026 | 🚧 En cours |
 | [2026-04-11-import-style-and-config-module.md](./2026-04-11-import-style-and-config-module.md) | ADR-004 — Style d'imports absolus et introduction du module `config/` | 11 avril 2026 | ✅ Décision prise |
+| [2026-04-11-decorator-api.md](./2026-04-11-decorator-api.md) | ADR-005 — API déclarative par décorateurs (`@step`, `@job`) | 11 avril 2026 | ✅ Décision prise |
 
 ---
 

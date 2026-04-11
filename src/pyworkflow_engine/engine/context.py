@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from ..models import JobRun, StepRun
+    from pyworkflow_engine.models import JobRun, StepRun
 
-from ..exceptions import ContextError
+from pyworkflow_engine.exceptions import ContextError
 
 
 class WorkflowContext:
@@ -158,14 +158,14 @@ class WorkflowContext:
         return self.job_run.get_step_run(step_name)
 
     def get_completed_steps(self) -> list[str]:
-        from ..models import RunStatus
+        from pyworkflow_engine.models import RunStatus
 
         return [
             r.step_name for r in self.job_run.get_step_runs_by_status(RunStatus.SUCCESS)
         ]
 
     def get_failed_steps(self) -> list[str]:
-        from ..models import RunStatus
+        from pyworkflow_engine.models import RunStatus
 
         return [
             r.step_name for r in self.job_run.get_step_runs_by_status(RunStatus.FAILED)

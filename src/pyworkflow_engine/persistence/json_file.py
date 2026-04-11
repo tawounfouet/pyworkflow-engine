@@ -22,8 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..models import Job, JobRun, StepRun
-from .base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
+from pyworkflow_engine.models import Job, JobRun, StepRun
+from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
 
 
 class JSONFilePersistence(BasePersistence):

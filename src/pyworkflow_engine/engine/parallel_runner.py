@@ -17,13 +17,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     pass
 
-from ..exceptions import StepExecutionError, WorkflowSuspended
-from ..models import JobRun, RunStatus, StepRun
-from .dag import DAGResolver
-from .runner import WorkflowRunner
+from pyworkflow_engine.exceptions import StepExecutionError, WorkflowSuspended
+from pyworkflow_engine.models import JobRun, RunStatus, StepRun
+from pyworkflow_engine.engine.dag import DAGResolver
+from pyworkflow_engine.engine.runner import WorkflowRunner
 
 if TYPE_CHECKING:
-    from .context import WorkflowContext
+    from pyworkflow_engine.engine.context import WorkflowContext
 
 
 class ParallelRunner(WorkflowRunner):

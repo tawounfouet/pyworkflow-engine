@@ -1,4 +1,4 @@
-# IAS Workflow Engine
+# PyWorkflow Engine
 
 Moteur d'orchestration de workflows Python pur — zero dépendance framework.
 
@@ -7,58 +7,81 @@ Moteur d'orchestration de workflows Python pur — zero dépendance framework.
 Transformer les workflows complexes en code Python simple et portable :
 
 ```python
-from ias_workflow_engine import Job, Step, WorkflowEngine
+from pyworkflow_engine import Job, Step, StepType, WorkflowEngine
+from pyworkflow_engine.config import WorkflowConfig, EngineConfig
 
-def fetch_data(source: str = "", **kw):
+def fetch_data(context):
+    # Accès au contexte initial ou intermédiaire
     return {"records": [1, 2, 3], "count": 3}
 
-def transform(records: list = None, **kw):
-    return {"transformed": [r * 10 for r in (records or [])]}
+def transform(context):
+    # Récupération des données du step précédent
+    records = context.get_step_output("fetch", {}).get("records", [])
+    return {"transformed": [r * 10 for r in records]}
 
 # Définir le workflow
-etl = Job(name="ETL Pipeline", steps=[
-    Step(id="fetch", name="Fetch", callable=fetch_data),
-    Step(id="transform", name="Transform", callable=transform, depends_on=["fetch"]),
-])
+etl = Job(
+    name="ETL Pipeline", 
+    steps=[
+        Step(
+            name="fetch", 
+            step_type=StepType.FUNCTION, 
+            handler=fetch_data
+        ),
+        Step(
+            name="transform", 
+            step_type=StepType.FUNCTION, 
+            handler=transform, 
+            dependencies=["fetch"]
+        ),
+    ]
+)
+
+# Configuration de l'exécution (Optionnelle)
+cfg = WorkflowConfig(engine=EngineConfig(parallel=True, max_workers=2))
 
 # Exécuter
-engine = WorkflowEngine()
-result = engine.run(etl, context={"source": "api"})
+engine = WorkflowEngine(config=cfg)
+result = engine.run(etl, initial_context={"source": "api"})
+
 print(result.status)  # RunStatus.SUCCESS
+print(result.output_data)
 ```
 
 ## Caractéristiques
 
-- **🚀 Zero dépendance** : Le core fonctionne avec la stdlib uniquement
-- **🔧 Pluggable** : Executors, triggers, et persistence modulaires  
-- **🌐 Universal** : Fonctionne dans notebooks, scripts, Django, FastAPI, CLI
-- **⚡ Performant** : Tests < 2s, exécution optimisée
-- **🎯 Type-safe** : Dataclasses + mypy pour une robustesse maximale
+- **🚀 Zero dépendance** : Le core fonctionne avec la stdlib uniquement.
+- **🔧 Pluggable** : Executors, triggers, et persistence modulaires.
+- **🌐 Universal** : Fonctionne dans notebooks, scripts, Django, FastAPI, CLI.
+- **⚡ Performant** : Exécution optimisée, possibilité d'exécution concurrente (`ParallelRunner`).
+- **🎯 Type-safe** : Dataclasses + mypy pour une robustesse maximale.
+- **🛡 Robuste** : Gestion unifiée des retries (`RetryHandler`), timeouts, et mécanisme de suspension/reprise.
 
 ## Installation
 
 ```bash
 # Core seulement (zero dépendance)
-pip install ias-workflow-engine
+pip install pyworkflow-engine
 
-# Avec adapters spécifiques
-pip install ias-workflow-engine[django]    # Pour Django
-pip install ias-workflow-engine[fastapi]   # Pour FastAPI  
-pip install ias-workflow-engine[all]       # Tout installer
+# Avec adapters spécifiques et backends
+pip install pyworkflow-engine[django]      # Pour Django
+pip install pyworkflow-engine[fastapi]     # Pour FastAPI
+pip install pyworkflow-engine[sqlalchemy]  # Persistence via bases de données
+pip install pyworkflow-engine[all]         # Tout installer
 ```
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│              workflow-engine (pure Python)       │
+│              pyworkflow-engine (pure Python)     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │  Models   │  │  Engine  │  │  Executors   │  │
-│  │(dataclass)│  │  (DAG)   │  │ (pluggable)  │  │
+│  │  Models  │  │  Engine  │  │   Executors  │  │
+│  │(dataclass)  │  (DAG)   │  │  (pluggable) │  │
 │  └──────────┘  └──────────┘  └──────────────┘  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
 │  │ Triggers │  │ Context  │  │ Persistence  │  │
-│  │(pluggable)│  │ (I/O)    │  │ (pluggable)  │  │
+│  │(pluggable)  │  (I/O)   │  │ (pluggable)  │  │
 │  └──────────┘  └──────────┘  └──────────────┘  │
 └─────────────────────────────────────────────────┘
         │               │               │
@@ -70,9 +93,9 @@ pip install ias-workflow-engine[all]       # Tout installer
 
 ## Status
 
-🚧 **En développement actif** - Version 0.1.0-alpha
+🚧 **En développement actif** - Version 0.4.0
 
-Cette librairie est en cours de développement dans le cadre de la migration de l'application Django `django-workflows` vers un package Python pur.
+Cette librairie est née de la volonté d'extraire la logique métier d'orchestration d'anciennes applications monolithiques pour fournir un package Python pur et découplé.
 
 ## Contribuer
 

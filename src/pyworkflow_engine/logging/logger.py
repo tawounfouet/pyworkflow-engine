@@ -19,8 +19,8 @@ import logging.handlers
 import queue
 from typing import Any
 
-from .config import LoggingConfig
-from .formatters import JSONFormatter, StructuredFormatter
+from pyworkflow_engine.logging.config import LoggingConfig
+from pyworkflow_engine.logging.formatters import JSONFormatter, StructuredFormatter
 
 # ── Namespace racine du package ──────────────────────────────────────────────
 _ROOT_LOGGER_NAME = "pyworkflow_engine"

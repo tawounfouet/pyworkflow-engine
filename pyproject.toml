@@ -102,7 +102,7 @@ ignore = ["E501"]  # Line too long (handled by formatter)
 # ADR-004 — interdire les imports relatifs hors __init__.py (ban-relative-imports = "parents")
 # Passer à "all" une fois la migration complète vers les imports absolus.
 [tool.ruff.lint.flake8-tidy-imports]
-ban-relative-imports = "parents"
+ban-relative-imports = "all"
 
 [tool.mypy]
 python_version = "3.11"

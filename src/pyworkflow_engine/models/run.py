@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from .enums import ExecutorType, RunStatus, can_resume, is_suspended, is_terminal
+from pyworkflow_engine.models.enums import ExecutorType, RunStatus, can_resume, is_suspended, is_terminal
 
 # ---------------------------------------------------------------------------
 # Utilitaires

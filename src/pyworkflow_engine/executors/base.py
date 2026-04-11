@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..engine.context import WorkflowContext
-    from ..models import Step
+    from pyworkflow_engine.engine.context import WorkflowContext
+    from pyworkflow_engine.models import Step
 
 
 class BaseExecutor(ABC):

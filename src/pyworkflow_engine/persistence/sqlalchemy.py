@@ -46,8 +46,8 @@ except ImportError as e:
         "SQLAlchemy persistence requires: pip install ias-workflow-engine[sqlalchemy]"
     ) from e
 
-from ..models import Job, JobRun, Step, StepRun
-from .base import BasePersistence, JobNotFoundError, PersistenceError
+from pyworkflow_engine.models import Job, JobRun, Step, StepRun
+from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError
 
 
 class SQLAlchemyPersistence(BasePersistence):
@@ -286,7 +286,7 @@ class SQLAlchemyPersistence(BasePersistence):
 
     def _deserialize_job_run(self, row: Any, step_runs: list[StepRun] = None) -> JobRun:
         """Deserialize job run from database row."""
-        from ..models.enums import RunStatus
+        from pyworkflow_engine.models.enums import RunStatus
 
         return JobRun(
             job_run_id=row.job_run_id,
@@ -317,7 +317,7 @@ class SQLAlchemyPersistence(BasePersistence):
 
     def _deserialize_step_run(self, row: Any) -> StepRun:
         """Deserialize step run from database row."""
-        from ..models.enums import RunStatus
+        from pyworkflow_engine.models.enums import RunStatus
 
         return StepRun(
             step_run_id=row.step_run_id,

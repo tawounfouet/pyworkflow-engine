@@ -13,9 +13,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..models import Job, JobRun
+    from pyworkflow_engine.models import Job, JobRun
 
-from .base import BasePersistence, JobNotFoundError, PersistenceError
+from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError
 
 
 class InMemoryPersistence(BasePersistence):
@@ -109,7 +109,7 @@ class InMemoryPersistence(BasePersistence):
 
             if status is not None:
                 # Accept both string and RunStatus enum for the filter value
-                from ..models.enums import RunStatus
+                from pyworkflow_engine.models.enums import RunStatus
 
                 status_val = RunStatus(status) if isinstance(status, str) else status
                 job_runs = [jr for jr in job_runs if jr.status == status_val]

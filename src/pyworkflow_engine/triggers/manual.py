@@ -14,11 +14,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from .base import BaseTrigger, TriggerState
+from pyworkflow_engine.triggers.base import BaseTrigger, TriggerState
 
 if TYPE_CHECKING:
-    from ..facade import WorkflowEngine
-    from ..models import Job, JobRun
+    from pyworkflow_engine.facade import WorkflowEngine
+    from pyworkflow_engine.models import Job, JobRun
 
 
 class ManualTrigger(BaseTrigger):

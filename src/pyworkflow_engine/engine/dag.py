@@ -13,9 +13,9 @@ from collections import defaultdict, deque
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..models import Job, Step
+    from pyworkflow_engine.models import Job, Step
 
-from ..exceptions import DAGValidationError
+from pyworkflow_engine.exceptions import DAGValidationError
 
 
 class DAGResolver:

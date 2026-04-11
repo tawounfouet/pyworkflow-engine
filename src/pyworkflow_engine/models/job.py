@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
 
-from .enums import ExecutorType, Priority, TriggerType
-from .step import Step, SubJob
+from pyworkflow_engine.models.enums import ExecutorType, Priority, TriggerType
+from pyworkflow_engine.models.step import Step, SubJob
 
 
 @dataclass(frozen=True)

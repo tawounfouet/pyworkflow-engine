@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import JobRun, RunStatus
-from .context import WorkflowContext
-from .dag import DAGResolver
+from pyworkflow_engine.models import JobRun, RunStatus
+from pyworkflow_engine.engine.context import WorkflowContext
+from pyworkflow_engine.engine.dag import DAGResolver
 
 
 class SuspensionManager:
@@ -26,6 +26,14 @@ class SuspensionManager:
     def __init__(self, persistence: Any | None = None):
         self._persistence = persistence
         self._in_memory: dict[str, JobRun] = {}
+
+    @property
+    def persistence(self) -> Any | None:
+        return self._persistence
+
+    @persistence.setter
+    def persistence(self, backend: Any | None) -> None:
+        self._persistence = backend
 
     # ------------------------------------------------------------------
     # Public API

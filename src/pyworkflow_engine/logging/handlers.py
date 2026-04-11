@@ -103,7 +103,7 @@ class SQLiteLogHandler(logging.Handler):
         try:
             # Extraire les extras
             extras: dict[str, Any] = {}
-            from .formatters import _STANDARD_LOG_RECORD_KEYS
+            from pyworkflow_engine.logging.formatters import _STANDARD_LOG_RECORD_KEYS
 
             for key, value in record.__dict__.items():
                 if key not in _STANDARD_LOG_RECORD_KEYS and not key.startswith("_"):

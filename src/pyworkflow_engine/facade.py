@@ -21,22 +21,18 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import datetime
 
-from .engine.context import WorkflowContext
-from .engine.dag import DAGResolver
-from .engine.parallel_runner import ParallelRunner
-from .engine.retry import RetryHandler
-from .engine.runner import WorkflowRunner
-from .engine.suspension import SuspensionManager
-from .exceptions import (
-    DAGValidationError,
-    WorkflowError,
-    WorkflowFailed,
-    WorkflowSuspended,
-)
-from .executors import BaseExecutor, ExecutorRegistry
-from .persistence.base import PersistenceError
-from .logging import get_logger
-from .models import Job, JobRun, RunStatus, StepType
+from pyworkflow_engine.engine.context import WorkflowContext
+from pyworkflow_engine.engine.dag import DAGResolver
+from pyworkflow_engine.engine.parallel_runner import ParallelRunner
+from pyworkflow_engine.engine.retry import RetryHandler
+from pyworkflow_engine.engine.runner import WorkflowRunner
+from pyworkflow_engine.engine.suspension import SuspensionManager
+from pyworkflow_engine.exceptions import DAGValidationError, WorkflowError, WorkflowFailed, WorkflowSuspended
+from pyworkflow_engine.executors import BaseExecutor, ExecutorRegistry
+from pyworkflow_engine.persistence.base import PersistenceError
+from pyworkflow_engine.logging import get_logger
+from pyworkflow_engine.models import Job, JobRun, RunStatus, StepType
+from pyworkflow_engine.config import WorkflowConfig
 
 _logger = get_logger("engine.facade")
 
@@ -53,11 +49,12 @@ class WorkflowEngine:
     L'utilisateur n'interagit qu'avec cette classe.
 
     Args:
-        parallel: Si ``True``, utilise ``ParallelRunner`` qui exécute les steps
-            sans dépendances mutuelles en parallèle via ``concurrent.futures``.
-            Défaut : ``False`` (exécution séquentielle).
-        max_workers: Nombre maximum de threads par groupe parallèle.
-            Ignoré si ``parallel=False``.
+        config: Configuration complète du moteur. Si fourni, ``parallel`` et
+            ``max_workers`` sont lus depuis ``config.engine``.
+        parallel: Si ``True``, utilise ``ParallelRunner``. Ignoré si ``config``
+            est fourni.
+        max_workers: Nombre maximum de threads par groupe parallèle. Ignoré si
+            ``config`` est fourni.
 
     Examples:
         >>> engine = WorkflowEngine()
@@ -66,12 +63,18 @@ class WorkflowEngine:
         >>> result = engine.run(job)
         >>> assert result.status == RunStatus.SUCCESS
 
-        >>> # Exécution parallèle
+        >>> # Via WorkflowConfig
+        >>> from pyworkflow_engine.config import WorkflowConfig, EngineConfig
+        >>> cfg = WorkflowConfig(engine=EngineConfig(parallel=True, max_workers=4))
+        >>> engine = WorkflowEngine(config=cfg)
+
+        >>> # Paramètres directs (inchangé)
         >>> engine = WorkflowEngine(parallel=True, max_workers=4)
     """
 
     def __init__(
         self,
+        config: WorkflowConfig | None = None,
         default_executor: Callable | None = None,
         step_executors: dict[StepType, Callable] | None = None,
         executor_registry: ExecutorRegistry | None = None,
@@ -79,6 +82,12 @@ class WorkflowEngine:
         parallel: bool = False,
         max_workers: int | None = None,
     ):
+        # config prend le dessus sur les paramètres directs
+        _engine_cfg = config.engine if config is not None else None
+        _use_parallel = _engine_cfg.parallel if _engine_cfg else parallel
+        _workers = _engine_cfg.max_workers if _engine_cfg else max_workers
+
+        self._config = config or WorkflowConfig()
         self._persistence = persistence
         self._executor_registry = executor_registry or ExecutorRegistry()
         runner_kwargs: dict[str, Any] = {
@@ -87,8 +96,8 @@ class WorkflowEngine:
             "step_executors": step_executors or {},
         }
         self._runner: WorkflowRunner = (
-            ParallelRunner(max_workers=max_workers, **runner_kwargs)
-            if parallel
+            ParallelRunner(max_workers=_workers, **runner_kwargs)
+            if _use_parallel
             else WorkflowRunner(**runner_kwargs)
         )
         self._retry = RetryHandler()
@@ -287,7 +296,7 @@ class WorkflowEngine:
     @persistence.setter
     def persistence(self, backend):
         self._persistence = backend
-        self._suspension._persistence = backend
+        self._suspension.persistence = backend
 
     def save_job(self, job: Job) -> None:
         self._require_persistence("save_job")

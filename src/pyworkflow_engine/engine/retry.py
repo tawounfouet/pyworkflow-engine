@@ -20,9 +20,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .context import WorkflowContext
+    from pyworkflow_engine.engine.context import WorkflowContext
 
-from ..models import RunStatus, Step, StepRun
+from pyworkflow_engine.models import RunStatus, Step, StepRun
 
 
 class RetryHandler:
@@ -95,7 +95,7 @@ class RetryHandler:
         return False
 
     def _log_error(self, step_run: StepRun, error: Exception) -> None:
-        from ..logging import get_logger
+        from pyworkflow_engine.logging import get_logger
 
         get_logger("engine.retry").error(
             "RETRY EXHAUSTED [%s]: %s", step_run.step_name, error

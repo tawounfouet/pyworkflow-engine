@@ -5,15 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — ADR-004 en cours
+## [Unreleased] — ADR-004 / ADR-005 en cours
 
 ### Planned (prochaine itération)
 
 - **Imports absolus** — migration de tous les imports relatifs (`from .module import …`) vers les imports absolus (`from pyworkflow_engine.module import …`) dans l'ensemble de `src/pyworkflow_engine/` · règle ruff `TID252`
 - **Module `config/`** — introduction de `WorkflowConfig`, `EngineConfig`, `ExecutorConfig`, `LoggingConfig` (dataclasses `frozen=True`) · point d'entrée unique de configuration
 - **`WorkflowEngine(config=…)`** — nouveau paramètre `config: WorkflowConfig | None` avec rétrocompatibilité des paramètres existants (`parallel`, `max_workers`)
+- **API décorateurs `@step` / `@job`** — API déclarative alternative pour définir les workflows · fonctions pures sans dépendance à `WorkflowContext` · injection automatique des paramètres · cohabitation avec l'API impérative existante
 
-> Voir [ADR-004](docs/changelog/2026-04-11-import-style-and-config-module.md) pour le détail des décisions.
+> Voir [ADR-004](docs/changelog/2026-04-11-import-style-and-config-module.md) pour les imports absolus et le module config.
+> Voir [ADR-005](docs/changelog/2026-04-11-decorator-api.md) pour l'API décorateurs.
 
 ---
 

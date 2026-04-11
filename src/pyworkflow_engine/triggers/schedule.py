@@ -17,11 +17,11 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from .base import BaseTrigger, TriggerState
+from pyworkflow_engine.triggers.base import BaseTrigger, TriggerState
 
 if TYPE_CHECKING:
-    from ..facade import WorkflowEngine
-    from ..models import Job, JobRun
+    from pyworkflow_engine.facade import WorkflowEngine
+    from pyworkflow_engine.models import Job, JobRun
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ class ScheduleTrigger(BaseTrigger):
         Vérifie toutes les secondes si la minute courante correspond à
         l'expression cron et n'a pas déjà été déclenchée.
         """
-        from ..logging import get_logger
+        from pyworkflow_engine.logging import get_logger
         logger = get_logger("triggers.schedule")
 
         while not self._stop_event.is_set():

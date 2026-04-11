@@ -13,9 +13,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..models import Job, JobRun
+    from pyworkflow_engine.models import Job, JobRun
 
-from ..exceptions import WorkflowError
+from pyworkflow_engine.exceptions import WorkflowError
 
 
 class PersistenceError(WorkflowError):

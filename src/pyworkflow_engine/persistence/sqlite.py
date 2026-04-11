@@ -23,8 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..models import Job, JobRun, StepRun
-from .base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
+from pyworkflow_engine.models import Job, JobRun, StepRun
+from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
 
 # Database schema version
 SCHEMA_VERSION = 2
@@ -204,7 +204,7 @@ class SQLitePersistence(BasePersistence):
 
     def _deserialize_job(self, row: sqlite3.Row) -> Job:
         """Deserialize a job from a database row."""
-        from ..models import Job, Step
+        from pyworkflow_engine.models import Job, Step
 
         steps = [Step.from_dict(s) for s in json.loads(row["steps"])]
 
@@ -249,7 +249,7 @@ class SQLitePersistence(BasePersistence):
         self, row: sqlite3.Row, step_runs: list[StepRun] = None
     ) -> JobRun:
         """Deserialize a job run from a database row."""
-        from ..models.enums import RunStatus
+        from pyworkflow_engine.models.enums import RunStatus
 
         _keys = (
             row.keys()
@@ -322,7 +322,7 @@ class SQLitePersistence(BasePersistence):
 
     def _deserialize_step_run(self, row: sqlite3.Row) -> StepRun:
         """Deserialize a step run from a database row."""
-        from ..models.enums import ExecutorType, RunStatus
+        from pyworkflow_engine.models.enums import ExecutorType, RunStatus
 
         _keys = (
             row.keys()

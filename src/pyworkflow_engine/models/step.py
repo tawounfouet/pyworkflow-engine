@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from .enums import ExecutorType, StepType
+from pyworkflow_engine.models.enums import ExecutorType, StepType
 
 
 @dataclass(frozen=True)
