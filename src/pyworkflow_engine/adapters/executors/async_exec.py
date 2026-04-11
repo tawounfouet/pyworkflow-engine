@@ -1,5 +1,5 @@
 """
-AsyncStepExecutor — exécution de fonctions async/await dans les workflows.
+Adapter executor — exécution de fonctions async/await (AsyncStepExecutor).
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pyworkflow_engine.models import Step
 
 from pyworkflow_engine.exceptions import StepExecutionError
-from pyworkflow_engine.executors.base import BaseExecutor
+from pyworkflow_engine.ports.executor import BaseExecutor
 
 
 class AsyncStepExecutor(BaseExecutor):

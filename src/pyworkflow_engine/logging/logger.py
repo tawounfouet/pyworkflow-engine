@@ -3,7 +3,7 @@ Logger principal — stdlib logging uniquement, zero dépendance.
 
 Suit les best practices pour les bibliothèques Python (PEP 282) :
 - NullHandler par défaut → la lib est silencieuse sauf configuration explicite
-- Namespace hiérarchique → ``pyworkflow_engine.engine``, ``pyworkflow_engine.persistence``…
+- Namespace hiérarchique → ``pyworkflow_engine.engine``, ``pyworkflow_engine.adapters.persistence``…
 - Compatible structlog si installé (voir adapters/structlog/)
 
 Design :

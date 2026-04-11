@@ -23,7 +23,7 @@ import pytest
 from pyworkflow_engine import WorkflowEngine
 from pyworkflow_engine.decorators import job, step
 from pyworkflow_engine.models.enums import RunStatus
-from pyworkflow_engine.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
 
 
 # ══════════════════════════════════════════════════════════════════════════════

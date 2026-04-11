@@ -1,5 +1,5 @@
 """
-ScheduleTrigger — déclenchement planifié par expression cron (stdlib).
+Adapter trigger — déclenchement planifié par expression cron (ScheduleTrigger).
 
 Implémente un déclencheur cron complet sans dépendance externe :
   - Parser d'expressions cron 5 champs (minute heure jour mois jour-semaine)
@@ -17,16 +17,15 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from pyworkflow_engine.triggers.base import BaseTrigger, TriggerState
+from pyworkflow_engine.ports.trigger import BaseTrigger, TriggerState
 
 if TYPE_CHECKING:
     from pyworkflow_engine.facade import WorkflowEngine
     from pyworkflow_engine.models import Job, JobRun
 
 
-# ---------------------------------------------------------------------------
-# Cron expression parser
-# ---------------------------------------------------------------------------
+# ── Cron expression parser ────────────────────────────────────────────────────
+
 
 class CronExpression:
     """Parser et évaluateur d'expressions cron 5 champs.
@@ -78,8 +77,6 @@ class CronExpression:
             lo, hi = self._FIELD_RANGES[i]
             self._fields.append(self._parse_field(part, lo, hi))
 
-    # ------------------------------------------------------------------
-
     def matches(self, dt: datetime) -> bool:
         """Vérifie si ``dt`` correspond à l'expression cron."""
         # weekday : Python datetime.weekday() → 0=lundi, 6=dimanche
@@ -97,10 +94,6 @@ class CronExpression:
     @property
     def expression(self) -> str:
         return self._expression
-
-    # ------------------------------------------------------------------
-    # Parsing helpers
-    # ------------------------------------------------------------------
 
     @classmethod
     def _parse_field(cls, field: str, lo: int, hi: int) -> set[int]:
@@ -156,9 +149,8 @@ class CronExpression:
         return f"CronExpression({self._expression!r})"
 
 
-# ---------------------------------------------------------------------------
-# ScheduleTrigger
-# ---------------------------------------------------------------------------
+# ── ScheduleTrigger ───────────────────────────────────────────────────────────
+
 
 class ScheduleTrigger(BaseTrigger):
     """Trigger planifié par expression cron.
@@ -171,28 +163,11 @@ class ScheduleTrigger(BaseTrigger):
         engine: Instance ``WorkflowEngine``.
         job: Job à exécuter à chaque déclenchement.
         cron: Expression cron 5 champs : ``"minute hour day month weekday"``.
-            Exemples :
-            - ``"* * * * *"``   — toutes les minutes
-            - ``"0 * * * *"``   — toutes les heures (à :00)
-            - ``"0 9 * * 1-5"`` — 9h00, lundi–vendredi
         name: Nom lisible (défaut : ``"ScheduleTrigger"``).
         initial_context_factory: Callable sans argument retournant un dict
-            de contexte initial à chaque déclenchement. Utilisé pour injecter
-            des données dynamiques (timestamp, etc.).
-        timezone_aware: Si ``True``, utilise ``datetime.now(tz=timezone.utc)``
-            pour les comparaisons. Défaut : ``False`` (heure locale).
+            de contexte initial à chaque déclenchement.
+        timezone_aware: Si ``True``, utilise ``datetime.now(tz=timezone.utc)``.
         **kwargs: Transmis à ``BaseTrigger.__init__``.
-
-    Examples:
-        >>> trigger = ScheduleTrigger(
-        ...     engine=engine,
-        ...     job=my_job,
-        ...     cron="0 6 * * 1-5",  # 6h00 du lundi au vendredi
-        ...     name="morning-etl",
-        ... )
-        >>> trigger.start()
-        >>> # ... le trigger tourne en arrière-plan ...
-        >>> trigger.stop()
     """
 
     def __init__(
@@ -212,11 +187,7 @@ class ScheduleTrigger(BaseTrigger):
         self._timezone_aware = timezone_aware
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-        self._last_fired_minute: int | None = None  # (year, month, day, hour, minute)
-
-    # ------------------------------------------------------------------
-    # BaseTrigger interface
-    # ------------------------------------------------------------------
+        self._last_fired_minute: int | None = None
 
     @property
     def cron(self) -> CronExpression:
@@ -224,11 +195,7 @@ class ScheduleTrigger(BaseTrigger):
         return self._cron
 
     def start(self) -> None:
-        """Démarre le thread de planification en arrière-plan.
-
-        Raises:
-            RuntimeError: Si le trigger est déjà actif.
-        """
+        """Démarre le thread de planification en arrière-plan."""
         if self._state == TriggerState.RUNNING:
             raise RuntimeError(f"Trigger '{self._name}' is already running")
         self._stop_event.clear()
@@ -242,11 +209,7 @@ class ScheduleTrigger(BaseTrigger):
         self._thread.start()
 
     def stop(self, timeout: float = 5.0) -> None:
-        """Arrête proprement le thread de planification.
-
-        Args:
-            timeout: Secondes d'attente maximale pour la fin du thread.
-        """
+        """Arrête proprement le thread de planification."""
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
@@ -258,32 +221,15 @@ class ScheduleTrigger(BaseTrigger):
         job: Job | None = None,
         initial_context: dict[str, Any] | None = None,
     ) -> JobRun:
-        """Déclenche une exécution immédiate du job configuré.
-
-        Args:
-            job: Job à exécuter. Si ``None``, utilise le job configuré.
-            initial_context: Données initiales. Si ``None`` et qu'une
-                ``initial_context_factory`` est configurée, elle est appelée.
-
-        Returns:
-            ``JobRun`` résultant.
-        """
+        """Déclenche une exécution immédiate du job configuré."""
         target_job = job or self._job
         ctx = initial_context
         if ctx is None and self._initial_context_factory is not None:
             ctx = self._initial_context_factory()
         return self._do_fire(target_job, initial_context=ctx)
 
-    # ------------------------------------------------------------------
-    # Internal scheduling loop
-    # ------------------------------------------------------------------
-
     def _loop(self) -> None:
-        """Boucle principale du thread d'arrière-plan.
-
-        Vérifie toutes les secondes si la minute courante correspond à
-        l'expression cron et n'a pas déjà été déclenchée.
-        """
+        """Boucle principale du thread d'arrière-plan."""
         from pyworkflow_engine.logging import get_logger
         logger = get_logger("triggers.schedule")
 
@@ -310,7 +256,6 @@ class ScheduleTrigger(BaseTrigger):
                     self._set_state(TriggerState.ERROR)
                     return
 
-            # Dormir jusqu'à la prochaine seconde (résolution : 1 s).
             self._stop_event.wait(timeout=1.0)
 
     def _now(self) -> datetime:

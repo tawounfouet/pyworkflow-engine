@@ -28,8 +28,8 @@ from pyworkflow_engine.engine.retry import RetryHandler
 from pyworkflow_engine.engine.runner import WorkflowRunner
 from pyworkflow_engine.engine.suspension import SuspensionManager
 from pyworkflow_engine.exceptions import DAGValidationError, WorkflowError, WorkflowFailed, WorkflowSuspended
-from pyworkflow_engine.executors import BaseExecutor, ExecutorRegistry
-from pyworkflow_engine.persistence.base import PersistenceError
+from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
+from pyworkflow_engine.ports.persistence import PersistenceError
 from pyworkflow_engine.logging import get_logger
 from pyworkflow_engine.models import Job, JobRun, RunStatus, StepType
 from pyworkflow_engine.config import WorkflowConfig

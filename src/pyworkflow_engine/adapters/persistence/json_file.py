@@ -1,20 +1,15 @@
 """
-JSON file-based persistence implementation for the PyWorkflow Engine.
+Adapter persistence — backend JSON sur disque (JSONFilePersistence).
 
-This persistence backend stores workflow data in JSON files on the filesystem.
-It's suitable for development, testing, and small-scale production deployments
-where simplicity is preferred over performance.
+Stockage dans des fichiers JSON.  Adapté au développement, aux tests et
+aux déploiements de petite échelle où la lisibilité prime sur la performance.
 
-Features:
-    - Human-readable JSON format
-    - Atomic file operations
-    - Basic transaction support via file locking
-    - Cross-platform compatibility
-    - No external dependencies (stdlib only)
+Zéro dépendance externe — stdlib uniquement.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import threading
@@ -23,7 +18,12 @@ from pathlib import Path
 from typing import Any
 
 from pyworkflow_engine.models import Job, JobRun, StepRun
-from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
+from pyworkflow_engine.ports.persistence import (
+    BasePersistence,
+    JobNotFoundError,
+    PersistenceError,
+    TransactionError,
+)
 
 
 class JSONFilePersistence(BasePersistence):
@@ -125,8 +125,6 @@ class JSONFilePersistence(BasePersistence):
         except OSError as e:
             # Clean up temp file if it exists
             if temp_path.exists():
-                import contextlib
-
                 with contextlib.suppress(OSError):
                     temp_path.unlink()
             raise PersistenceError(f"Failed to write {file_path}: {e}") from e

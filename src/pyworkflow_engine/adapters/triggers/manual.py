@@ -1,5 +1,5 @@
 """
-ManualTrigger — déclenchement explicite d'un workflow par le code.
+Adapter trigger — déclenchement explicite par le code (ManualTrigger).
 
 Le trigger le plus simple : pas de surveillance en arrière-plan, pas de
 planification. L'utilisateur appelle ``fire(job)`` quand il le souhaite.
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pyworkflow_engine.triggers.base import BaseTrigger, TriggerState
+from pyworkflow_engine.ports.trigger import BaseTrigger, TriggerState
 
 if TYPE_CHECKING:
     from pyworkflow_engine.facade import WorkflowEngine
@@ -44,9 +44,7 @@ class ManualTrigger(BaseTrigger):
     def __init__(self, engine: WorkflowEngine, name: str = "ManualTrigger", **kwargs: Any) -> None:
         super().__init__(engine=engine, name=name, **kwargs)
 
-    # ------------------------------------------------------------------
-    # BaseTrigger interface
-    # ------------------------------------------------------------------
+    # ── BaseTrigger interface ─────────────────────────────────────────────────
 
     def start(self) -> None:
         """Marque le trigger comme actif.

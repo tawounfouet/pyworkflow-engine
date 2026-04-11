@@ -19,12 +19,12 @@ from pyworkflow_engine.models import (
     StepRun,
     StepType,
 )
-from pyworkflow_engine.persistence.base import (
+from pyworkflow_engine.ports.persistence import (
     BasePersistence,
 )
-from pyworkflow_engine.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.adapters.persistence.json_file import JSONFilePersistence
+from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
 
 # SQLAlchemy tests only run if SQLAlchemy is available
 try:
@@ -599,7 +599,7 @@ class TestSQLAlchemyPersistence(PersistenceBackendTests):
     @pytest.fixture
     def persistence(self):
         """Create a SQLAlchemy persistence instance with in-memory SQLite."""
-        from pyworkflow_engine.persistence.sqlalchemy import SQLAlchemyPersistence
+        from pyworkflow_engine.adapters.persistence.sqlalchemy import SQLAlchemyPersistence
 
         return SQLAlchemyPersistence("sqlite:///:memory:")
 
@@ -775,7 +775,7 @@ class TestPersistenceIntegration:
     def test_engine_integration(self):
         """Test persistence integration with WorkflowEngine."""
         from pyworkflow_engine import WorkflowEngine
-        from pyworkflow_engine.persistence import InMemoryPersistence
+        from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
 
         persistence = InMemoryPersistence()
         engine = WorkflowEngine(persistence=persistence)

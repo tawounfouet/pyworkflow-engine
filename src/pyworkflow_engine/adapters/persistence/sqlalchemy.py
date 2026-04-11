@@ -1,21 +1,8 @@
 """
-SQLAlchemy persistence implementation for the PyWorkflow Engine.
+Adapter persistence — backend SQLAlchemy (SQLAlchemyPersistence).
 
-This persistence backend provides advanced SQL features through SQLAlchemy,
-including support for PostgreSQL, MySQL, and other databases with
-connection pooling, advanced querying, and ORM capabilities.
-
-Features:
-    - Multiple database backends (PostgreSQL, MySQL, SQLite, etc.)
-    - Connection pooling and management
-    - Advanced querying with SQLAlchemy Core/ORM
-    - Database migrations via Alembic integration
-    - Async support (when available)
-    - High performance with bulk operations
-
-This backend requires optional dependencies:
-    - SQLAlchemy 2.0+
-    - Database drivers (psycopg2, PyMySQL, etc.)
+Support PostgreSQL, MySQL, SQLite, etc. via SQLAlchemy.
+Nécessite : ``pip install pyworkflow-engine[sqlalchemy]``
 """
 
 from __future__ import annotations
@@ -43,33 +30,21 @@ try:
     from sqlalchemy.sql import delete, func, insert, select, update
 except ImportError as e:
     raise ImportError(
-        "SQLAlchemy persistence requires: pip install ias-workflow-engine[sqlalchemy]"
+        "SQLAlchemy persistence requires: pip install pyworkflow-engine[sqlalchemy]"
     ) from e
 
 from pyworkflow_engine.models import Job, JobRun, Step, StepRun
-from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError
+from pyworkflow_engine.ports.persistence import BasePersistence, JobNotFoundError, PersistenceError
 
 
 class SQLAlchemyPersistence(BasePersistence):
     """SQLAlchemy-based persistence backend.
-
-    This implementation provides enterprise-grade persistence with support
-    for multiple database backends, connection pooling, and advanced SQL
-    features through SQLAlchemy.
 
     Supported databases:
         - PostgreSQL (recommended for production)
         - MySQL/MariaDB
         - SQLite (for development/testing)
         - Oracle, SQL Server (with appropriate drivers)
-
-    Features:
-        - ACID transactions
-        - Connection pooling
-        - Query optimization
-        - Bulk operations
-        - Database migrations
-        - Multi-database support
     """
 
     def __init__(
@@ -78,27 +53,18 @@ class SQLAlchemyPersistence(BasePersistence):
         engine_options: dict[str, Any] | None = None,
         table_prefix: str = "workflow_",
     ):
-        """Initialize SQLAlchemy persistence.
-
-        Args:
-            database_url: SQLAlchemy database URL (e.g., "postgresql://user:pass@localhost/db")
-            engine_options: Additional SQLAlchemy engine options
-            table_prefix: Prefix for all table names
-        """
         self.database_url = database_url
         self.table_prefix = table_prefix
 
-        # Default engine options
         default_options = {
             "echo": False,
-            "pool_pre_ping": True,  # Verify connections before use
-            "pool_recycle": 3600,  # Recycle connections every hour
+            "pool_pre_ping": True,
+            "pool_recycle": 3600,
         }
 
         if engine_options:
             default_options.update(engine_options)
 
-        # Handle SQLite memory databases
         if database_url.startswith("sqlite:///:memory:"):
             default_options.update(
                 {
@@ -107,28 +73,22 @@ class SQLAlchemyPersistence(BasePersistence):
                 }
             )
 
-        # Create engine
         self.engine = create_engine(database_url, **default_options)
-
-        # Define metadata and tables
         self.metadata = MetaData()
         self._define_tables()
-
-        # Initialize database
         self._initialize_database()
 
     def _define_tables(self) -> None:
         """Define database tables using SQLAlchemy Core."""
 
-        # Jobs table
         self.jobs_table = Table(
             f"{self.table_prefix}jobs",
             self.metadata,
             Column("name", String(255), primary_key=True),
             Column("description", Text),
-            Column("steps", Text, nullable=False),  # JSON
-            Column("tags", Text),  # JSON
-            Column("metadata", Text),  # JSON
+            Column("steps", Text, nullable=False),
+            Column("tags", Text),
+            Column("metadata", Text),
             Column("version", String(50)),
             Column("enabled", Integer, default=1),
             Column("created_at", DateTime, default=datetime.utcnow),
@@ -140,7 +100,6 @@ class SQLAlchemyPersistence(BasePersistence):
             ),
         )
 
-        # Job runs table
         self.job_runs_table = Table(
             f"{self.table_prefix}job_runs",
             self.metadata,
@@ -155,11 +114,10 @@ class SQLAlchemyPersistence(BasePersistence):
             Column("created_at", DateTime, nullable=False),
             Column("start_time", DateTime),
             Column("end_time", DateTime),
-            Column("input_data", Text),  # JSON
-            Column("metadata", Text),  # JSON
+            Column("input_data", Text),
+            Column("metadata", Text),
         )
 
-        # Step runs table
         self.step_runs_table = Table(
             f"{self.table_prefix}step_runs",
             self.metadata,
@@ -174,13 +132,12 @@ class SQLAlchemyPersistence(BasePersistence):
             Column("status", String(50), nullable=False),
             Column("start_time", DateTime),
             Column("end_time", DateTime),
-            Column("input_data", Text),  # JSON
-            Column("output_data", Text),  # JSON
+            Column("input_data", Text),
+            Column("output_data", Text),
             Column("error", Text),
-            Column("metadata", Text),  # JSON
+            Column("metadata", Text),
         )
 
-        # Schema version table
         self.schema_version_table = Table(
             f"{self.table_prefix}schema_version",
             self.metadata,
@@ -188,7 +145,6 @@ class SQLAlchemyPersistence(BasePersistence):
             Column("applied_at", DateTime, default=datetime.utcnow),
         )
 
-        # Create indexes
         Index(
             f"idx_{self.table_prefix}job_runs_job_name", self.job_runs_table.c.job_name
         )
@@ -206,12 +162,9 @@ class SQLAlchemyPersistence(BasePersistence):
     def _initialize_database(self) -> None:
         """Initialize database schema."""
         try:
-            # Create all tables
             self.metadata.create_all(self.engine)
 
-            # Record schema version
             with self.engine.begin() as conn:
-                # Check if version exists
                 result = conn.execute(
                     select(self.schema_version_table.c.version).where(
                         self.schema_version_table.c.version == 1
@@ -224,15 +177,12 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to initialize database: {e}") from e
 
     def _serialize_json(self, data: Any) -> str | None:
-        """Serialize data to JSON string."""
         return json.dumps(data) if data else None
 
     def _deserialize_json(self, data: str | None) -> Any:
-        """Deserialize JSON string to data."""
         return json.loads(data) if data else {}
 
     def _serialize_job(self, job: Job) -> dict[str, Any]:
-        """Serialize job for database storage."""
         return {
             "name": job.name,
             "description": job.description,
@@ -244,7 +194,6 @@ class SQLAlchemyPersistence(BasePersistence):
         }
 
     def _deserialize_job(self, row: Any) -> Job:
-        """Deserialize job from database row."""
         steps = [Step.from_dict(s) for s in json.loads(row.steps)]
 
         return Job(
@@ -262,17 +211,13 @@ class SQLAlchemyPersistence(BasePersistence):
         )
 
     def _to_naive_utc(self, dt: datetime | None) -> datetime | None:
-        """Convert a datetime to naive UTC (strip tzinfo) for DB storage."""
         if dt is None:
             return None
         if dt.tzinfo is not None:
-            # Convert to UTC then strip tzinfo
-
             dt = dt.astimezone(UTC).replace(tzinfo=None)
         return dt
 
     def _serialize_job_run(self, job_run: JobRun) -> dict[str, Any]:
-        """Serialize job run for database storage."""
         return {
             "job_run_id": job_run.job_run_id,
             "job_name": job_run.job_name,
@@ -285,7 +230,6 @@ class SQLAlchemyPersistence(BasePersistence):
         }
 
     def _deserialize_job_run(self, row: Any, step_runs: list[StepRun] = None) -> JobRun:
-        """Deserialize job run from database row."""
         from pyworkflow_engine.models.enums import RunStatus
 
         return JobRun(
@@ -301,7 +245,6 @@ class SQLAlchemyPersistence(BasePersistence):
         )
 
     def _serialize_step_run(self, step_run: StepRun) -> dict[str, Any]:
-        """Serialize step run for database storage."""
         return {
             "step_run_id": step_run.step_run_id,
             "job_run_id": step_run.job_run_id,
@@ -316,7 +259,6 @@ class SQLAlchemyPersistence(BasePersistence):
         }
 
     def _deserialize_step_run(self, row: Any) -> StepRun:
-        """Deserialize step run from database row."""
         from pyworkflow_engine.models.enums import RunStatus
 
         return StepRun(
@@ -333,7 +275,6 @@ class SQLAlchemyPersistence(BasePersistence):
         )
 
     def _load_step_runs(self, job_run_id: str, conn=None) -> list[StepRun]:
-        """Load all step runs for a job run."""
         query = (
             select(self.step_runs_table)
             .where(self.step_runs_table.c.job_run_id == job_run_id)
@@ -350,7 +291,6 @@ class SQLAlchemyPersistence(BasePersistence):
 
     @contextmanager
     def _get_connection(self):
-        """Get a database connection with proper cleanup."""
         conn = self.engine.connect()
         try:
             yield conn
@@ -359,39 +299,29 @@ class SQLAlchemyPersistence(BasePersistence):
 
     @contextmanager
     def _transaction(self):
-        """Get a database transaction with proper cleanup."""
         with self.engine.begin() as conn:
             yield conn
 
     # Transaction support
 
     def begin_transaction(self) -> None:
-        """Begin a database transaction."""
-        # SQLAlchemy handles transactions via context managers
-        # This method is for interface compatibility
+        """Begin a database transaction (no-op — SQLAlchemy uses context managers)."""
 
     def commit_transaction(self) -> None:
-        """Commit the current transaction."""
-        # SQLAlchemy handles commits automatically with context managers
-        # This method is for interface compatibility
+        """Commit (no-op — SQLAlchemy auto-commits via context managers)."""
 
     def rollback_transaction(self) -> None:
-        """Roll back the current transaction."""
-        # SQLAlchemy handles rollbacks automatically with context managers
-        # This method is for interface compatibility
+        """Rollback (no-op — SQLAlchemy auto-rolls back via context managers)."""
 
     # Job operations
 
     def save_job(self, job: Job) -> None:
-        """Save a job definition."""
         data = self._serialize_job(job)
 
         try:
             with self._transaction() as conn:
-                # Use merge-like behavior (INSERT OR UPDATE)
                 stmt = insert(self.jobs_table).values(**data)
 
-                # Check if job exists
                 existing = conn.execute(
                     select(self.jobs_table.c.name).where(
                         self.jobs_table.c.name == job.name
@@ -399,7 +329,6 @@ class SQLAlchemyPersistence(BasePersistence):
                 ).fetchone()
 
                 if existing:
-                    # Update existing job
                     update_data = {k: v for k, v in data.items() if k != "name"}
                     update_data["updated_at"] = datetime.utcnow()
 
@@ -415,7 +344,6 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to save job '{job.name}': {e}") from e
 
     def get_job(self, job_name: str) -> Job | None:
-        """Retrieve a job definition by name."""
         try:
             with self._get_connection() as conn:
                 query = select(self.jobs_table).where(
@@ -429,7 +357,6 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to get job '{job_name}': {e}") from e
 
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
-        """List all job definitions."""
         try:
             with self._get_connection() as conn:
                 query = select(self.jobs_table).order_by(self.jobs_table.c.name)
@@ -444,7 +371,6 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to list jobs: {e}") from e
 
     def delete_job(self, job_name: str) -> bool:
-        """Delete a job definition."""
         try:
             with self._transaction() as conn:
                 stmt = delete(self.jobs_table).where(self.jobs_table.c.name == job_name)
@@ -457,12 +383,10 @@ class SQLAlchemyPersistence(BasePersistence):
     # Job run operations
 
     def save_job_run(self, job_run: JobRun) -> None:
-        """Save a job run and its step runs."""
         try:
             with self._transaction() as conn:
                 run_data = self._serialize_job_run(job_run)
 
-                # Check if exists
                 existing = conn.execute(
                     select(self.job_runs_table.c.job_run_id).where(
                         self.job_runs_table.c.job_run_id == job_run.job_run_id
@@ -480,7 +404,6 @@ class SQLAlchemyPersistence(BasePersistence):
 
                 conn.execute(stmt)
 
-                # Replace step runs
                 conn.execute(
                     delete(self.step_runs_table).where(
                         self.step_runs_table.c.job_run_id == job_run.job_run_id
@@ -499,7 +422,6 @@ class SQLAlchemyPersistence(BasePersistence):
             ) from e
 
     def update_job_run(self, job_run: JobRun) -> None:
-        """Update an existing job run."""
         try:
             with self._transaction() as conn:
                 existing = conn.execute(
@@ -537,7 +459,6 @@ class SQLAlchemyPersistence(BasePersistence):
             ) from e
 
     def get_job_run(self, run_id: str) -> JobRun | None:
-        """Retrieve a job run by ID."""
         try:
             with self._get_connection() as conn:
                 query = select(self.job_runs_table).where(
@@ -563,12 +484,10 @@ class SQLAlchemyPersistence(BasePersistence):
         offset: int = 0,
         since: datetime | None = None,
     ) -> list[JobRun]:
-        """List job runs with optional filtering."""
         try:
             with self._get_connection() as conn:
                 query = select(self.job_runs_table)
 
-                # Apply filters
                 if job_name:
                     query = query.where(self.job_runs_table.c.job_name == job_name)
 
@@ -580,7 +499,6 @@ class SQLAlchemyPersistence(BasePersistence):
                         self.job_runs_table.c.created_at >= self._to_naive_utc(since)
                     )
 
-                # Order and paginate
                 query = query.order_by(self.job_runs_table.c.created_at.desc())
 
                 if limit is not None:
@@ -599,7 +517,6 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to list job runs: {e}") from e
 
     def delete_job_run(self, run_id: str) -> bool:
-        """Delete a job run and its step runs."""
         try:
             with self._transaction() as conn:
                 stmt = delete(self.job_runs_table).where(
@@ -612,7 +529,6 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to delete job run '{run_id}': {e}") from e
 
     def get_job_run_count(self, job_name: str | None = None) -> int:
-        """Get the total number of job runs."""
         try:
             with self._get_connection() as conn:
                 query = select(func.count()).select_from(self.job_runs_table)
@@ -627,12 +543,6 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to count job runs: {e}") from e
 
     def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
-        """Remove job runs older than the specified datetime.
-
-        Args:
-            older_than: Delete runs created before this datetime.
-            dry_run: If True (default), only count without deleting.
-        """
         try:
             if dry_run:
                 with self._get_connection() as conn:
@@ -653,10 +563,8 @@ class SQLAlchemyPersistence(BasePersistence):
             raise PersistenceError(f"Failed to cleanup old runs: {e}") from e
 
     def health_check(self) -> dict[str, Any]:
-        """Check the health of the persistence backend."""
         try:
             with self._get_connection() as conn:
-                # Test basic queries
                 job_result = conn.execute(
                     select(func.count()).select_from(self.jobs_table)
                 )
@@ -667,7 +575,6 @@ class SQLAlchemyPersistence(BasePersistence):
                 )
                 run_count = run_result.scalar()
 
-                # Test write capability
                 test_query = select(self.schema_version_table.c.version).where(
                     self.schema_version_table.c.version == -999
                 )
@@ -697,7 +604,6 @@ class SQLAlchemyPersistence(BasePersistence):
             }
 
     def get_statistics(self) -> dict[str, Any]:
-        """Get persistence backend statistics."""
         health = self.health_check()
 
         if health["status"] == "unhealthy":
@@ -705,14 +611,12 @@ class SQLAlchemyPersistence(BasePersistence):
 
         try:
             with self._get_connection() as conn:
-                # Get status distribution
                 status_query = select(
                     self.job_runs_table.c.status, func.count().label("count")
                 ).group_by(self.job_runs_table.c.status)
                 status_result = conn.execute(status_query)
                 status_counts = dict(status_result.fetchall())
 
-                # Get recent activity
                 recent_query = (
                     select(func.count())
                     .select_from(self.job_runs_table)
@@ -740,7 +644,6 @@ class SQLAlchemyPersistence(BasePersistence):
             }
 
     def _mask_password(self, url: str) -> str:
-        """Mask password in database URL for security."""
         if "://" not in url:
             return url
 

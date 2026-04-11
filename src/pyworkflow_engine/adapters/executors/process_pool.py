@@ -1,10 +1,7 @@
 """
-ProcessPoolStepExecutor — exécution CPU-bound en sous-processus.
+Adapter executor — exécution CPU-bound en sous-processus (ProcessPoolStepExecutor).
 
-Utilise ``concurrent.futures.ProcessPoolExecutor`` pour isoler les steps
-dans des processus séparés. Les fonctions passées en handler doivent être
-**picklables** (pas de lambdas, pas de fonctions imbriquées).
-
+Les fonctions passées en handler doivent être picklables.
 Zéro dépendance externe — stdlib uniquement.
 """
 
@@ -19,7 +16,7 @@ if TYPE_CHECKING:
     from pyworkflow_engine.models import Step
 
 from pyworkflow_engine.exceptions import StepExecutionError
-from pyworkflow_engine.executors.base import BaseExecutor
+from pyworkflow_engine.ports.executor import BaseExecutor
 
 
 def _has_positional_params(fn) -> bool:
@@ -49,12 +46,6 @@ class ProcessPoolStepExecutor(BaseExecutor):
 
     Args:
         max_workers: Nombre maximum de processus. ``None`` = ``os.cpu_count()``.
-
-    Examples:
-        >>> from pyworkflow_engine.executors import ProcessPoolStepExecutor
-        >>> from pyworkflow_engine.executors import ExecutorRegistry
-        >>> registry = ExecutorRegistry()
-        >>> registry.register("cpu", ProcessPoolStepExecutor(max_workers=4))
     """
 
     def __init__(self, max_workers: int | None = None) -> None:
@@ -67,19 +58,7 @@ class ProcessPoolStepExecutor(BaseExecutor):
         return self._executor
 
     def execute(self, step: Step, context: WorkflowContext) -> Any:
-        """Exécute le handler du step dans un processus séparé.
-
-        Args:
-            step: Step à exécuter. Le handler doit être picklable.
-            context: Contexte converti en ``dict`` avant transmission.
-
-        Returns:
-            Valeur de retour du handler.
-
-        Raises:
-            StepExecutionError: Si le step n'a pas de handler ou si l'exécution
-                échoue.
-        """
+        """Exécute le handler du step dans un processus séparé."""
         if not step.handler:
             raise StepExecutionError(
                 f"Step '{step.name}' has no callable function", step_name=step.name

@@ -9,13 +9,11 @@ import pytest
 
 from pyworkflow_engine import Job, RunStatus, Step, StepType, WorkflowEngine
 from pyworkflow_engine.exceptions import StepExecutionError
-from pyworkflow_engine.executors import (
-    AsyncStepExecutor,
-    ExecutorRegistry,
-    ProcessPoolStepExecutor,
-    RetryableExecutor,
-    ThreadPoolStepExecutor,
-)
+from pyworkflow_engine.ports.executor import ExecutorRegistry
+from pyworkflow_engine.adapters.executors.async_exec import AsyncStepExecutor
+from pyworkflow_engine.adapters.executors.process_pool import ProcessPoolStepExecutor
+from pyworkflow_engine.adapters.executors.retryable import RetryableExecutor
+from pyworkflow_engine.adapters.executors.thread_pool import ThreadPoolStepExecutor
 
 
 # Add helper function for creating context
@@ -536,7 +534,7 @@ class TestLocalExecutor:
 
     def test_local_executor_no_args(self):
         """LocalExecutor exécute un callable sans arguments."""
-        from pyworkflow_engine.executors.local import LocalExecutor
+        from pyworkflow_engine.adapters.executors.local import LocalExecutor
 
         executor = LocalExecutor()
         step = Step(name="s", step_type=StepType.FUNCTION, handler=local_no_args)
@@ -546,7 +544,7 @@ class TestLocalExecutor:
 
     def test_local_executor_with_context(self):
         """LocalExecutor passe le contexte si le callable l'accepte."""
-        from pyworkflow_engine.executors.local import LocalExecutor
+        from pyworkflow_engine.adapters.executors.local import LocalExecutor
 
         executor = LocalExecutor()
         step = Step(name="s", step_type=StepType.FUNCTION, handler=local_with_context)
@@ -556,7 +554,7 @@ class TestLocalExecutor:
 
     def test_local_executor_no_callable_raises(self):
         """LocalExecutor lève StepExecutionError si callable est None."""
-        from pyworkflow_engine.executors.local import LocalExecutor
+        from pyworkflow_engine.adapters.executors.local import LocalExecutor
 
         executor = LocalExecutor()
         step = Step(name="s", step_type=StepType.SUBPROCESS)

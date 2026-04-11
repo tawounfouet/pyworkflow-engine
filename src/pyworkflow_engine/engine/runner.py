@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pyworkflow_engine.engine.context import WorkflowContext
 
 from pyworkflow_engine.exceptions import StepExecutionError, WorkflowSuspended
-from pyworkflow_engine.executors import BaseExecutor, ExecutorRegistry
+from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
 from pyworkflow_engine.models import JobRun, RunStatus, Step, StepRun, StepType
 from pyworkflow_engine.models.enums import ExecutorType
 
@@ -167,17 +167,17 @@ class WorkflowRunner:
             return None  # Handled by default executor path
 
         if et == ExecutorType.THREAD:
-            from pyworkflow_engine.executors.thread_pool import ThreadPoolStepExecutor
+            from pyworkflow_engine.adapters.executors.thread_pool import ThreadPoolStepExecutor
 
             return ThreadPoolStepExecutor()
 
         if et == ExecutorType.PROCESS:
-            from pyworkflow_engine.executors.process_pool import ProcessPoolStepExecutor
+            from pyworkflow_engine.adapters.executors.process_pool import ProcessPoolStepExecutor
 
             return ProcessPoolStepExecutor()
 
         if et == ExecutorType.ASYNC:
-            from pyworkflow_engine.executors.async_exec import AsyncStepExecutor
+            from pyworkflow_engine.adapters.executors.async_exec import AsyncStepExecutor
 
             return AsyncStepExecutor()
 

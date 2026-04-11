@@ -38,15 +38,15 @@ from pyworkflow_engine.models import (
     sub_job_to_dict,
 )
 from pyworkflow_engine.models.step import SubJob
-from pyworkflow_engine.persistence.base import (
+from pyworkflow_engine.ports.persistence import (
     JobNotFoundError,
     PersistenceError,
     TransactionContext,
     TransactionError,
 )
-from pyworkflow_engine.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.adapters.persistence.json_file import JSONFilePersistence
+from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
 
 
 # --- Helpers ---
@@ -108,27 +108,7 @@ class TestModelsWrapperFunctions:
 # --- persistence/__init__.py lazy imports ---
 
 
-class TestPersistenceInit:
-    def test_lazy_in_memory(self):
-        import pyworkflow_engine.persistence as pm
 
-        assert pm.InMemoryPersistence is InMemoryPersistence
-
-    def test_lazy_json_file(self):
-        import pyworkflow_engine.persistence as pm
-
-        assert pm.JSONFilePersistence is JSONFilePersistence
-
-    def test_lazy_sqlite(self):
-        import pyworkflow_engine.persistence as pm
-
-        assert pm.SQLitePersistence is SQLitePersistence
-
-    def test_attribute_error(self):
-        import pyworkflow_engine.persistence as pm
-
-        with pytest.raises(AttributeError, match="no attribute"):
-            _ = pm.DoesNotExist  # type: ignore[attr-defined]
 
 
 # --- persistence/base.py utilities ---
@@ -518,7 +498,7 @@ class TestBasePersistenceDeeper:
         InMemoryPersistence overrides get_statistics, so we call the base
         implementation explicitly with a list_jobs that raises.
         """
-        from pyworkflow_engine.persistence.base import BasePersistence
+        from pyworkflow_engine.ports.persistence import BasePersistence
 
         p = InMemoryPersistence()
 
@@ -538,7 +518,7 @@ class TestBasePersistenceDeeper:
 
     def test_base_cleanup_old_runs_via_base_method(self):
         """Call BasePersistence.cleanup_old_runs directly (not overridden)."""
-        from pyworkflow_engine.persistence.base import BasePersistence
+        from pyworkflow_engine.ports.persistence import BasePersistence
 
         p = InMemoryPersistence()
         job = _job()
@@ -594,38 +574,7 @@ class TestBasePersistenceDeeper:
 # --- persistence/__init__.py — ImportError branch for SQLAlchemy ---
 
 
-class TestPersistenceInitImportError:
-    """Cover the ImportError branch for optional SQLAlchemy backend."""
 
-    def test_sqlalchemy_import_error_message(self):
-        """Trigger the ImportError path for SQLAlchemy when not installed."""
-        import sys
-        import importlib
-
-        # Temporarily hide sqlalchemy from sys.modules
-        saved = sys.modules.pop("sqlalchemy", None)
-        saved_alchemy = sys.modules.pop(
-            "pyworkflow_engine.persistence.sqlalchemy", None
-        )
-
-        try:
-            import pyworkflow_engine.persistence as pm
-
-            # Clear the cached attribute so __getattr__ is triggered again
-            pm.__dict__.pop("SQLAlchemyPersistence", None)
-
-            # If sqlalchemy is genuinely absent, this should raise ImportError
-            try:
-                _ = pm.SQLAlchemyPersistence
-            except ImportError as e:
-                assert "sqlalchemy" in str(e).lower()
-            except Exception:
-                pass  # sqlalchemy IS installed — skip this branch
-        finally:
-            if saved is not None:
-                sys.modules["sqlalchemy"] = saved
-            if saved_alchemy is not None:
-                sys.modules["pyworkflow_engine.persistence.sqlalchemy"] = saved_alchemy
 
 
 # --- persistence/json_file.py — list_job_runs limit/offset, delete_job_run ---

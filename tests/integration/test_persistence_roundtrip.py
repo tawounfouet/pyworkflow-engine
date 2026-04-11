@@ -20,15 +20,15 @@ from pyworkflow_engine.models import (
     StepRun,
     StepType,
 )
-from pyworkflow_engine.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.adapters.persistence.json_file import JSONFilePersistence
+from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
 
 # ---------------------------------------------------------------------------
 # SQLAlchemy — optional
 # ---------------------------------------------------------------------------
 try:
-    from pyworkflow_engine.persistence.sqlalchemy import SQLAlchemyPersistence  # noqa: F401
+    from pyworkflow_engine.adapters.persistence.sqlalchemy import SQLAlchemyPersistence  # noqa: F401
 
     HAS_SQLALCHEMY = True
 except ImportError:

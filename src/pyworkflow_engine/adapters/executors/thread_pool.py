@@ -1,11 +1,7 @@
 """
-ThreadPoolStepExecutor — exécution I/O-bound via threads.
+Adapter executor — exécution I/O-bound via threads (ThreadPoolStepExecutor).
 
 Idéal pour les opérations réseau, fichiers, ou tout workload thread-safe.
-Utilise ``inspect.signature`` pour la détection de signature (robuste aux
-partials, méthodes de classe, *args/**kwargs).
-
-Pour l'exécution CPU-bound en sous-processus, voir ``process_pool.py``.
 """
 
 from __future__ import annotations
@@ -19,7 +15,7 @@ if TYPE_CHECKING:
     from pyworkflow_engine.models import Step
 
 from pyworkflow_engine.exceptions import StepExecutionError
-from pyworkflow_engine.executors.base import BaseExecutor
+from pyworkflow_engine.ports.executor import BaseExecutor
 
 
 def _has_positional_params(fn) -> bool:

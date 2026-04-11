@@ -25,7 +25,7 @@ Architecture modulaire:
     - Adapters: Intégrations framework-spécifiques (Django, FastAPI, Celery, etc.)
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __author__ = "PyWorkflow Contributors"
 __email__ = "dev@pyworkflow.dev"
 
@@ -67,27 +67,31 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         "WorkflowFailed": (".exceptions", "WorkflowFailed"),
         "StepExecutionError": (".exceptions", "StepExecutionError"),
         "DAGValidationError": (".exceptions", "DAGValidationError"),
-        # Executors
-        "ThreadPoolStepExecutor": (".executors.thread_pool", "ThreadPoolStepExecutor"),
+        # Executors — ports publics
+        "BaseExecutor": (".ports.executor", "BaseExecutor"),
+        "ExecutorRegistry": (".ports.executor", "ExecutorRegistry"),
+        # Executors — adapters
+        "LocalExecutor": (".adapters.executors.local", "LocalExecutor"),
+        "ThreadPoolStepExecutor": (".adapters.executors.thread_pool", "ThreadPoolStepExecutor"),
         "ProcessPoolStepExecutor": (
-            ".executors.thread_pool",
+            ".adapters.executors.process_pool",
             "ProcessPoolStepExecutor",
         ),
-        "AsyncStepExecutor": (".executors.async_exec", "AsyncStepExecutor"),
-        "RetryableExecutor": (".executors.retryable", "RetryableExecutor"),
-        "ExecutorRegistry": (".executors.base", "ExecutorRegistry"),
-        "LocalExecutor": (".executors.local", "LocalExecutor"),
+        "AsyncStepExecutor": (".adapters.executors.async_exec", "AsyncStepExecutor"),
+        "RetryableExecutor": (".adapters.executors.retryable", "RetryableExecutor"),
         # Engine — parallel runner
         "ParallelRunner": (".engine.parallel_runner", "ParallelRunner"),
-        # Triggers
-        "BaseTrigger": (".triggers.base", "BaseTrigger"),
-        "TriggerState": (".triggers.base", "TriggerState"),
-        "ManualTrigger": (".triggers.manual", "ManualTrigger"),
-        "ScheduleTrigger": (".triggers.schedule", "ScheduleTrigger"),
-        "CronExpression": (".triggers.schedule", "CronExpression"),
-        # Persistence
-        "InMemoryPersistence": (".persistence.memory", "InMemoryPersistence"),
-        "BasePersistence": (".persistence.base", "BasePersistence"),
+        # Triggers — ports publics
+        "BaseTrigger": (".ports.trigger", "BaseTrigger"),
+        "TriggerState": (".ports.trigger", "TriggerState"),
+        # Triggers — adapters
+        "ManualTrigger": (".adapters.triggers.manual", "ManualTrigger"),
+        "ScheduleTrigger": (".adapters.triggers.schedule", "ScheduleTrigger"),
+        "CronExpression": (".adapters.triggers.schedule", "CronExpression"),
+        # Persistence — port public
+        "BasePersistence": (".ports.persistence", "BasePersistence"),
+        # Persistence — adapters
+        "InMemoryPersistence": (".adapters.persistence.memory", "InMemoryPersistence"),
         # Decorators API (ADR-005)
         "step": (".decorators.step_decorator", "step"),
         "job": (".decorators.job_decorator", "job"),

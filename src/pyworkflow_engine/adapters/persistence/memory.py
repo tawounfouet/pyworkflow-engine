@@ -1,8 +1,9 @@
 """
-In-memory persistence backend for the PyWorkflow Engine.
+Adapter persistence — backend en mémoire (InMemoryPersistence).
 
-Provides fast, thread-safe storage for development and testing.
-Data is stored in memory and lost when the process exits.
+Stockage rapide et thread-safe en mémoire.
+Idéal pour les tests, le développement et les workflows temporaires.
+Les données sont perdues à la fin du processus.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pyworkflow_engine.models import Job, JobRun
 
-from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError
+from pyworkflow_engine.ports.persistence import BasePersistence, JobNotFoundError, PersistenceError
 
 
 class InMemoryPersistence(BasePersistence):

@@ -1,12 +1,17 @@
 """
-BaseTrigger — contrat abstrait pour tous les déclencheurs de workflow.
+Port trigger — contrat abstrait pour tous les déclencheurs de workflow.
+
+Ce module définit les interfaces pures (ABC + Enum) que toute implémentation
+de trigger doit respecter.  Il ne contient aucune implémentation concrète.
 
 Un trigger est responsable de :
   1. Décider *quand* un workflow doit démarrer.
   2. Appeler ``engine.run(job)`` (ou équivalent) au bon moment.
   3. Gérer son propre cycle de vie (start / stop).
 
-Zéro dépendance externe — stdlib uniquement.
+Règle hexagonale :
+    ``ports/`` ← dépend uniquement de la stdlib.
+    ``adapters/triggers/`` importe depuis ce module et l'implémente.
 """
 
 from __future__ import annotations
@@ -20,6 +25,9 @@ if TYPE_CHECKING:
 
     from pyworkflow_engine.facade import WorkflowEngine
     from pyworkflow_engine.models import Job, JobRun
+
+
+# ── Enum de contrat ───────────────────────────────────────────────────────────
 
 
 class TriggerState(Enum):
@@ -36,6 +44,9 @@ class TriggerState(Enum):
 
     ERROR = "error"
     """Arrêté suite à une erreur interne."""
+
+
+# ── Port principal ────────────────────────────────────────────────────────────
 
 
 class BaseTrigger(ABC):
@@ -81,9 +92,7 @@ class BaseTrigger(ABC):
         self._state = TriggerState.IDLE
         self._run_count = 0
 
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
+    # ── Properties ────────────────────────────────────────────────────────────
 
     @property
     def name(self) -> str:
@@ -105,9 +114,7 @@ class BaseTrigger(ABC):
         """``True`` si le trigger est actif."""
         return self._state == TriggerState.RUNNING
 
-    # ------------------------------------------------------------------
-    # Abstract interface
-    # ------------------------------------------------------------------
+    # ── Interface abstraite ───────────────────────────────────────────────────
 
     @abstractmethod
     def start(self) -> None:
@@ -146,9 +153,7 @@ class BaseTrigger(ABC):
             ``JobRun`` résultant de l'exécution.
         """
 
-    # ------------------------------------------------------------------
-    # Helpers pour les sous-classes
-    # ------------------------------------------------------------------
+    # ── Helpers pour les sous-classes ─────────────────────────────────────────
 
     def _do_fire(
         self,

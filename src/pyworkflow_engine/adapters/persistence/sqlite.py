@@ -1,17 +1,8 @@
 """
-SQLite persistence implementation for the PyWorkflow Engine.
+Adapter persistence — backend SQLite via stdlib (SQLitePersistence).
 
-This persistence backend uses SQLite database for reliable storage with
-ACID transactions and SQL querying capabilities. It uses only Python's
-standard library sqlite3 module, making it suitable for production
-deployments where SQLite is sufficient.
-
-Features:
-    - ACID transactions
-    - Efficient indexing and querying
-    - WAL mode for better concurrency
-    - Schema versioning and migrations
-    - No external dependencies (stdlib only)
+Stockage fiable avec transactions ACID.  Utilise uniquement le module
+``sqlite3`` de la stdlib — zéro dépendance externe.
 """
 
 from __future__ import annotations
@@ -24,7 +15,12 @@ from pathlib import Path
 from typing import Any
 
 from pyworkflow_engine.models import Job, JobRun, StepRun
-from pyworkflow_engine.persistence.base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
+from pyworkflow_engine.ports.persistence import (
+    BasePersistence,
+    JobNotFoundError,
+    PersistenceError,
+    TransactionError,
+)
 
 # Database schema version
 SCHEMA_VERSION = 2
@@ -704,12 +700,7 @@ class SQLitePersistence(BasePersistence):
             raise PersistenceError(f"Failed to count job runs: {e}") from e
 
     def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
-        """Remove job runs older than the specified datetime.
-
-        Args:
-            older_than: Delete runs created before this datetime.
-            dry_run: If True (default), only count without deleting.
-        """
+        """Remove job runs older than the specified datetime."""
         conn = self._get_connection()
         try:
             if dry_run:

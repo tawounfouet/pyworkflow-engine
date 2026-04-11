@@ -1,5 +1,5 @@
 """
-LocalExecutor — exécution synchrone dans le même processus.
+Adapter executor — exécution synchrone dans le même processus (LocalExecutor).
 
 C'est l'executor par défaut, équivalent à un appel direct de la fonction.
 Zéro overhead de pool, zéro dépendance externe.
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from pyworkflow_engine.models import Step
 
 from pyworkflow_engine.exceptions import StepExecutionError, WorkflowSuspended
-from pyworkflow_engine.executors.base import BaseExecutor
+from pyworkflow_engine.ports.executor import BaseExecutor
 
 
 class LocalExecutor(BaseExecutor):
@@ -32,7 +32,8 @@ class LocalExecutor(BaseExecutor):
 
     Examples:
         >>> from pyworkflow_engine import Job, Step, StepType, WorkflowEngine
-        >>> from pyworkflow_engine import LocalExecutor, ExecutorRegistry
+        >>> from pyworkflow_engine.adapters.executors import LocalExecutor
+        >>> from pyworkflow_engine.ports.executor import ExecutorRegistry
         >>>
         >>> def process(ctx):
         ...     return {"count": 42}
