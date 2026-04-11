@@ -7,7 +7,7 @@ the PyWorkflow Engine persistence layer.
 
 from pyworkflow_engine import WorkflowEngine
 from pyworkflow_engine.models import Job, Step, StepType
-from pyworkflow_engine.persistence import InMemoryPersistence
+from pyworkflow_engine.adapters.storage import InMemoryStorage
 
 
 def create_sample_job() -> Job:
@@ -49,12 +49,12 @@ def main():
     print(f"   ✅ Execution Time: {result.duration_ms}ms")
 
     # InMemory persistence (fully working)
-    print("\n💾 Testing InMemoryPersistence...")
-    persistence = InMemoryPersistence()
-    engine.persistence = persistence
+    print("\n💾 Testing InMemoryStorage...")
+    persistence = InMemoryStorage()
+    engine.storage = persistence
 
     # Run with persistence
-    result = engine.run_with_persistence(job)
+    result = engine.run_with_storage(job)
 
     print(f"   ✅ Persistent Execution: {result.status}")
     print(f"   ✅ Jobs Stored: {len(persistence.list_jobs())}")

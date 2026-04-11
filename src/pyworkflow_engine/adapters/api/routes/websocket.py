@@ -73,7 +73,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     continue
                 try:
                     job_run = await asyncio.to_thread(
-                        engine.run_with_persistence,
+                        engine.run_with_storage,
                         job_name,
                         initial_context=msg.get("context"),
                     )

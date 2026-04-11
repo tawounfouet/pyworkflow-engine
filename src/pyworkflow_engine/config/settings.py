@@ -173,7 +173,7 @@ class Settings:
         from pyworkflow_engine.config.engine import EngineConfig
         from pyworkflow_engine.config.executor import ExecutorConfig
         from pyworkflow_engine.config.logging import LoggingConfig
-        from pyworkflow_engine.config.persistence import PersistenceConfig
+        from pyworkflow_engine.config.storage import StorageConfig
 
         return WorkflowConfig(
             engine=EngineConfig(
@@ -193,7 +193,7 @@ class Settings:
                 log_file_backup_count=self.LOGGING_FILE_BACKUP_COUNT,
                 log_to_db=self.LOGGING_TO_DB,
             ),
-            persistence=PersistenceConfig(
+            (StorageConfig)(
                 db_path=self.DATABASE,
             ),
         )

@@ -6,9 +6,9 @@ Usage::
 
     from pyworkflow_engine.adapters.api import create_app
     from pyworkflow_engine import WorkflowEngine
-    from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+    from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
-    engine = WorkflowEngine(persistence=SQLitePersistence("workflow.db"))
+    engine = WorkflowEngine(storage=SQLiteStorage("workflow.db"))
     app = create_app(engine)
 
     # Lancer avec uvicorn

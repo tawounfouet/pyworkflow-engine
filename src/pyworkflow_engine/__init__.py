@@ -97,9 +97,9 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         "ScheduleTrigger": (".adapters.triggers.schedule", "ScheduleTrigger"),
         "CronExpression": (".adapters.triggers.schedule", "CronExpression"),
         # Persistence — port public
-        "BasePersistence": (".ports.persistence", "BasePersistence"),
+        "BaseStorage": (".ports.storage", "BaseStorage"),
         # Persistence — adapters
-        "InMemoryPersistence": (".adapters.persistence.memory", "InMemoryPersistence"),
+        "InMemoryStorage": (".adapters.storage.memory", "InMemoryStorage"),
         # Celery adapter (ADR-007) — opt-in, requiert pip install pyworkflow-engine[celery]
         "CeleryExecutor": (".adapters.celery.executor", "CeleryExecutor"),
         "CeleryConfig": (".adapters.celery.config", "CeleryConfig"),
@@ -165,8 +165,8 @@ __all__ = [
     "ScheduleTrigger",
     "CronExpression",
     # Built-in persistence
-    "InMemoryPersistence",
-    "BasePersistence",
+    "InMemoryStorage",
+    "BaseStorage",
     # Decorators API (ADR-005)
     "step",
     "job",

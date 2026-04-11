@@ -1,0 +1,26 @@
+# Configuration de la source [NOM_SOURCE]
+# TODO: Remplacer par les paramètres réels
+
+source:
+  name: "TODO_SOURCE"
+  type: "api"                        # api | sftp | database | file
+  base_url: "https://api.example.com"
+
+entities:
+  - name: "TODO_ENTITY"
+    endpoint: "/v1/data"
+    method: "GET"
+    pagination:
+      type: "cursor"                 # cursor | offset | page
+      page_size: 100
+
+# Champs requis pour la validation minimale
+validation:
+  required_fields:
+    - "id"
+    - "created_at"
+
+# Rate limiting
+rate_limit:
+  requests_per_second: 10
+  retry_after_429: true

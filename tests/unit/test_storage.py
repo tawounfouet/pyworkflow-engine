@@ -19,12 +19,12 @@ from pyworkflow_engine.models import (
     StepRun,
     StepType,
 )
-from pyworkflow_engine.ports.persistence import (
-    BasePersistence,
+from pyworkflow_engine.ports.storage import (
+    BaseStorage,
 )
-from pyworkflow_engine.adapters.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.adapters.storage.json_file import JSONFileStorage
+from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
+from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
 # SQLAlchemy tests only run if SQLAlchemy is available
 try:
@@ -35,7 +35,7 @@ except ImportError:
     HAS_SQLALCHEMY = False
 
 
-class PersistenceBackendTests:
+class StorageBackendTests:
     """Mixin de tests communs pour tous les backends de persistence.
 
     Cette classe n'est **pas** collectée par pytest (absence de préfixe
@@ -43,10 +43,10 @@ class PersistenceBackendTests:
     fournissent leur propre fixture ``persistence``.
 
     Sous-classes concrètes :
-        - ``TestInMemoryPersistence``
-        - ``TestJSONFilePersistence``
-        - ``TestSQLitePersistence``
-        - ``TestSQLAlchemyPersistence``
+        - ``TestInMemoryStorage``
+        - ``TestJSONFileStorage``
+        - ``TestSQLiteStorage``
+        - ``TestSQLAlchemyStorage``
     """
 
     @pytest.fixture
@@ -116,7 +116,7 @@ class PersistenceBackendTests:
             step_runs=step_runs,
         )
 
-    def test_save_and_get_job(self, persistence: BasePersistence, sample_job: Job):
+    def test_save_and_get_job(self, persistence: BaseStorage, sample_job: Job):
         """Test saving and retrieving a job."""
         # Save job
         persistence.save_job(sample_job)
@@ -141,12 +141,12 @@ class PersistenceBackendTests:
             assert orig_step.dependencies == retr_step.dependencies
             assert orig_step.timeout == retr_step.timeout
 
-    def test_get_nonexistent_job(self, persistence: BasePersistence):
+    def test_get_nonexistent_job(self, persistence: BaseStorage):
         """Test retrieving a job that doesn't exist."""
         result = persistence.get_job("nonexistent_job")
         assert result is None
 
-    def test_list_jobs(self, persistence: BasePersistence, sample_job: Job):
+    def test_list_jobs(self, persistence: BaseStorage, sample_job: Job):
         """Test listing jobs."""
         # Initially empty
         jobs = persistence.list_jobs()
@@ -160,7 +160,7 @@ class PersistenceBackendTests:
         assert len(jobs) == 1
         assert jobs[0].name == sample_job.name
 
-    def test_list_jobs_pagination(self, persistence: BasePersistence):
+    def test_list_jobs_pagination(self, persistence: BaseStorage):
         """Test job listing with pagination."""
         # Create multiple jobs
         for i in range(5):
@@ -195,7 +195,7 @@ class PersistenceBackendTests:
         all_jobs = persistence.list_jobs()
         assert len(all_jobs) == 5
 
-    def test_delete_job(self, persistence: BasePersistence, sample_job: Job):
+    def test_delete_job(self, persistence: BaseStorage, sample_job: Job):
         """Test deleting a job."""
         # Save job
         persistence.save_job(sample_job)
@@ -213,7 +213,7 @@ class PersistenceBackendTests:
         assert result is False
 
     def test_save_and_get_job_run(
-        self, persistence: BasePersistence, sample_job: Job, sample_job_run: JobRun
+        self, persistence: BaseStorage, sample_job: Job, sample_job_run: JobRun
     ):
         """Test saving and retrieving a job run."""
         # Save job first (some backends require it)
@@ -246,13 +246,13 @@ class PersistenceBackendTests:
             assert orig_step_run.output_data == retr_step_run.output_data
             assert orig_step_run.metadata == retr_step_run.metadata
 
-    def test_get_nonexistent_job_run(self, persistence: BasePersistence):
+    def test_get_nonexistent_job_run(self, persistence: BaseStorage):
         """Test retrieving a job run that doesn't exist."""
         result = persistence.get_job_run("nonexistent_run")
         assert result is None
 
     def test_list_job_runs(
-        self, persistence: BasePersistence, sample_job: Job, sample_job_run: JobRun
+        self, persistence: BaseStorage, sample_job: Job, sample_job_run: JobRun
     ):
         """Test listing job runs."""
         # Save job first
@@ -271,7 +271,7 @@ class PersistenceBackendTests:
         assert runs[0].id == sample_job_run.id
 
     def test_list_job_runs_filtering(
-        self, persistence: BasePersistence, sample_job: Job
+        self, persistence: BaseStorage, sample_job: Job
     ):
         """Test listing job runs with filters."""
         # Save job first
@@ -326,7 +326,7 @@ class PersistenceBackendTests:
         assert recent_runs[0].id == "run3"
 
     def test_list_job_runs_pagination(
-        self, persistence: BasePersistence, sample_job: Job
+        self, persistence: BaseStorage, sample_job: Job
     ):
         """Test job run listing with pagination."""
         # Save job first
@@ -356,7 +356,7 @@ class PersistenceBackendTests:
         assert page2[1].id == "run_1"
 
     def test_delete_job_run(
-        self, persistence: BasePersistence, sample_job: Job, sample_job_run: JobRun
+        self, persistence: BaseStorage, sample_job: Job, sample_job_run: JobRun
     ):
         """Test deleting a job run."""
         # Save job and job run
@@ -376,7 +376,7 @@ class PersistenceBackendTests:
         result = persistence.delete_job_run("nonexistent")
         assert result is False
 
-    def test_get_job_run_count(self, persistence: BasePersistence, sample_job: Job):
+    def test_get_job_run_count(self, persistence: BaseStorage, sample_job: Job):
         """Test getting job run count."""
         # Save job first
         persistence.save_job(sample_job)
@@ -407,7 +407,7 @@ class PersistenceBackendTests:
         count_for_job = persistence.get_job_run_count(job_name=sample_job.name)
         assert count_for_job == 3
 
-    def test_cleanup_old_runs(self, persistence: BasePersistence, sample_job: Job):
+    def test_cleanup_old_runs(self, persistence: BaseStorage, sample_job: Job):
         """Test cleaning up old job runs."""
         # Save job first
         persistence.save_job(sample_job)
@@ -479,7 +479,7 @@ class PersistenceBackendTests:
 
     @pytest.mark.parametrize("dry_run", [True, False])
     def test_cleanup_old_runs_dry_run(
-        self, persistence: BasePersistence, sample_job: Job, dry_run: bool
+        self, persistence: BaseStorage, sample_job: Job, dry_run: bool
     ):
         """Test cleanup_old_runs avec dry_run=True et dry_run=False.
 
@@ -518,7 +518,7 @@ class PersistenceBackendTests:
             assert persistence.get_job_run("old_dr_run") is None
             assert persistence.get_job_run("recent_dr_run") is not None
 
-    def test_health_check(self, persistence: BasePersistence):
+    def test_health_check(self, persistence: BaseStorage):
         """Test health check functionality."""
         health = persistence.health_check()
 
@@ -527,7 +527,7 @@ class PersistenceBackendTests:
         assert "backend" in health
         assert health["status"] in ["healthy", "unhealthy"]
 
-    def test_get_statistics(self, persistence: BasePersistence):
+    def test_get_statistics(self, persistence: BaseStorage):
         """Test statistics functionality."""
         stats = persistence.get_statistics()
 
@@ -535,27 +535,27 @@ class PersistenceBackendTests:
         assert "backend" in stats
 
 
-class TestInMemoryPersistence(PersistenceBackendTests):
-    """Test cases specific to InMemoryPersistence."""
+class TestInMemoryStorage(StorageBackendTests):
+    """Test cases specific to InMemoryStorage."""
 
     @pytest.fixture
-    def persistence(self) -> InMemoryPersistence:
+    def storage(self) -> InMemoryStorage:
         """Create an in-memory persistence instance."""
-        return InMemoryPersistence()
+        return InMemoryStorage()
 
 
-class TestJSONFilePersistence(PersistenceBackendTests):
-    """Test cases specific to JSONFilePersistence."""
+class TestJSONFileStorage(StorageBackendTests):
+    """Test cases specific to JSONFileStorage."""
 
     @pytest.fixture
-    def persistence(self) -> JSONFilePersistence:
+    def storage(self) -> JSONFileStorage:
         """Create a JSON file persistence instance with temporary directory."""
         temp_dir = tempfile.mkdtemp()
         # Store for cleanup - pytest will handle this
-        return JSONFilePersistence(storage_dir=temp_dir)
+        return JSONFileStorage(storage_dir=temp_dir)
 
     def test_file_based_storage(
-        self, persistence: JSONFilePersistence, sample_job: Job
+        self, persistence: JSONFileStorage, sample_job: Job
     ):
         """Test that data is actually stored in files."""
         # Save job
@@ -573,15 +573,15 @@ class TestJSONFilePersistence(PersistenceBackendTests):
             assert data["name"] == sample_job.name
 
 
-class TestSQLitePersistence(PersistenceBackendTests):
-    """Test cases specific to SQLitePersistence."""
+class TestSQLiteStorage(StorageBackendTests):
+    """Test cases specific to SQLiteStorage."""
 
     @pytest.fixture
-    def persistence(self) -> SQLitePersistence:
+    def storage(self) -> SQLiteStorage:
         """Create a SQLite persistence instance with in-memory database."""
-        return SQLitePersistence(":memory:")
+        return SQLiteStorage(":memory:")
 
-    def test_database_initialization(self, persistence: SQLitePersistence):
+    def test_database_initialization(self, persistence: SQLiteStorage):
         """Test that database tables are properly created."""
         # Basic test - if we can create the instance, tables should be created
         assert persistence is not None
@@ -593,15 +593,15 @@ class TestSQLitePersistence(PersistenceBackendTests):
 
 # SQLAlchemy tests only run if SQLAlchemy is available
 @pytest.mark.skipif(not HAS_SQLALCHEMY, reason="SQLAlchemy not available")
-class TestSQLAlchemyPersistence(PersistenceBackendTests):
-    """Test cases specific to SQLAlchemyPersistence."""
+class TestSQLAlchemyStorage(StorageBackendTests):
+    """Test cases specific to SQLAlchemyStorage."""
 
     @pytest.fixture
-    def persistence(self):
+    def storage(self):
         """Create a SQLAlchemy persistence instance with in-memory SQLite."""
-        from pyworkflow_engine.adapters.persistence.sqlalchemy import SQLAlchemyPersistence
+        from pyworkflow_engine.adapters.storage.sqlalchemy import SQLAlchemyStorage
 
-        return SQLAlchemyPersistence("sqlite:///:memory:")
+        return SQLAlchemyStorage("sqlite:///:memory:")
 
     def test_database_initialization(self, persistence):
         """Test that database is properly initialized."""
@@ -704,9 +704,9 @@ class TestTransactionBehavior:
 
     @pytest.fixture(
         params=[
-            InMemoryPersistence,
-            lambda: JSONFilePersistence(tempfile.mkdtemp()),
-            lambda: SQLitePersistence(":memory:"),
+            InMemoryStorage,
+            lambda: JSONFileStorage(tempfile.mkdtemp()),
+            lambda: SQLiteStorage(":memory:"),
         ]
     )
     def persistence(self, request):
@@ -732,7 +732,7 @@ class TestTransactionBehavior:
         )
 
     def test_transaction_context_manager(
-        self, persistence: BasePersistence, sample_job: Job
+        self, persistence: BaseStorage, sample_job: Job
     ):
         """Test transaction context manager."""
         # Test successful transaction
@@ -775,10 +775,10 @@ class TestPersistenceIntegration:
     def test_engine_integration(self):
         """Test persistence integration with WorkflowEngine."""
         from pyworkflow_engine import WorkflowEngine
-        from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+        from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
 
-        persistence = InMemoryPersistence()
-        engine = WorkflowEngine(persistence=persistence)
+        persistence = InMemoryStorage()
+        engine = WorkflowEngine(storage=persistence)
 
         # Engine should use the persistence backend
         assert engine.persistence is persistence

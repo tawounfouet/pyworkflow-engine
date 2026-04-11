@@ -1,5 +1,5 @@
 """
-Adapter persistence — backend en mémoire (InMemoryPersistence).
+Adapter persistence — backend en mémoire (InMemoryStorage).
 
 Stockage rapide et thread-safe en mémoire.
 Idéal pour les tests, le développement et les workflows temporaires.
@@ -16,10 +16,10 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pyworkflow_engine.models import Job, JobRun
 
-from pyworkflow_engine.ports.persistence import BasePersistence, JobNotFoundError, PersistenceError
+from pyworkflow_engine.ports.storage import BaseStorage, JobNotFoundError, StorageError
 
 
-class InMemoryPersistence(BasePersistence):
+class InMemoryStorage(BaseStorage):
     """In-memory persistence backend.
 
     Stores all data in memory using thread-safe data structures.
@@ -33,8 +33,8 @@ class InMemoryPersistence(BasePersistence):
     - Data lost on process exit
 
     Usage:
-        persistence = InMemoryPersistence()
-        engine = WorkflowEngine(persistence=persistence)
+        persistence = InMemoryStorage()
+        engine = WorkflowEngine(storage=persistence)
     """
 
     def __init__(self):
@@ -177,7 +177,7 @@ class InMemoryPersistence(BasePersistence):
         """Begin a transaction by creating snapshots."""
         with self._lock:
             if self._transaction_active:
-                raise PersistenceError("Transaction already active")
+                raise StorageError("Transaction already active")
 
             # Create deep copies for rollback
             self._transaction_snapshots = {
@@ -190,7 +190,7 @@ class InMemoryPersistence(BasePersistence):
         """Commit the current transaction."""
         with self._lock:
             if not self._transaction_active:
-                raise PersistenceError("No active transaction to commit")
+                raise StorageError("No active transaction to commit")
 
             # Discard snapshots - current state becomes committed
             self._transaction_snapshots = None
@@ -200,7 +200,7 @@ class InMemoryPersistence(BasePersistence):
         """Rollback to transaction snapshots."""
         with self._lock:
             if not self._transaction_active:
-                raise PersistenceError("No active transaction to rollback")
+                raise StorageError("No active transaction to rollback")
 
             if self._transaction_snapshots:
                 # Restore from snapshots
@@ -258,7 +258,7 @@ class InMemoryPersistence(BasePersistence):
         """
         with self._lock:
             if self._transaction_active:
-                raise PersistenceError("Cannot clear data during active transaction")
+                raise StorageError("Cannot clear data during active transaction")
 
             self._jobs.clear()
             self._job_runs.clear()
@@ -285,9 +285,9 @@ class InMemoryPersistence(BasePersistence):
             data: Data dictionary from export_data().
 
         Raises:
-            PersistenceError: If data format is invalid.
+            StorageError: If data format is invalid.
         """
-        raise PersistenceError(
-            "InMemoryPersistence does not support import_data. "
+        raise StorageError(
+            "InMemoryStorage does not support import_data. "
             "Use a file-based backend for data migration."
         )

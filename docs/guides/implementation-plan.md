@@ -200,10 +200,10 @@ assert result.result["step_0"]["message"] == "Hello World!"
 #### Semaine 4 : Persistence & Triggers
 
 **Jour 1-3 : Persistence**
-- [ ] `persistence/base.py` : BasePersistence (ABC)
-- [ ] `persistence/memory.py` : InMemoryPersistence
-- [ ] `persistence/json_file.py` : JSONFilePersistence
-- [ ] `persistence/sqlite.py` : SQLitePersistence (sqlite3 stdlib)
+- [ ] `persistence/base.py` : BaseStorage (ABC)
+- [ ] `persistence/memory.py` : InMemoryStorage
+- [ ] `persistence/json_file.py` : JSONFileStorage
+- [ ] `persistence/sqlite.py` : SQLiteStorage (sqlite3 stdlib)
 - [ ] Tests pour chaque backend de persistence
 
 **Jour 4-5 : Triggers**
@@ -218,9 +218,9 @@ assert result.result["step_0"]["message"] == "Hello World!"
 ```python
 # Persistence pluggable
 from pyworkflow_engine import Job, WorkflowEngine
-from pyworkflow_engine.persistence import SQLitePersistence
+from pyworkflow_engine.persistence import SQLiteStorage
 
-persistence = SQLitePersistence("workflows.db")
+persistence = SQLiteStorage("workflows.db")
 engine = WorkflowEngine(persistence=persistence)
 
 # Executors pluggables
@@ -270,7 +270,7 @@ assert resumed.status == "success"
 
 **Jour 5 : Adapter SQLAlchemy**
 - [ ] `adapters/sqlalchemy/models.py` : Tables SQLAlchemy
-- [ ] `adapters/sqlalchemy/persistence.py` : SQLAlchemyPersistence
+- [ ] `adapters/sqlalchemy/persistence.py` : SQLAlchemyStorage
 - [ ] Tests SQLAlchemy
 
 **Critères d'Acceptance Phase 3** :

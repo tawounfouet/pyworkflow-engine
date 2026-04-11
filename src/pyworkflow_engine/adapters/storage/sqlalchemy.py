@@ -1,5 +1,5 @@
 """
-Adapter persistence — backend SQLAlchemy (SQLAlchemyPersistence).
+Adapter persistence — backend SQLAlchemy (SQLAlchemyStorage).
 
 Support PostgreSQL, MySQL, SQLite, etc. via SQLAlchemy.
 Nécessite : ``pip install pyworkflow-engine[sqlalchemy]``
@@ -34,10 +34,10 @@ except ImportError as e:
     ) from e
 
 from pyworkflow_engine.models import Job, JobRun, Step, StepRun
-from pyworkflow_engine.ports.persistence import BasePersistence, JobNotFoundError, PersistenceError
+from pyworkflow_engine.ports.storage import BaseStorage, JobNotFoundError, StorageError
 
 
-class SQLAlchemyPersistence(BasePersistence):
+class SQLAlchemyStorage(BaseStorage):
     """SQLAlchemy-based persistence backend.
 
     Supported databases:
@@ -174,7 +174,7 @@ class SQLAlchemyPersistence(BasePersistence):
                     conn.execute(insert(self.schema_version_table).values(version=1))
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to initialize database: {e}") from e
+            raise StorageError(f"Failed to initialize database: {e}") from e
 
     def _serialize_json(self, data: Any) -> str | None:
         return json.dumps(data) if data else None
@@ -341,7 +341,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 conn.execute(stmt)
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to save job '{job.name}': {e}") from e
+            raise StorageError(f"Failed to save job '{job.name}': {e}") from e
 
     def get_job(self, job_name: str) -> Job | None:
         try:
@@ -354,7 +354,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return self._deserialize_job(row) if row else None
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to get job '{job_name}': {e}") from e
+            raise StorageError(f"Failed to get job '{job_name}': {e}") from e
 
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         try:
@@ -368,7 +368,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return [self._deserialize_job(row) for row in result]
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to list jobs: {e}") from e
+            raise StorageError(f"Failed to list jobs: {e}") from e
 
     def delete_job(self, job_name: str) -> bool:
         try:
@@ -378,7 +378,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return result.rowcount > 0
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to delete job '{job_name}': {e}") from e
+            raise StorageError(f"Failed to delete job '{job_name}': {e}") from e
 
     # Job run operations
 
@@ -417,7 +417,7 @@ class SQLAlchemyPersistence(BasePersistence):
                     conn.execute(insert(self.step_runs_table), step_data)
 
         except SQLAlchemyError as e:
-            raise PersistenceError(
+            raise StorageError(
                 f"Failed to save job run '{job_run.job_run_id}': {e}"
             ) from e
 
@@ -454,7 +454,7 @@ class SQLAlchemyPersistence(BasePersistence):
                     conn.execute(insert(self.step_runs_table), step_data)
 
         except SQLAlchemyError as e:
-            raise PersistenceError(
+            raise StorageError(
                 f"Failed to update job run '{job_run.job_run_id}': {e}"
             ) from e
 
@@ -474,7 +474,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return self._deserialize_job_run(row, step_runs)
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to get job run '{run_id}': {e}") from e
+            raise StorageError(f"Failed to get job run '{run_id}': {e}") from e
 
     def list_job_runs(
         self,
@@ -514,7 +514,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return runs
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to list job runs: {e}") from e
+            raise StorageError(f"Failed to list job runs: {e}") from e
 
     def delete_job_run(self, run_id: str) -> bool:
         try:
@@ -526,7 +526,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return result.rowcount > 0
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to delete job run '{run_id}': {e}") from e
+            raise StorageError(f"Failed to delete job run '{run_id}': {e}") from e
 
     def get_job_run_count(self, job_name: str | None = None) -> int:
         try:
@@ -540,7 +540,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return result.scalar()
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to count job runs: {e}") from e
+            raise StorageError(f"Failed to count job runs: {e}") from e
 
     def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
         try:
@@ -560,7 +560,7 @@ class SQLAlchemyPersistence(BasePersistence):
                 return result.rowcount
 
         except SQLAlchemyError as e:
-            raise PersistenceError(f"Failed to cleanup old runs: {e}") from e
+            raise StorageError(f"Failed to cleanup old runs: {e}") from e
 
     def health_check(self) -> dict[str, Any]:
         try:

@@ -1,5 +1,5 @@
 """
-Adapter persistence — backend SQLite via stdlib (SQLitePersistence).
+Adapter persistence — backend SQLite via stdlib (SQLiteStorage).
 
 Stockage fiable avec transactions ACID.  Utilise uniquement le module
 ``sqlite3`` de la stdlib — zéro dépendance externe.
@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from pyworkflow_engine.models import Job, JobRun, StepRun
-from pyworkflow_engine.ports.persistence import (
-    BasePersistence,
+from pyworkflow_engine.ports.storage import (
+    BaseStorage,
     JobNotFoundError,
-    PersistenceError,
+    StorageError,
     TransactionError,
 )
 
@@ -102,7 +102,7 @@ END;
 """
 
 
-class SQLitePersistence(BasePersistence):
+class SQLiteStorage(BaseStorage):
     """SQLite-based persistence backend.
 
     This implementation provides reliable, ACID-compliant storage using
@@ -184,7 +184,7 @@ class SQLitePersistence(BasePersistence):
                     conn.commit()
 
             except sqlite3.Error as e:
-                raise PersistenceError(f"Failed to initialize database: {e}") from e
+                raise StorageError(f"Failed to initialize database: {e}") from e
 
     def _serialize_job(self, job: Job) -> dict[str, Any]:
         """Serialize a job for database storage (compact SQL row format)."""
@@ -361,7 +361,7 @@ class SQLitePersistence(BasePersistence):
             )
             return [self._deserialize_step_run(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to load step runs: {e}") from e
+            raise StorageError(f"Failed to load step runs: {e}") from e
 
     # Transaction support
 
@@ -415,7 +415,7 @@ class SQLitePersistence(BasePersistence):
             )
             conn.commit()
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to save job '{job.name}': {e}") from e
+            raise StorageError(f"Failed to save job '{job.name}': {e}") from e
 
     def get_job(self, job_name: str) -> Job | None:
         """Retrieve a job definition by name."""
@@ -425,7 +425,7 @@ class SQLitePersistence(BasePersistence):
             row = cursor.fetchone()
             return self._deserialize_job(row) if row else None
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to get job '{job_name}': {e}") from e
+            raise StorageError(f"Failed to get job '{job_name}': {e}") from e
 
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         """List all job definitions."""
@@ -441,7 +441,7 @@ class SQLitePersistence(BasePersistence):
             cursor = conn.execute(sql, params)
             return [self._deserialize_job(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to list jobs: {e}") from e
+            raise StorageError(f"Failed to list jobs: {e}") from e
 
     def delete_job(self, job_name: str) -> bool:
         """Delete a job definition."""
@@ -451,7 +451,7 @@ class SQLitePersistence(BasePersistence):
             conn.commit()
             return cursor.rowcount > 0
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to delete job '{job_name}': {e}") from e
+            raise StorageError(f"Failed to delete job '{job_name}': {e}") from e
 
     # Job run operations
 
@@ -526,7 +526,7 @@ class SQLitePersistence(BasePersistence):
             conn.commit()
 
         except sqlite3.Error as e:
-            raise PersistenceError(
+            raise StorageError(
                 f"Failed to save job run '{job_run.job_run_id}': {e}"
             ) from e
 
@@ -608,7 +608,7 @@ class SQLitePersistence(BasePersistence):
             conn.commit()
 
         except sqlite3.Error as e:
-            raise PersistenceError(
+            raise StorageError(
                 f"Failed to update job run '{job_run.job_run_id}': {e}"
             ) from e
 
@@ -627,7 +627,7 @@ class SQLitePersistence(BasePersistence):
             return self._deserialize_job_run(row, step_runs)
 
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to get job run '{run_id}': {e}") from e
+            raise StorageError(f"Failed to get job run '{run_id}': {e}") from e
 
     def list_job_runs(
         self,
@@ -671,7 +671,7 @@ class SQLitePersistence(BasePersistence):
             return runs
 
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to list job runs: {e}") from e
+            raise StorageError(f"Failed to list job runs: {e}") from e
 
     def delete_job_run(self, run_id: str) -> bool:
         """Delete a job run and its step runs."""
@@ -683,7 +683,7 @@ class SQLitePersistence(BasePersistence):
             conn.commit()
             return cursor.rowcount > 0
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to delete job run '{run_id}': {e}") from e
+            raise StorageError(f"Failed to delete job run '{run_id}': {e}") from e
 
     def get_job_run_count(self, job_name: str | None = None) -> int:
         """Get the total number of job runs."""
@@ -697,7 +697,7 @@ class SQLitePersistence(BasePersistence):
                 cursor = conn.execute("SELECT COUNT(*) FROM job_runs")
             return cursor.fetchone()[0]
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to count job runs: {e}") from e
+            raise StorageError(f"Failed to count job runs: {e}") from e
 
     def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
         """Remove job runs older than the specified datetime."""
@@ -715,7 +715,7 @@ class SQLitePersistence(BasePersistence):
             conn.commit()
             return cursor.rowcount
         except sqlite3.Error as e:
-            raise PersistenceError(f"Failed to cleanup old runs: {e}") from e
+            raise StorageError(f"Failed to cleanup old runs: {e}") from e
 
     def health_check(self) -> dict[str, Any]:
         """Check the health of the persistence backend."""

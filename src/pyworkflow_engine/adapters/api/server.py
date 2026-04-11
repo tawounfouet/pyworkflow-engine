@@ -6,9 +6,9 @@ Usage::
 
     from pyworkflow_engine.adapters.api.server import run_server
     from pyworkflow_engine import WorkflowEngine
-    from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+    from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
-    engine = WorkflowEngine(persistence=SQLitePersistence("workflow.db"))
+    engine = WorkflowEngine(storage=SQLiteStorage("workflow.db"))
     run_server(engine, host="0.0.0.0", port=8000)
 """
 

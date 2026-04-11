@@ -13,7 +13,7 @@ from pyworkflow_engine.adapters.api.schemas.jobs import (
     ValidationResponse,
 )
 from pyworkflow_engine.facade import WorkflowEngine
-from pyworkflow_engine.ports.persistence import JobNotFoundError
+from pyworkflow_engine.ports.storage import JobNotFoundError
 
 router = APIRouter(
     prefix="/api/v1/jobs",

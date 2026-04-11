@@ -24,16 +24,16 @@ class SuspensionManager:
     """
 
     def __init__(self, persistence: Any | None = None):
-        self._persistence = persistence
+        self._storage = persistence
         self._in_memory: dict[str, JobRun] = {}
 
     @property
-    def persistence(self) -> Any | None:
-        return self._persistence
+    def storage(self) -> Any | None:
+        return self._storage
 
-    @persistence.setter
+    @storage.setter
     def persistence(self, backend: Any | None) -> None:
-        self._persistence = backend
+        self._storage = backend
 
     # ------------------------------------------------------------------
     # Public API
@@ -49,11 +49,11 @@ class SuspensionManager:
         job_run.suspend(reason)
         self._in_memory[job_run.job_run_id] = job_run
 
-        if self._persistence:
+        if self._storage:
             import contextlib
 
             with contextlib.suppress(Exception):
-                self._persistence.save_job_run(job_run)
+                self._storage.save_job_run(job_run)
 
     def get_suspended(self, run_id: str) -> JobRun | None:
         """Retrouve un workflow suspendu.
@@ -69,9 +69,9 @@ class SuspensionManager:
         if run_id in self._in_memory:
             return self._in_memory[run_id]
 
-        if self._persistence:
+        if self._storage:
             try:
-                job_run = self._persistence.get_job_run(run_id)
+                job_run = self._storage.get_job_run(run_id)
                 if job_run and job_run.status == RunStatus.SUSPENDED:
                     self._in_memory[run_id] = job_run
                     return job_run
@@ -100,9 +100,9 @@ class SuspensionManager:
         """
         ids: set[str] = set(self._in_memory.keys())
 
-        if self._persistence:
+        if self._storage:
             try:
-                runs = self._persistence.list_job_runs(status="suspended")
+                runs = self._storage.list_job_runs(status="suspended")
                 ids.update(r.job_run_id for r in runs)
             except Exception:
                 pass  # Fallback silencieux — le dict mémoire reste disponible
@@ -113,9 +113,9 @@ class SuspensionManager:
         """Vérifie si un workflow est suspendu (mémoire ou persistence)."""
         if run_id in self._in_memory:
             return True
-        if self._persistence:
+        if self._storage:
             try:
-                job_run = self._persistence.get_job_run(run_id)
+                job_run = self._storage.get_job_run(run_id)
                 return job_run is not None and job_run.status.value == "suspended"
             except Exception:
                 pass

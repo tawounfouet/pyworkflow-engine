@@ -20,7 +20,7 @@ from pyworkflow_engine.exceptions import (
     WorkflowError,
     WorkflowFailed,
 )
-from pyworkflow_engine.ports.persistence import JobNotFoundError, PersistenceError
+from pyworkflow_engine.ports.storage import JobNotFoundError, StorageError
 
 err = Console(stderr=True)
 
@@ -32,7 +32,7 @@ EXIT_OK = 0
 EXIT_JOB_ERROR = 1  # JobNotFoundError, DAGValidationError, WorkflowError
 EXIT_STEP_ERROR = 2  # StepExecutionError, WorkflowFailed
 EXIT_IMPORT_ERROR = 3  # ImportError, module/attribut introuvable
-EXIT_CONFIG_ERROR = 4  # PersistenceError, configuration manquante
+EXIT_CONFIG_ERROR = 4  # StorageError, configuration manquante
 EXIT_UNEXPECTED = 5  # Exception inattendue
 
 
@@ -73,7 +73,7 @@ def error_handler(func: Callable[..., Any]) -> Callable[..., Any]:
         except WorkflowFailed as e:
             err.print(f"[bold red]✗[/bold red] Workflow échoué : {e}")
             raise typer.Exit(EXIT_STEP_ERROR) from e
-        except PersistenceError as e:
+        except StorageError as e:
             err.print(f"[bold red]✗[/bold red] Erreur persistence : {e}")
             raise typer.Exit(EXIT_CONFIG_ERROR) from e
         except WorkflowError as e:

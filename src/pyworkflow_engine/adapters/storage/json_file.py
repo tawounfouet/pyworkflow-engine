@@ -1,5 +1,5 @@
 """
-Adapter persistence — backend JSON sur disque (JSONFilePersistence).
+Adapter persistence — backend JSON sur disque (JSONFileStorage).
 
 Stockage dans des fichiers JSON.  Adapté au développement, aux tests et
 aux déploiements de petite échelle où la lisibilité prime sur la performance.
@@ -18,15 +18,15 @@ from pathlib import Path
 from typing import Any
 
 from pyworkflow_engine.models import Job, JobRun, StepRun
-from pyworkflow_engine.ports.persistence import (
-    BasePersistence,
+from pyworkflow_engine.ports.storage import (
+    BaseStorage,
     JobNotFoundError,
-    PersistenceError,
+    StorageError,
     TransactionError,
 )
 
 
-class JSONFilePersistence(BasePersistence):
+class JSONFileStorage(BaseStorage):
     """File-based persistence using JSON format.
 
     This implementation stores each job and job run in separate JSON files
@@ -108,7 +108,7 @@ class JSONFilePersistence(BasePersistence):
             with open(file_path, encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, json.JSONDecodeError) as e:
-            raise PersistenceError(f"Failed to read {file_path}: {e}") from e
+            raise StorageError(f"Failed to read {file_path}: {e}") from e
 
     def _write_file_atomic(self, file_path: Path, data: dict[str, Any]) -> None:
         """Atomically write a JSON file."""
@@ -127,7 +127,7 @@ class JSONFilePersistence(BasePersistence):
             if temp_path.exists():
                 with contextlib.suppress(OSError):
                     temp_path.unlink()
-            raise PersistenceError(f"Failed to write {file_path}: {e}") from e
+            raise StorageError(f"Failed to write {file_path}: {e}") from e
 
     def _delete_file_atomic(self, file_path: Path) -> bool:
         """Atomically delete a file."""
@@ -137,7 +137,7 @@ class JSONFilePersistence(BasePersistence):
                 return True
             return False
         except OSError as e:
-            raise PersistenceError(f"Failed to delete {file_path}: {e}") from e
+            raise StorageError(f"Failed to delete {file_path}: {e}") from e
 
     # Transaction support
 
@@ -237,7 +237,7 @@ class JSONFilePersistence(BasePersistence):
                         data = self._read_file_atomic(file_path)
                         if data:
                             jobs.append(self._deserialize_job(data))
-                    except PersistenceError:
+                    except StorageError:
                         # Skip corrupted files
                         continue
 
@@ -322,7 +322,7 @@ class JSONFilePersistence(BasePersistence):
                                 continue
 
                             runs.append(run)
-                    except PersistenceError:
+                    except StorageError:
                         # Skip corrupted files
                         continue
 
@@ -358,7 +358,7 @@ class JSONFilePersistence(BasePersistence):
                             job_name is None or data.get("job_name") == job_name
                         ):
                             count += 1
-                    except PersistenceError:
+                    except StorageError:
                         # Skip corrupted files
                         continue
 
@@ -384,7 +384,7 @@ class JSONFilePersistence(BasePersistence):
                                 dry_run or self._delete_file_atomic(file_path)
                             ):
                                 count += 1
-                    except (PersistenceError, ValueError):
+                    except (StorageError, ValueError):
                         continue
 
             return count

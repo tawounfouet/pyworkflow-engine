@@ -9,10 +9,10 @@ from pathlib import Path
 
 from pyworkflow_engine import WorkflowEngine
 from pyworkflow_engine.models import Job, Step, StepType
-from pyworkflow_engine.persistence import (
-    InMemoryPersistence,
-    JSONFilePersistence,
-    SQLitePersistence,
+from pyworkflow_engine.adapters.storage import (
+    InMemoryStorage,
+    JSONFileStorage,
+    SQLiteStorage,
 )
 
 
@@ -40,17 +40,17 @@ def create_sample_job() -> Job:
 
 
 def test_in_memory_persistence():
-    """Test InMemoryPersistence with the renamed package."""
-    print("\n📦 Testing InMemoryPersistence...")
+    """Test InMemoryStorage with the renamed package."""
+    print("\n📦 Testing InMemoryStorage...")
 
     # Create persistence and engine
-    persistence = InMemoryPersistence()
+    persistence = InMemoryStorage()
     engine = WorkflowEngine()
-    engine.persistence = persistence
+    engine.storage = persistence
 
     # Create and save a job
     job = create_sample_job()
-    result = engine.run_with_persistence(job)
+    result = engine.run_with_storage(job)
 
     print(f"   ✅ Job executed: {result.status}")
     print(f"   ✅ Jobs in storage: {len(persistence.list_jobs())}")
@@ -58,18 +58,18 @@ def test_in_memory_persistence():
 
 
 def test_json_persistence():
-    """Test JSONFilePersistence with the renamed package."""
-    print("\n📁 Testing JSONFilePersistence...")
+    """Test JSONFileStorage with the renamed package."""
+    print("\n📁 Testing JSONFileStorage...")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create persistence and engine
-        persistence = JSONFilePersistence(storage_dir=temp_dir)
+        persistence = JSONFileStorage(storage_dir=temp_dir)
         engine = WorkflowEngine()
-        engine.persistence = persistence
+        engine.storage = persistence
 
         # Create and save a job
         job = create_sample_job()
-        result = engine.run_with_persistence(job)
+        result = engine.run_with_storage(job)
 
         print(f"   ✅ Job executed: {result.status}")
         print(f"   ✅ Storage directory: {temp_dir}")
@@ -81,21 +81,21 @@ def test_json_persistence():
 
 
 def test_sqlite_persistence():
-    """Test SQLitePersistence with the renamed package."""
-    print("\n🗃️  Testing SQLitePersistence...")
+    """Test SQLiteStorage with the renamed package."""
+    print("\n🗃️  Testing SQLiteStorage...")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
         db_path = temp_db.name
 
     try:
         # Create persistence and engine
-        persistence = SQLitePersistence(database_path=db_path)
+        persistence = SQLiteStorage(database_path=db_path)
         engine = WorkflowEngine()
-        engine.persistence = persistence
+        engine.storage = persistence
 
         # Create and save a job
         job = create_sample_job()
-        result = engine.run_with_persistence(job)
+        result = engine.run_with_storage(job)
 
         print(f"   ✅ Job executed: {result.status}")
         print(f"   ✅ Database path: {db_path}")

@@ -78,7 +78,7 @@ def build_job_detail_page(
 
             def _run_job() -> None:
                 try:
-                    jr = engine.run_with_persistence(job_name)
+                    jr = engine.run_with_storage(job_name)
                     result_label.set_text(f"Run démarré : {jr.job_run_id[:14]}…")
                     result_label.classes(remove="text-negative", add="text-positive")
                     ui.notify(f"Run {jr.job_run_id[:14]}… démarré ✓", type="positive")

@@ -30,7 +30,7 @@ La hiérarchie complète (`WorkflowError` → `WorkflowExecutionError` → `Step
 
 Conforme PEP 282 : NullHandler par défaut, namespace hiérarchique, `configure_logging()` optionnel. La library est silencieuse par défaut, ce qui est impératif pour un package distribué.
 
-### ✅ Le contrat `BasePersistence` est solide
+### ✅ Le contrat `BaseStorage` est solide
 
 L'interface abstraite est complète (CRUD, filtres, pagination, transactions, health check, statistiques). Elle permet de switcher de backend sans changer le code métier.
 
@@ -58,13 +58,13 @@ completed_at=...,  # même chose, c'est `end_time`
 status=StepRunStatus(row["status"]),  # StepRunStatus n'existe pas
 ```
 
-**Conséquence :** `SQLitePersistence` et `JSONFilePersistence` sont **non fonctionnels**. L'appel à n'importe quelle méthode de sérialisation lèvera un `AttributeError`. Seul `InMemoryPersistence` fonctionne réellement.
+**Conséquence :** `SQLiteStorage` et `JSONFileStorage` sont **non fonctionnels**. L'appel à n'importe quelle méthode de sérialisation lèvera un `AttributeError`. Seul `InMemoryStorage` fonctionne réellement.
 
 **Origine :** Le code des backends semble avoir été généré ou rédigé à partir d'une version **antérieure** du modèle (pré-migration `ias_workflow_engine`), sans être mis à jour après le renommage et le refactoring des champs.
 
 ---
 
-### 🔴 Problème 2 : `InMemoryPersistence.export_data()` appelle des méthodes inexistantes
+### 🔴 Problème 2 : `InMemoryStorage.export_data()` appelle des méthodes inexistantes
 
 ```python
 # memory.py — export_data()
@@ -78,13 +78,13 @@ job = Job.from_dict(job_data)    # from_dict() n'existe pas sur Job
 job_run = JobRun.from_dict(...)  # idem
 ```
 
-Ces méthodes de sérialisation ne sont ni définies sur les dataclasses, ni dans les modules de sérialisation (qui sont vides). La fonctionnalité d'import/export de `InMemoryPersistence` est donc également **cassée**.
+Ces méthodes de sérialisation ne sont ni définies sur les dataclasses, ni dans les modules de sérialisation (qui sont vides). La fonctionnalité d'import/export de `InMemoryStorage` est donc également **cassée**.
 
 ---
 
 ### 🔴 Problème 3 : L'engine n'est pas intégré à la persistance lors de `run()`
 
-La méthode principale `engine.run()` ne sauvegarde **jamais** le `JobRun` dans la persistance. La seule façon de persister est via `run_with_persistence()` (mentionnée dans le CHANGELOG mais absente du code de `engine.py` analysé). Le développeur doit appeler manuellement `engine.save_job_run(job_run)` après chaque exécution — ce qui n'est pas documenté et très facile à oublier.
+La méthode principale `engine.run()` ne sauvegarde **jamais** le `JobRun` dans la persistance. La seule façon de persister est via `run_with_storage()` (mentionnée dans le CHANGELOG mais absente du code de `engine.py` analysé). Le développeur doit appeler manuellement `engine.save_job_run(job_run)` après chaque exécution — ce qui n'est pas documenté et très facile à oublier.
 
 ```python
 # engine.py — run() — pas de sauvegarde automatique
@@ -189,8 +189,8 @@ Cet exemple en production serait immédiatement en erreur — il teste un API fa
 
 ### 🟡 `cleanup_old_runs` a une signature incohérente entre backends
 
-- `BasePersistence.cleanup_old_runs(older_than, dry_run=True)` → 2 paramètres
-- `SQLitePersistence.cleanup_old_runs(older_than)` → 1 paramètre (override sans `dry_run`)
+- `BaseStorage.cleanup_old_runs(older_than, dry_run=True)` → 2 paramètres
+- `SQLiteStorage.cleanup_old_runs(older_than)` → 1 paramètre (override sans `dry_run`)
 
 La LSP (Liskov Substitution Principle) est violée : le backend SQLite ne respecte pas le contrat de la classe abstraite.
 
@@ -204,7 +204,7 @@ Le répertoire `tests/integration/` est vide. Les quelques scénarios de bout-en
 
 ### 🟢 `sys.getsizeof` sous-estime massivement la mémoire réelle
 
-`InMemoryPersistence._estimate_memory_usage()` utilise `sys.getsizeof()` qui retourne la taille *superficielle* des objets, sans récursion dans leurs attributs. Pour des `JobRun` contenant des listes de `StepRun`, l'estimation peut être sous-estimée d'un facteur 10 à 100.
+`InMemoryStorage._estimate_memory_usage()` utilise `sys.getsizeof()` qui retourne la taille *superficielle* des objets, sans récursion dans leurs attributs. Pour des `JobRun` contenant des listes de `StepRun`, l'estimation peut être sous-estimée d'un facteur 10 à 100.
 
 ---
 
@@ -232,7 +232,7 @@ Ajouter un test d'intégration minimal par backend :
 
 ```python
 def test_sqlite_round_trip():
-    persistence = SQLitePersistence(":memory:")
+    persistence = SQLiteStorage(":memory:")
     engine = WorkflowEngine(persistence=persistence)
     job_run = engine.run(job)
     retrieved = persistence.get_job_run(job_run.job_run_id)
@@ -295,11 +295,11 @@ Choisir une seule approche :
 
 Documenter explicitement que les deux mécanismes ne doivent pas être combinés, ou ajouter une validation qui lève une `WorkflowValidationError` si les deux sont définis simultanément.
 
-### R7 — Corriger `cleanup_old_runs` dans `SQLitePersistence` *(priorité basse)*
+### R7 — Corriger `cleanup_old_runs` dans `SQLiteStorage` *(priorité basse)*
 
 ```python
 def cleanup_old_runs(self, older_than: datetime, dry_run: bool = True) -> int:
-    # Respecter le contrat BasePersistence
+    # Respecter le contrat BaseStorage
     if dry_run:
         # Compter seulement
         ...
@@ -378,6 +378,6 @@ Actuellement, chaque `WorkflowEngine` est une instance indépendante avec son pr
 
 L'architecture de `pyworkflow-engine` **repose sur des fondations conceptuelles saines** : la séparation design-time/runtime, le DAG résolveur, la hiérarchie d'exceptions, et le contrat de persistance sont des choix réfléchis et bien exécutés.
 
-Cependant, le projet souffre d'une **dette technique critique** née d'une migration de package incomplète : les backends de persistance autre qu'`InMemoryPersistence` sont non fonctionnels car jamais mis à jour pour refléter les nouveaux modèles. Le mécanisme de suspension — pourtant central pour les workflows humains — n'est pas durable.
+Cependant, le projet souffre d'une **dette technique critique** née d'une migration de package incomplète : les backends de persistance autre qu'`InMemoryStorage` sont non fonctionnels car jamais mis à jour pour refléter les nouveaux modèles. Le mécanisme de suspension — pourtant central pour les workflows humains — n'est pas durable.
 
 La priorité immédiate devrait être de **corriger les backends** et d'**ajouter des tests d'intégration** qui valident le cycle complet de persistance. Les optimisations architecturales (exécution parallèle, sérialisation des callables, unification du retry) peuvent être traitées dans un second temps, une fois les bases stabilisées.

@@ -64,11 +64,11 @@ pyworkflow-engine/
 │       │
 │       ├── persistence/            # 🔴 COUCHE STOCKAGE — OÙ persister
 │       │   ├── __init__.py
-│       │   ├── base.py             #   BasePersistence (ABC)
-│       │   ├── memory.py           #   InMemoryPersistence
-│       │   ├── json_file.py        #   JSONFilePersistence
-│       │   ├── sqlite.py           #   SQLitePersistence
-│       │   └── sqlalchemy.py       #   SQLAlchemyPersistence (opt: pip install [sqlalchemy])
+│       │   ├── base.py             #   BaseStorage (ABC)
+│       │   ├── memory.py           #   InMemoryStorage
+│       │   ├── json_file.py        #   JSONFileStorage
+│       │   ├── sqlite.py           #   SQLiteStorage
+│       │   └── sqlalchemy.py       #   SQLAlchemyStorage (opt: pip install [sqlalchemy])
 │       │
 │       ├── logging/                # 🟣 COUCHE OBSERVABILITÉ
 │       │   ├── __init__.py
@@ -227,19 +227,19 @@ engine = WorkflowEngine(
 )
 ```
 
-**Contrat `run()` vs `run_with_persistence()` :**
+**Contrat `run()` vs `run_with_storage()` :**
 
 | Méthode                     | Persistence | Checkpoints        | Usage                          |
 |-----------------------------|:-----------:|:------------------:|--------------------------------|
 | `run(job)`                  | ❌ Aucune   | —                  | Exécution pure, tests, scripts |
-| `run_with_persistence(job)` | ✅ Backend  | Initial + par step + final | Production                |
+| `run_with_storage(job)` | ✅ Backend  | Initial + par step + final | Production                |
 
 **Méthodes publiques :**
 
 | Méthode                  | Description                                          |
 |--------------------------|------------------------------------------------------|
 | `run(job, ...)`          | Exécution pure, sans side-effect de persistence      |
-| `run_with_persistence()` | Exécution + sauvegarde avec checkpoints intermédiaires |
+| `run_with_storage()` | Exécution + sauvegarde avec checkpoints intermédiaires |
 | `resume(run_id, ...)`    | Reprend un workflow suspendu                         |
 | `cancel(run_id)`         | Annule un workflow suspendu                          |
 | `validate_job(job)`      | Valide un job sans l'exécuter                        |
@@ -298,7 +298,7 @@ WorkflowError (base)
 │   ├── WorkflowSuspendedHuman       ← attente d'une approbation humaine
 │   └── WorkflowSuspendedExternal    ← attente d'un système externe
 ├── WorkflowCancelled                ← workflow annulé
-├── PersistenceError                 ← erreur backend de persistance
+├── StorageError                 ← erreur backend de persistance
 └── ContextError                     ← accès invalide au contexte
 ```
 
@@ -323,7 +323,7 @@ Utilitaires : `logged_operation` (context manager), `StepLogBridge` (handler →
 
 ## 7. Persistance (`persistence/`)
 
-Interface `BasePersistence(ABC)` :
+Interface `BaseStorage(ABC)` :
 
 | Méthode                           | Description                              |
 |-----------------------------------|------------------------------------------|
@@ -339,10 +339,10 @@ Interface `BasePersistence(ABC)` :
 
 | Backend                | Dépendance      | Usage recommandé                        |
 |------------------------|-----------------|-----------------------------------------|
-| `InMemoryPersistence`  | aucune          | Tests, développement, sessions courtes  |
-| `JSONFilePersistence`  | aucune          | Workflows locaux, configuration simple  |
-| `SQLitePersistence`    | aucune (stdlib) | Déploiements mono-nœud                  |
-| `SQLAlchemyPersistence`| `sqlalchemy`    | Production, PostgreSQL, MySQL…          |
+| `InMemoryStorage`  | aucune          | Tests, développement, sessions courtes  |
+| `JSONFileStorage`  | aucune          | Workflows locaux, configuration simple  |
+| `SQLiteStorage`    | aucune (stdlib) | Déploiements mono-nœud                  |
+| `SQLAlchemyStorage`| `sqlalchemy`    | Production, PostgreSQL, MySQL…          |
 
 ---
 
@@ -375,7 +375,7 @@ from pyworkflow_engine import (
 )
 
 # Persistence
-from pyworkflow_engine import InMemoryPersistence, BasePersistence
+from pyworkflow_engine import InMemoryStorage, BaseStorage
 ```
 
 ---

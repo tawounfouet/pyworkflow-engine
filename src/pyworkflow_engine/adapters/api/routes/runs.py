@@ -21,7 +21,7 @@ from pyworkflow_engine.adapters.api.schemas.runs import (
 )
 from pyworkflow_engine.adapters.api.converters import _step_run_to_schema
 from pyworkflow_engine.facade import WorkflowEngine
-from pyworkflow_engine.ports.persistence import JobNotFoundError
+from pyworkflow_engine.ports.storage import JobNotFoundError
 
 router = APIRouter(
     prefix="/api/v1/runs",
@@ -51,7 +51,7 @@ async def create_run(
     Phase 3 prévoit un background worker avec réponse 202 Accepted.
     """
     job_run = await asyncio.to_thread(
-        engine.run_with_persistence,
+        engine.run_with_storage,
         body.job_name,
         initial_context=body.context,
         run_id=body.run_id,

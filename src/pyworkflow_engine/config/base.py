@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pyworkflow_engine.config.engine import EngineConfig
 from pyworkflow_engine.config.executor import ExecutorConfig
 from pyworkflow_engine.config.logging import LoggingConfig
-from pyworkflow_engine.config.persistence import PersistenceConfig
+from pyworkflow_engine.config.storage import StorageConfig
 
 
 @dataclass(frozen=True)
@@ -49,10 +49,10 @@ class WorkflowConfig:
 
         >>> # Configuration clé en main — DB + logs fichier + logs en BD
         >>> from pyworkflow_engine.config import (
-        ...     WorkflowConfig, PersistenceConfig, LoggingConfig
+        ...     WorkflowConfig, StorageConfig, LoggingConfig
         ... )
         >>> cfg = WorkflowConfig(
-        ...     persistence=PersistenceConfig(db_path="workflow.db"),
+        ...     (StorageConfig)(db_path="workflow.db"),
         ...     logging=LoggingConfig(
         ...         level="DEBUG",
         ...         log_dir="logs",
@@ -68,4 +68,4 @@ class WorkflowConfig:
     engine: EngineConfig = field(default_factory=EngineConfig)
     executor: ExecutorConfig = field(default_factory=ExecutorConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    persistence: PersistenceConfig = field(default_factory=PersistenceConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)

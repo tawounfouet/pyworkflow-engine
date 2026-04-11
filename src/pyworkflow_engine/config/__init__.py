@@ -5,7 +5,7 @@ Point d'entrée public :
 
     from pyworkflow_engine.config import (
         WorkflowConfig, EngineConfig, ExecutorConfig,
-        LoggingConfig, PersistenceConfig,
+        LoggingConfig, StorageConfig,
         Settings, settings,
     )
 """
@@ -14,7 +14,7 @@ from pyworkflow_engine.config.base import WorkflowConfig
 from pyworkflow_engine.config.engine import EngineConfig
 from pyworkflow_engine.config.executor import ExecutorConfig
 from pyworkflow_engine.config.logging import LoggingConfig
-from pyworkflow_engine.config.persistence import PersistenceConfig
+from pyworkflow_engine.config.storage import StorageConfig
 from pyworkflow_engine.config.settings import Settings, settings
 
 __all__ = [
@@ -22,7 +22,7 @@ __all__ = [
     "EngineConfig",
     "ExecutorConfig",
     "LoggingConfig",
-    "PersistenceConfig",
+    "StorageConfig",
     "Settings",
     "settings",
 ]

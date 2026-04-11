@@ -25,22 +25,22 @@ from pyworkflow_engine.exceptions import WorkflowError
 # ── Exceptions de contrat ─────────────────────────────────────────────────────
 
 
-class PersistenceError(WorkflowError):
+class StorageError(WorkflowError):
     """Exception de base pour les erreurs de persistance."""
 
 
-class JobNotFoundError(PersistenceError):
+class JobNotFoundError(StorageError):
     """Levée quand un job ou un job run demandé est introuvable."""
 
 
-class TransactionError(PersistenceError):
+class TransactionError(StorageError):
     """Levée quand une opération de transaction échoue."""
 
 
 # ── Port principal ────────────────────────────────────────────────────────────
 
 
-class BasePersistence(ABC):
+class BaseStorage(ABC):
     """Contrat abstrait pour tous les backends de persistance.
 
     Cette interface définit ce que toute implémentation de persistance doit
@@ -62,7 +62,7 @@ class BasePersistence(ABC):
             job: Le job à sauvegarder.
 
         Raises:
-            PersistenceError: Si la sauvegarde échoue.
+            StorageError: Si la sauvegarde échoue.
         """
 
     @abstractmethod
@@ -76,7 +76,7 @@ class BasePersistence(ABC):
             Le job si trouvé, ``None`` sinon.
 
         Raises:
-            PersistenceError: Si la récupération échoue.
+            StorageError: Si la récupération échoue.
         """
 
     @abstractmethod
@@ -91,7 +91,7 @@ class BasePersistence(ABC):
             Liste de jobs.
 
         Raises:
-            PersistenceError: Si la requête échoue.
+            StorageError: Si la requête échoue.
         """
 
     @abstractmethod
@@ -105,7 +105,7 @@ class BasePersistence(ABC):
             ``True`` si le job a été supprimé, ``False`` s'il n'existait pas.
 
         Raises:
-            PersistenceError: Si la suppression échoue.
+            StorageError: Si la suppression échoue.
         """
 
     @abstractmethod
@@ -116,7 +116,7 @@ class BasePersistence(ABC):
             job_run: Le job run à sauvegarder.
 
         Raises:
-            PersistenceError: Si la sauvegarde échoue.
+            StorageError: Si la sauvegarde échoue.
         """
 
     @abstractmethod
@@ -130,7 +130,7 @@ class BasePersistence(ABC):
             Le job run si trouvé, ``None`` sinon.
 
         Raises:
-            PersistenceError: Si la récupération échoue.
+            StorageError: Si la récupération échoue.
         """
 
     @abstractmethod
@@ -155,7 +155,7 @@ class BasePersistence(ABC):
             Liste de job runs correspondant aux critères.
 
         Raises:
-            PersistenceError: Si la requête échoue.
+            StorageError: Si la requête échoue.
         """
 
     @abstractmethod
@@ -169,7 +169,7 @@ class BasePersistence(ABC):
             ``True`` si le run a été supprimé, ``False`` s'il n'existait pas.
 
         Raises:
-            PersistenceError: Si la suppression échoue.
+            StorageError: Si la suppression échoue.
         """
 
     @abstractmethod
@@ -181,7 +181,7 @@ class BasePersistence(ABC):
 
         Raises:
             JobNotFoundError: Si le job run n'existe pas.
-            PersistenceError: Si la mise à jour échoue.
+            StorageError: Si la mise à jour échoue.
         """
 
     # ── Méthodes utilitaires (non-abstract) ───────────────────────────────────
@@ -299,11 +299,11 @@ class BasePersistence(ABC):
 class TransactionContext:
     """Context manager pour les transactions de persistance."""
 
-    def __init__(self, persistence: BasePersistence) -> None:
-        self.persistence = persistence
+    def __init__(self, persistence: BaseStorage) -> None:
+        self.storage = persistence
         self._in_transaction = False
 
-    def __enter__(self) -> BasePersistence:
+    def __enter__(self) -> BaseStorage:
         self.persistence.begin_transaction()
         self._in_transaction = True
         return self.persistence

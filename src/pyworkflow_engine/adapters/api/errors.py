@@ -20,9 +20,9 @@ from pyworkflow_engine.exceptions import (
     WorkflowTimeoutError,
     WorkflowValidationError,
 )
-from pyworkflow_engine.ports.persistence import (
+from pyworkflow_engine.ports.storage import (
     JobNotFoundError,
-    PersistenceError,
+    StorageError,
 )
 
 # Ordre important : sous-classes avant classes parentes
@@ -35,7 +35,7 @@ EXCEPTION_MAP: list[tuple[type[Exception], int, str]] = [
     (WorkflowTimeoutError, 504, "TIMEOUT"),
     (StepExecutionError, 500, "STEP_EXECUTION_ERROR"),
     (WorkflowFailed, 500, "WORKFLOW_FAILED"),
-    (PersistenceError, 503, "PERSISTENCE_ERROR"),
+    (StorageError, 503, "PERSISTENCE_ERROR"),
     (WorkflowError, 500, "INTERNAL_ERROR"),
     (ValueError, 400, "BAD_REQUEST"),
 ]

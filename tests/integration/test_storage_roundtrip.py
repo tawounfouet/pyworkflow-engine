@@ -20,15 +20,15 @@ from pyworkflow_engine.models import (
     StepRun,
     StepType,
 )
-from pyworkflow_engine.adapters.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.adapters.storage.json_file import JSONFileStorage
+from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
+from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
 # ---------------------------------------------------------------------------
 # SQLAlchemy — optional
 # ---------------------------------------------------------------------------
 try:
-    from pyworkflow_engine.adapters.persistence.sqlalchemy import SQLAlchemyPersistence  # noqa: F401
+    from pyworkflow_engine.adapters.storage.sqlalchemy import SQLAlchemyStorage  # noqa: F401
 
     HAS_SQLALCHEMY = True
 except ImportError:
@@ -110,17 +110,17 @@ def _make_job_run(job: Job) -> JobRun:
 
 @pytest.fixture()
 def memory_backend():
-    return InMemoryPersistence()
+    return InMemoryStorage()
 
 
 @pytest.fixture()
 def json_backend(tmp_path):
-    return JSONFilePersistence(str(tmp_path / "workflow_data"))
+    return JSONFileStorage(str(tmp_path / "workflow_data"))
 
 
 @pytest.fixture()
 def sqlite_backend():
-    return SQLitePersistence(":memory:")
+    return SQLiteStorage(":memory:")
 
 
 @pytest.fixture(
@@ -344,12 +344,12 @@ def test_full_lifecycle(backend):
         ],
     )
 
-    engine = WorkflowEngine(persistence=backend)
+    engine = WorkflowEngine(storage=backend)
 
     # SQLite enforces a FK constraint: job must exist before saving a job_run.
     backend.save_job(runnable_job)
 
-    run = engine.run_with_persistence(runnable_job)
+    run = engine.run_with_storage(runnable_job)
 
     # Retrieve persisted run
     retrieved = backend.get_job_run(run.job_run_id)

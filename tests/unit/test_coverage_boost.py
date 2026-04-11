@@ -38,15 +38,15 @@ from pyworkflow_engine.models import (
     sub_job_to_dict,
 )
 from pyworkflow_engine.models.step import SubJob
-from pyworkflow_engine.ports.persistence import (
+from pyworkflow_engine.ports.storage import (
     JobNotFoundError,
-    PersistenceError,
+    StorageError,
     TransactionContext,
     TransactionError,
 )
-from pyworkflow_engine.adapters.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+from pyworkflow_engine.adapters.storage.json_file import JSONFileStorage
+from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
+from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
 
 # --- Helpers ---
@@ -114,9 +114,9 @@ class TestModelsWrapperFunctions:
 # --- persistence/base.py utilities ---
 
 
-class TestBasePersistenceUtilities:
+class TestBaseStorageUtilities:
     def setup_method(self):
-        self.p = InMemoryPersistence()
+        self.p = InMemoryStorage()
 
     def test_health_check(self):
         hc = self.p.health_check()
@@ -185,7 +185,7 @@ class TestBasePersistenceUtilities:
 
 class TestTransactionContext:
     def test_commit_on_success(self):
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
         job = _job()
         p.save_job(job)
         run = _run(job)
@@ -194,7 +194,7 @@ class TestTransactionContext:
         assert p.get_job_run(run.job_run_id) is not None
 
     def test_rollback_on_exception(self):
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
         job = _job()
         p.save_job(job)
         run = _run(job)
@@ -205,7 +205,7 @@ class TestTransactionContext:
         assert p.get_job_run(run.job_run_id) is None
 
     def test_commit_failure_propagates(self):
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
         ctx = TransactionContext(p)
         original = p.commit_transaction
 
@@ -224,7 +224,7 @@ class TestTransactionContext:
 
 class TestInMemoryEdgeCases:
     def setup_method(self):
-        self.p = InMemoryPersistence()
+        self.p = InMemoryStorage()
 
     def test_update_not_found(self):
         with pytest.raises(JobNotFoundError):
@@ -232,16 +232,16 @@ class TestInMemoryEdgeCases:
 
     def test_begin_tx_while_active(self):
         self.p.begin_transaction()
-        with pytest.raises(PersistenceError, match="already active"):
+        with pytest.raises(StorageError, match="already active"):
             self.p.begin_transaction()
         self.p.rollback_transaction()
 
     def test_commit_no_tx(self):
-        with pytest.raises(PersistenceError, match="No active"):
+        with pytest.raises(StorageError, match="No active"):
             self.p.commit_transaction()
 
     def test_rollback_no_tx(self):
-        with pytest.raises(PersistenceError):
+        with pytest.raises(StorageError):
             self.p.rollback_transaction()
 
     def test_rollback_restores_state(self):
@@ -265,7 +265,7 @@ class TestInMemoryEdgeCases:
 
     def test_clear_during_tx_raises(self):
         self.p.begin_transaction()
-        with pytest.raises(PersistenceError, match="Cannot clear"):
+        with pytest.raises(StorageError, match="Cannot clear"):
             self.p.clear_all_data()
         self.p.rollback_transaction()
 
@@ -288,17 +288,17 @@ class TestInMemoryEdgeCases:
         assert run.job_run_id in exp["job_run_ids"]
 
     def test_import_raises(self):
-        with pytest.raises(PersistenceError, match="does not support import_data"):
+        with pytest.raises(StorageError, match="does not support import_data"):
             self.p.import_data({})
 
 
 # --- persistence/json_file.py transactions ---
 
 
-class TestJSONFilePersistenceTransactions:
+class TestJSONFileStorageTransactions:
     @pytest.fixture()
     def jfp(self, tmp_path):
-        return JSONFilePersistence(str(tmp_path / "data"))
+        return JSONFileStorage(str(tmp_path / "data"))
 
     def test_double_begin_raises(self, jfp):
         jfp.begin_transaction()
@@ -364,7 +364,7 @@ class TestJSONFilePersistenceTransactions:
 class TestSQLiteEdgeCases:
     @pytest.fixture()
     def db(self):
-        return SQLitePersistence(":memory:")
+        return SQLiteStorage(":memory:")
 
     def test_list_by_status(self, db):
         job = _job()
@@ -489,18 +489,18 @@ class TestSQLiteEdgeCases:
 #     cleanup_old_runs base impl, TransactionContext edge cases ---
 
 
-class TestBasePersistenceDeeper:
+class TestBaseStorageDeeper:
     """Cover the remaining uncovered branches in persistence/base.py."""
 
     def test_get_statistics_error_branch(self):
-        """Force the BasePersistence.get_statistics error branch directly.
+        """Force the BaseStorage.get_statistics error branch directly.
 
-        InMemoryPersistence overrides get_statistics, so we call the base
+        InMemoryStorage overrides get_statistics, so we call the base
         implementation explicitly with a list_jobs that raises.
         """
-        from pyworkflow_engine.ports.persistence import BasePersistence
+        from pyworkflow_engine.ports.storage import BaseStorage
 
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
 
         original_list_jobs = p.list_jobs
 
@@ -510,17 +510,17 @@ class TestBasePersistenceDeeper:
         p.list_jobs = bad_list_jobs  # type: ignore[method-assign]
 
         # Call the base class method directly to hit lines 248-258
-        stats = BasePersistence.get_statistics(p)
+        stats = BaseStorage.get_statistics(p)
         assert stats.get("error") == "Unable to collect statistics"
         assert stats["total_jobs"] == 0
 
         p.list_jobs = original_list_jobs  # type: ignore[method-assign]
 
     def test_base_cleanup_old_runs_via_base_method(self):
-        """Call BasePersistence.cleanup_old_runs directly (not overridden)."""
-        from pyworkflow_engine.ports.persistence import BasePersistence
+        """Call BaseStorage.cleanup_old_runs directly (not overridden)."""
+        from pyworkflow_engine.ports.storage import BaseStorage
 
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
         job = _job()
         p.save_job(job)
         run = JobRun(
@@ -530,12 +530,12 @@ class TestBasePersistenceDeeper:
         )
         p.save_job_run(run)
         # Call the base class method directly (bypassing InMemory override)
-        count = BasePersistence.cleanup_old_runs(
+        count = BaseStorage.cleanup_old_runs(
             p, older_than=datetime.now(UTC) - timedelta(days=1), dry_run=True
         )
         assert count == 1
         # Real deletion
-        count2 = BasePersistence.cleanup_old_runs(
+        count2 = BaseStorage.cleanup_old_runs(
             p, older_than=datetime.now(UTC) - timedelta(days=1)
         )
         assert count2 == 1
@@ -543,7 +543,7 @@ class TestBasePersistenceDeeper:
 
     def test_transaction_context_no_in_transaction(self):
         """__exit__ when _in_transaction is False should be a no-op."""
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
         ctx = TransactionContext(p)
         ctx._in_transaction = False  # simulate: __enter__ never called
         # Should not raise
@@ -551,7 +551,7 @@ class TestBasePersistenceDeeper:
 
     def test_transaction_context_commit_fail_rollback_suppressed(self):
         """commit_transaction raises; rollback is called but suppressed on failure."""
-        p = InMemoryPersistence()
+        p = InMemoryStorage()
         ctx = TransactionContext(p)
 
         def bad_commit():
@@ -580,10 +580,10 @@ class TestBasePersistenceDeeper:
 # --- persistence/json_file.py — list_job_runs limit/offset, delete_job_run ---
 
 
-class TestJSONFilePersistenceExtra:
+class TestJSONFileStorageExtra:
     @pytest.fixture()
     def jfp(self, tmp_path):
-        return JSONFilePersistence(str(tmp_path / "extra_data"))
+        return JSONFileStorage(str(tmp_path / "extra_data"))
 
     def test_list_job_runs_limit_offset(self, jfp):
         job = _job("lim_job")
@@ -615,7 +615,7 @@ class TestJSONFilePersistenceExtra:
         assert jfp.get_job_run_count(job.name) == 2
 
     def test_cleanup_old_runs(self, jfp):
-        # JSONFilePersistence.cleanup_old_runs filters on created_at, not start_time
+        # JSONFileStorage.cleanup_old_runs filters on created_at, not start_time
         job = _job()
         jfp.save_job(job)
         old = JobRun(
@@ -695,14 +695,14 @@ class TestExceptionsDeepCoverage:
         assert e.executor_details == {"pool_size": 4}
 
     def test_persistence_error_class(self):
-        from pyworkflow_engine.exceptions import PersistenceError
-        e = PersistenceError(
+        from pyworkflow_engine.exceptions import StorageError
+        e = StorageError(
             "save failed",
             operation="save",
-            persistence_type="sqlite",
+            storage_type="sqlite",
         )
         assert e.operation == "save"
-        assert e.persistence_type == "sqlite"
+        assert e.storage_type == "sqlite"
 
     def test_context_error(self):
         from pyworkflow_engine.exceptions import ContextError

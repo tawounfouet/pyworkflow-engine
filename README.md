@@ -188,7 +188,7 @@ pyworkflow-engine/
 │   ├── logging/               # Structured logging
 │   ├── ports/                 # ⬡ Pure interfaces (ABCs)
 │   │   ├── executor.py        # BaseExecutor, ExecutorRegistry
-│   │   ├── persistence.py     # BasePersistence + exceptions
+│   │   ├── persistence.py     # BaseStorage + exceptions
 │   │   └── trigger.py         # BaseTrigger, TriggerState
 │   └── adapters/              # ⬡ Concrete implementations
 │       ├── executors/         # Local, ThreadPool, ProcessPool, Async, Retryable

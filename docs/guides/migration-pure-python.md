@@ -145,10 +145,10 @@ pyworkflow_engine/
 │       │# PERSISTENCE — Où les données sont stockées
 │       ├── persistence/
 │       │   ├── __init__.py
-│       │   ├── base.py                    # ABC BasePersistence
-│       │   ├── memory.py                  # InMemoryPersistence — tests, scripts, notebooks
-│       │   ├── json_file.py              # JSONFilePersistence — fichier JSON local
-│       │   └── sqlite.py                 # SQLitePersistence — sqlite3 stdlib
+│       │   ├── base.py                    # ABC BaseStorage
+│       │   ├── memory.py                  # InMemoryStorage — tests, scripts, notebooks
+│       │   ├── json_file.py              # JSONFileStorage — fichier JSON local
+│       │   └── sqlite.py                 # SQLiteStorage — sqlite3 stdlib
 │       │
 │       │# SERIALIZATION — Conversion dataclass ↔ dict/JSON
 │       ├── serialization/
@@ -171,7 +171,7 @@ pyworkflow_engine/
 │       │   ├── django/                   # pip install pyworkflow-engine[django]
 │       │   │   ├── __init__.py
 │       │   │   ├── models.py             # Modèles Django wrappant dataclasses core
-│       │   │   ├── persistence.py        # DjangoORMPersistence(BasePersistence)
+│       │   │   ├── persistence.py        # DjangoORMPersistence(BaseStorage)
 │       │   │   ├── signals.py            # DjangoSignalTrigger
 │       │   │   ├── admin.py              # Admin Django
 │       │   │   ├── views.py              # Vues DRF
@@ -190,7 +190,7 @@ pyworkflow_engine/
 │       │   ├── sqlalchemy/               # pip install pyworkflow-engine[sqlalchemy]
 │       │   │   ├── __init__.py
 │       │   │   ├── models.py             # Tables SQLAlchemy
-│       │   │   └── persistence.py        # SQLAlchemyPersistence(BasePersistence)
+│       │   │   └── persistence.py        # SQLAlchemyStorage(BaseStorage)
 │       │   └── streamlit/                # pip install pyworkflow-engine[streamlit]
 │       │       ├── __init__.py
 │       │       ├── components.py         # Widgets workflow
@@ -524,7 +524,7 @@ from typing import Any
 from ..core.models.design_time import Job
 from ..core.models.runtime import JobRun
 
-class BasePersistence(ABC):
+class BaseStorage(ABC):
     """Interface de persistance — swap entre memory, JSON, SQLite, SQLAlchemy, Django ORM."""
     
     @abstractmethod
@@ -543,7 +543,7 @@ class BasePersistence(ABC):
     def list_job_runs(self, job_id: str | None = None, 
                       status: str | None = None) -> list[JobRun]: ...
 
-class InMemoryPersistence(BasePersistence):
+class InMemoryStorage(BaseStorage):
     """Parfait pour les tests, scripts, notebooks."""
     
     def __init__(self):
@@ -570,11 +570,11 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from django.db import models
 
-from ...persistence.base import BasePersistence
+from ...persistence.base import BaseStorage
 from ...core.models.design_time import Job
 from ...core.models.runtime import JobRun
 
-class DjangoORMPersistence(BasePersistence):
+class DjangoORMPersistence(BaseStorage):
     """Persiste les Jobs/JobRuns via l'ORM Django.
     
     Les modèles Django deviennent de simples wrappers de sérialisation

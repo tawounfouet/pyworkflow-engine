@@ -12,15 +12,15 @@ from pathlib import Path
 
 from pyworkflow_engine import WorkflowEngine
 from pyworkflow_engine.models import Job, Step, StepType
-from pyworkflow_engine.persistence import (
-    InMemoryPersistence,
-    JSONFilePersistence,
-    SQLitePersistence,
+from pyworkflow_engine.adapters.storage import (
+    InMemoryStorage,
+    JSONFileStorage,
+    SQLiteStorage,
 )
 
 # Try to import SQLAlchemy persistence (optional)
 try:
-    from pyworkflow_engine.persistence import SQLAlchemyPersistence
+    from pyworkflow_engine.adapters.storage import SQLAlchemyStorage
 
     HAS_SQLALCHEMY = True
 except ImportError:
@@ -69,16 +69,16 @@ def create_sample_job() -> Job:
 
 
 def demo_in_memory_persistence():
-    """Demonstrate InMemoryPersistence usage."""
+    """Demonstrate InMemoryStorage usage."""
     print("\n" + "=" * 60)
     print("IN-MEMORY PERSISTENCE DEMO")
     print("=" * 60)
 
     # Create persistence backend
-    persistence = InMemoryPersistence()
-    engine = WorkflowEngine(persistence=persistence)
+    persistence = InMemoryStorage()
+    engine = WorkflowEngine(storage=persistence)
 
-    print(f"✓ Created InMemoryPersistence backend")
+    print(f"✓ Created InMemoryStorage backend")
 
     # Save a job
     job = create_sample_job()
@@ -125,14 +125,14 @@ def demo_in_memory_persistence():
     print(f"✓ Backend health: {health['status']}")
     print(f"✓ Memory usage: {stats.get('memory_usage_mb', 0):.3f} MB")
 
-    print(f"\nInMemoryPersistence is perfect for:")
+    print(f"\nInMemoryStorage is perfect for:")
     print(f"  - Development and testing")
     print(f"  - Temporary workflows")
     print(f"  - High-performance scenarios where data loss is acceptable")
 
 
 def demo_json_file_persistence():
-    """Demonstrate JSONFilePersistence usage."""
+    """Demonstrate JSONFileStorage usage."""
     print("\n" + "=" * 60)
     print("JSON FILE PERSISTENCE DEMO")
     print("=" * 60)
@@ -142,10 +142,10 @@ def demo_json_file_persistence():
         print(f"Using temporary directory: {temp_dir}")
 
         # Create persistence backend
-        persistence = JSONFilePersistence(storage_dir=temp_dir)
-        engine = WorkflowEngine(persistence=persistence)
+        persistence = JSONFileStorage(storage_dir=temp_dir)
+        engine = WorkflowEngine(storage=persistence)
 
-        print(f"✓ Created JSONFilePersistence backend")
+        print(f"✓ Created JSONFileStorage backend")
 
         # Save jobs
         job = create_sample_job()
@@ -219,7 +219,7 @@ def demo_json_file_persistence():
         print(f"✓ Total jobs: {stats['total_jobs']}")
         print(f"✓ Storage size: {stats['storage_size_bytes']} bytes")
 
-        print(f"\nJSONFilePersistence is perfect for:")
+        print(f"\nJSONFileStorage is perfect for:")
         print(f"  - Small to medium deployments")
         print(f"  - Human-readable storage format")
         print(f"  - Simple backup and version control")
@@ -227,7 +227,7 @@ def demo_json_file_persistence():
 
 
 def demo_sqlite_persistence():
-    """Demonstrate SQLitePersistence usage."""
+    """Demonstrate SQLiteStorage usage."""
     print("\n" + "=" * 60)
     print("SQLITE PERSISTENCE DEMO")
     print("=" * 60)
@@ -240,10 +240,10 @@ def demo_sqlite_persistence():
         print(f"Using temporary database: {db_path}")
 
         # Create persistence backend
-        persistence = SQLitePersistence(database_path=db_path)
-        engine = WorkflowEngine(persistence=persistence)
+        persistence = SQLiteStorage(database_path=db_path)
+        engine = WorkflowEngine(storage=persistence)
 
-        print(f"✓ Created SQLitePersistence backend")
+        print(f"✓ Created SQLiteStorage backend")
 
         # Save job and job runs
         job = create_sample_job()
@@ -353,7 +353,7 @@ def demo_sqlite_persistence():
         print(f"✓ Total runs: {stats['total_runs']}")
         print(f"✓ Status distribution: {stats.get('status_counts', {})}")
 
-        print(f"\nSQLitePersistence is perfect for:")
+        print(f"\nSQLiteStorage is perfect for:")
         print(f"  - Production deployments (single-node)")
         print(f"  - ACID compliance requirements")
         print(f"  - Complex querying and reporting")
@@ -369,7 +369,7 @@ def demo_sqlite_persistence():
 
 
 def demo_sqlalchemy_persistence():
-    """Demonstrate SQLAlchemyPersistence usage."""
+    """Demonstrate SQLAlchemyStorage usage."""
     if not HAS_SQLALCHEMY:
         print("\n" + "=" * 60)
         print("SQLALCHEMY PERSISTENCE - NOT AVAILABLE")
@@ -386,13 +386,13 @@ def demo_sqlalchemy_persistence():
     print(f"Using database: {database_url}")
 
     # Create persistence backend
-    persistence = SQLAlchemyPersistence(
+    persistence = SQLAlchemyStorage(
         database_url=database_url,
         engine_options={"echo": False},  # Set to True to see SQL queries
     )
-    engine = WorkflowEngine(persistence=persistence)
+    engine = WorkflowEngine(storage=persistence)
 
-    print(f"✓ Created SQLAlchemyPersistence backend")
+    print(f"✓ Created SQLAlchemyStorage backend")
 
     # Test bulk operations
     print(f"\nTesting bulk operations...")
@@ -461,7 +461,7 @@ def demo_sqlalchemy_persistence():
     # Cleanup
     persistence.close()
 
-    print(f"\nSQLAlchemyPersistence is perfect for:")
+    print(f"\nSQLAlchemyStorage is perfect for:")
     print(f"  - Enterprise production deployments")
     print(f"  - Multiple database backend support")
     print(f"  - High-performance bulk operations")
@@ -489,29 +489,29 @@ Backend Comparison Summary:
 └─────────────────┴────────────┴───────────────┴──────────────┴─────────────────┘
 
 Dependencies:
-  • InMemoryPersistence: None (stdlib only)
-  • JSONFilePersistence: None (stdlib only)
-  • SQLitePersistence: None (stdlib only)
-  • SQLAlchemyPersistence: pip install ias-workflow-engine[sqlalchemy]
+  • InMemoryStorage: None (stdlib only)
+  • JSONFileStorage: None (stdlib only)
+  • SQLiteStorage: None (stdlib only)
+  • SQLAlchemyStorage: pip install ias-workflow-engine[sqlalchemy]
 
 Storage:
-  • InMemoryPersistence: RAM only (lost on restart)
-  • JSONFilePersistence: JSON files on disk
-  • SQLitePersistence: SQLite database file
-  • SQLAlchemyPersistence: Any SQL database (PostgreSQL, MySQL, etc.)
+  • InMemoryStorage: RAM only (lost on restart)
+  • JSONFileStorage: JSON files on disk
+  • SQLiteStorage: SQLite database file
+  • SQLAlchemyStorage: Any SQL database (PostgreSQL, MySQL, etc.)
 
 Transactions:
-  • InMemoryPersistence: Full rollback support via snapshots
-  • JSONFilePersistence: Limited (queued operations)
-  • SQLitePersistence: Full ACID transactions
-  • SQLAlchemyPersistence: Full ACID transactions + connection pooling
+  • InMemoryStorage: Full rollback support via snapshots
+  • JSONFileStorage: Limited (queued operations)
+  • SQLiteStorage: Full ACID transactions
+  • SQLAlchemyStorage: Full ACID transactions + connection pooling
 
 Use Cases:
-  • Development: InMemoryPersistence
-  • CI/CD Testing: InMemoryPersistence or SQLite
-  • Small Production: JSONFilePersistence or SQLitePersistence
-  • Enterprise: SQLAlchemyPersistence with PostgreSQL
-  • Analytics: SQLAlchemyPersistence for complex queries
+  • Development: InMemoryStorage
+  • CI/CD Testing: InMemoryStorage or SQLite
+  • Small Production: JSONFileStorage or SQLiteStorage
+  • Enterprise: SQLAlchemyStorage with PostgreSQL
+  • Analytics: SQLAlchemyStorage for complex queries
     """
     )
 

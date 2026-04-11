@@ -16,7 +16,7 @@ La v0.3.0 est un **refactoring architectural majeur** qui répond directement à
 |---|:---:|:---:|---|
 | **P1** — Backends SQLite/JSON décrivent un modèle différent | 🔴 Critique | ✅ Résolu | `to_dict()` / `from_dict()` implémentés sur chaque modèle ; backends réécrits pour s'aligner sur les vrais champs |
 | **P2** — `to_dict()` / `from_dict()` inexistants | 🔴 Critique | ✅ Résolu | Méthodes présentes sur `Job`, `Step`, `JobRun`, `StepRun` |
-| **P3** — `run()` ne persiste pas automatiquement | 🔴 Critique | ✅ Résolu (by design) | `run()` = exécution pure, documentée ; `run_with_persistence()` = checkpoints step-by-step |
+| **P3** — `run()` ne persiste pas automatiquement | 🔴 Critique | ✅ Résolu (by design) | `run()` = exécution pure, documentée ; `run_with_storage()` = checkpoints step-by-step |
 | **P4** — Suspension non durable | 🔴 Critique | ✅ Résolu | `SuspensionManager` : persistence-aware avec fallback mémoire |
 | **P5** — Parallélisme calculé mais non activé | 🟡 Moyen | ✅ Résolu | `ParallelRunner` + flag `parallel=True` sur `WorkflowEngine` |
 | **P6** — `co_argcount` fragile | 🟡 Moyen | ✅ Résolu | Remplacé par `inspect.signature()` avec filtrage `self`/`cls` et `VAR_POSITIONAL`/`VAR_KEYWORD` |
@@ -25,7 +25,7 @@ La v0.3.0 est un **refactoring architectural majeur** qui répond directement à
 | **LSP cleanup_old_runs** | 🟡 Moyen | ✅ Résolu | Signature alignée sur tous les backends |
 | **`Step.callable`** (nom réservé) | 🟢 Bas | ✅ Résolu | Renommé `handler` ; `callable` conservé comme **alias déprécié formel** avec `DeprecationWarning` (stacklevel=2, échéance v0.5.0) et synchronisation bidirectionnelle `handler ↔ callable`. Les tests l'utilisent intentionnellement pour valider la rétrocompatibilité. |
 | **Tests d'intégration absents** | 🟡 Moyen | ✅ Résolu | `tests/integration/test_persistence_roundtrip.py` — round-trip paramétré sur 3 backends |
-| **`sys.getsizeof` sous-estime la mémoire** | 🟢 Bas | ❌ Non résolu | Comportement inchangé dans `InMemoryPersistence._estimate_memory_usage()` |
+| **`sys.getsizeof` sous-estime la mémoire** | 🟢 Bas | ❌ Non résolu | Comportement inchangé dans `InMemoryStorage._estimate_memory_usage()` |
 
 **Bilan : 9 problèmes sur 12 résolus. Régression : 0.**
 
@@ -49,7 +49,7 @@ Chaque composant a une responsabilité unique, est testable indépendamment et p
 
 ### ✅ `run()` = contrat explicite et documenté
 
-La séparation `run()` (pure, sans side-effects) vs `run_with_persistence()` (checkpoints automatiques) est maintenant **explicitement documentée dans les docstrings**. L'utilisateur sait exactement à quoi s'attendre. Les checkpoints step-by-step de `run_with_persistence()` permettent la reprise d'un workflow interrompu à mi-parcours.
+La séparation `run()` (pure, sans side-effects) vs `run_with_storage()` (checkpoints automatiques) est maintenant **explicitement documentée dans les docstrings**. L'utilisateur sait exactement à quoi s'attendre. Les checkpoints step-by-step de `run_with_storage()` permettent la reprise d'un workflow interrompu à mi-parcours.
 
 ### ✅ `ParallelRunner` : parallélisme réel et correct
 
@@ -72,23 +72,23 @@ C'est LA bonne approche pour un workflow engine destiné à être utilisé comme
 
 ### ✅ Tests d'intégration paramétrés
 
-`test_persistence_roundtrip.py` couvre les 3 backends (Memory, JSONFile, SQLite) avec des fixtures paramétrées. Le `test_full_lifecycle` valide le chemin complet `define → run_with_persistence → retrieve → assert`.
+`test_persistence_roundtrip.py` couvre les 3 backends (Memory, JSONFile, SQLite) avec des fixtures paramétrées. Le `test_full_lifecycle` valide le chemin complet `define → run_with_storage → retrieve → assert`.
 
 ---
 
 ## 3. Nouveaux problèmes identifiés
 
-### 🔴 Problème 1 : `run_with_persistence()` stocke chaque checkpoint via `save_job_run()` mais le backend peut avoir une FK constraint
+### 🔴 Problème 1 : `run_with_storage()` stocke chaque checkpoint via `save_job_run()` mais le backend peut avoir une FK constraint
 
 Dans `test_full_lifecycle`, le commentaire révèle une contrainte cachée :
 
 ```python
 # SQLite enforces a FK constraint: job must exist before saving a job_run.
 backend.save_job(runnable_job)  # ← requis !
-run = engine.run_with_persistence(runnable_job)
+run = engine.run_with_storage(runnable_job)
 ```
 
-`run_with_persistence()` sauvegarde le `JobRun` **avant** de sauvegarder le `Job`. Si un utilisateur appelle `run_with_persistence(job)` sans avoir au préalable fait `engine.save_job(job)`, le premier checkpoint (`PENDING`) échouera silencieusement sur SQLite (FK violation, absorbée par `contextlib.suppress(Exception)`).
+`run_with_storage()` sauvegarde le `JobRun` **avant** de sauvegarder le `Job`. Si un utilisateur appelle `run_with_storage(job)` sans avoir au préalable fait `engine.save_job(job)`, le premier checkpoint (`PENDING`) échouera silencieusement sur SQLite (FK violation, absorbée par `contextlib.suppress(Exception)`).
 
 ```python
 # facade.py — _save_job_run_checkpoint()
@@ -100,7 +100,7 @@ def _save_job_run_checkpoint(self, job_run: JobRun) -> None:
 
 **Conséquence :** Le workflow s'exécute correctement en mémoire, mais rien n'est persisté — sans aucun avertissement. L'utilisateur croit que ses runs sont sauvegardés.
 
-**Recommandation :** Soit `run_with_persistence()` sauvegarde automatiquement le job avant le premier checkpoint, soit `_save_job_run_checkpoint()` logue un `WARNING` au lieu de supprimer silencieusement l'exception.
+**Recommandation :** Soit `run_with_storage()` sauvegarde automatiquement le job avant le premier checkpoint, soit `_save_job_run_checkpoint()` logue un `WARNING` au lieu de supprimer silencieusement l'exception.
 
 ---
 
@@ -160,14 +160,14 @@ def _save_job_run_checkpoint(self, job_run: JobRun) -> None:
 
 `contextlib.suppress(Exception)` est intentionnellement large — il absorbe `TypeError`, `AttributeError`, n'importe quelle exception de programmation dans le backend. Un `AttributeError` dans `_serialize_job_run()` (comme ceux de la v0.2.1) passerait entièrement inaperçu.
 
-**Recommandation :** Limiter à `PersistenceError` (les erreurs métier de la couche persistence) et logger en `WARNING` les autres :
+**Recommandation :** Limiter à `StorageError` (les erreurs métier de la couche persistence) et logger en `WARNING` les autres :
 
 ```python
 def _save_job_run_checkpoint(self, job_run: JobRun) -> None:
     if self._persistence:
         try:
             self._persistence.save_job_run(job_run)
-        except PersistenceError as e:
+        except StorageError as e:
             _logger.warning("Checkpoint failed (non-fatal): %s", e)
         except Exception as e:
             _logger.error("Unexpected checkpoint error: %s", e)
@@ -257,12 +257,12 @@ En v0.3.0, `engine/dag.py` et `engine/context.py` pointent probablement vers les
 
 ## 4. Analyse de la dette résiduelle
 
-### La double responsabilité du `WorkflowContext` dans `run_with_persistence`
+### La double responsabilité du `WorkflowContext` dans `run_with_storage`
 
-`run_with_persistence()` re-importe localement depuis `.engine.context` et `.engine.dag`, alors que ces imports sont déjà en tête de `facade.py`. C'est cosmétiquement redondant et révèle une hésitation dans la structure des imports :
+`run_with_storage()` re-importe localement depuis `.engine.context` et `.engine.dag`, alors que ces imports sont déjà en tête de `facade.py`. C'est cosmétiquement redondant et révèle une hésitation dans la structure des imports :
 
 ```python
-# facade.py — run_with_persistence()
+# facade.py — run_with_storage()
 try:
     from .engine.context import WorkflowContext   # ← déjà importé en tête de fichier
     from .engine.dag import DAGResolver            # ← idem
@@ -273,7 +273,7 @@ try:
     )
 ```
 
-Cela suggère que `run_with_persistence()` a été ajouté après coup sans harmonisation avec les imports existants.
+Cela suggère que `run_with_storage()` a été ajouté après coup sans harmonisation avec les imports existants.
 
 ---
 
@@ -301,7 +301,7 @@ Cela suggère que `run_with_persistence()` a été ajouté après coup sans harm
 
 | # | Action | Effort |
 |---|--------|:------:|
-| 1 | Corriger `run_with_persistence()` : sauvegarder le job automatiquement avant le premier checkpoint, ou logguer `WARNING` au lieu d'absorber silencieusement | Faible |
+| 1 | Corriger `run_with_storage()` : sauvegarder le job automatiquement avant le premier checkpoint, ou logguer `WARNING` au lieu d'absorber silencieusement | Faible |
 | 2 | Corriger `ParallelRunner.execute()` : respecter `execution_order` lors de la reprise, ou calculer les steps restants depuis les données du `job_run` | Moyen |
 | 3 | `list_suspended()` : interroger la persistence si disponible | Faible |
 
@@ -309,7 +309,7 @@ Cela suggère que `run_with_persistence()` a été ajouté après coup sans harm
 
 | # | Action | Effort |
 |---|--------|:------:|
-| 4 | Remplacer `contextlib.suppress(Exception)` par une gestion différenciée `PersistenceError` vs autres dans `_save_job_run_checkpoint()` | Faible |
+| 4 | Remplacer `contextlib.suppress(Exception)` par une gestion différenciée `StorageError` vs autres dans `_save_job_run_checkpoint()` | Faible |
 | 5 | Thread-safety de `WorkflowContext` : utiliser `threading.RLock` sur `_data` | Faible |
 | 6 | Déplacer `ProcessPoolStepExecutor` dans `executors/process_pool.py` | Faible |
 | 7 | Supprimer `Job.has_cycles()` ou le déléguer à `DAGResolver` | Faible |
@@ -319,7 +319,7 @@ Cela suggère que `run_with_persistence()` a été ajouté après coup sans harm
 
 | # | Action | Effort |
 |---|--------|:------:|
-| 9 | Harmoniser les imports dans `run_with_persistence()` | Très faible |
+| 9 | Harmoniser les imports dans `run_with_storage()` | Très faible |
 | 10 | Documenter le comportement de `retry_count` lors de la reprise | Faible |
 | 11 | Couvrir `ParallelRunner` dans les tests d'intégration (scénario fork-join) | Moyen |
 

@@ -206,16 +206,16 @@ WorkflowError: No persistence backend configured | Details: {'operation': 'save_
 
 ```python
 # 1. Import ajouté
-from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
 
 # 2. Méthode correcte
 engine = WorkflowEngine()
-engine.persistence = InMemoryPersistence()   # ← persistence requise
+engine.persistence = InMemoryStorage()   # ← persistence requise
 engine.save_job(etl_job)                     # ← register() → save_job()
 engine.save_job(monitoring_job)
 ```
 
-`InMemoryPersistence` est le bon choix pour un exemple/démo : zéro fichier,
+`InMemoryStorage` est le bon choix pour un exemple/démo : zéro fichier,
 zéro dépendance, fonctionne partout.
 
 ### Leçon
@@ -341,7 +341,7 @@ un 404 car elle a été déplacée.
 ### Solution
 
 **A) `adapters/cli/commands/api.py`** — rendre `--app` optionnel pour `api serve`.
-Sans `--app`, créer un `WorkflowEngine` autonome avec `SQLitePersistence` :
+Sans `--app`, créer un `WorkflowEngine` autonome avec `SQLiteStorage` :
 
 ```python
 app_path = ctx.obj.get("app_path") if ctx.obj else None
@@ -352,10 +352,10 @@ if app_path:
 else:
     # Mode "standalone" — SQLite sur disque, aucun code utilisateur requis
     from pyworkflow_engine import WorkflowEngine
-    from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+    from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
     engine = WorkflowEngine()
-    engine.persistence = SQLitePersistence(database_path=db)
+    engine.persistence = SQLiteStorage(database_path=db)
 ```
 
 **B) `adapters/api/app.py`** — ajouter une route `GET /` qui redirige vers
@@ -413,7 +413,7 @@ pyworkflow --app myproject.workflows:engine api serve --port 8000
 | `pyproject.toml` | `pythonpath = ["."]` dans `[tool.pytest.ini_options]` |
 | `tests/__init__.py` | Créé (vide) — fait de `tests/` un package rooted |
 | `tests/unit/test_celery_adapter.py` | `is` → `__qualname__` + `__module__` |
-| `examples/tui_demo.py` | `register()` → `save_job()` + `InMemoryPersistence` |
+| `examples/tui_demo.py` | `register()` → `save_job()` + `InMemoryStorage` |
 | `adapters/cli/loader.py` | `sys.path.insert(0, cwd)` + meilleur message d'erreur |
 | `adapters/cli/formatters/tables.py` | Suppression de `SKIPPED`, ajout des 3 statuts manquants |
 | `adapters/cli/commands/api.py` | `--app` optionnel + standalone SQLite + banner Rich |

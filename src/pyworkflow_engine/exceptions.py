@@ -291,20 +291,20 @@ class ExecutorError(WorkflowExecutionError):
         self.executor_details = executor_details or {}
 
 
-class PersistenceError(WorkflowError):
+class StorageError(WorkflowError):
     """Erreur de persistence.
 
     Levée quand la sauvegarde ou le chargement d'un JobRun échoue.
 
     Attributes:
         operation: Opération qui a échoué ('save', 'load', 'delete').
-        persistence_type: Type de backend de persistence.
+        storage_type: Type de backend de persistence.
     """
 
-    def __init__(self, message: str, operation: str, persistence_type: str, **kwargs):
+    def __init__(self, message: str, operation: str, storage_type: str, **kwargs):
         super().__init__(message, **kwargs)
         self.operation = operation
-        self.persistence_type = persistence_type
+        self.storage_type = storage_type
 
 
 class ContextError(WorkflowError):
