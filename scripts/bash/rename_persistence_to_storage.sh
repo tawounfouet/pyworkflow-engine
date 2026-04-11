@@ -267,7 +267,18 @@ log_step "Étape 4 : Renommage des dossiers"
 for dirpath in "${DIRS_TO_RENAME[@]}"; do
     [[ -d "${dirpath}" ]] || { log_warn "Dossier introuvable (déjà renommé ?) : ${dirpath}"; continue; }
     newdir="${dirpath//persistence/storage}"
-    git mv "${dirpath}" "${newdir}"
+
+    # git mv refuse les dossiers vides — les gérer manuellement
+    if [[ -z "$(find "${dirpath}" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+        log_warn "Dossier vide ignoré par git mv : ${dirpath} (rm + mkdir)"
+        rm -rf "${dirpath}"
+        mkdir -p "${newdir}"
+        # Ajouter un .gitkeep pour que git le suive
+        touch "${newdir}/.gitkeep"
+        git add "${newdir}/.gitkeep"
+    else
+        git mv "${dirpath}" "${newdir}"
+    fi
     log_ok "${dirpath} → ${newdir}"
 done
 
