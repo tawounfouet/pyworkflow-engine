@@ -25,6 +25,11 @@ YYYY-MM-DD_adr_NNN_<slug>.md
 | [2026-04-11_adr_005_decorator-api.md](./2026-04-11_adr_005_decorator-api.md) | ADR-005 — API déclarative par décorateurs (`@step`, `@job`) | 11 avril 2026 | ✅ Implémentée (v0.5.0) |
 | [2026-04-11_adr_006_hexagonal-ports-adapters.md](./2026-04-11_adr_006_hexagonal-ports-adapters.md) | ADR-006 — Architecture hexagonale : introduction `ports/` et réorganisation `adapters/` | 11 avril 2026 | ✅ Implémentée (v0.6.0) |
 | [2026-04-11_adr_007_celery-adapter-integration.md](./2026-04-11_adr_007_celery-adapter-integration.md) | ADR-007 — Intégration Celery : adapter complexe vs simple executor | 11 avril 2026 | ✅ Décision prise |
+| [2026-04-11_adr_008_cli-adapter-typer-rich.md](./2026-04-11_adr_008_cli-adapter-typer-rich.md) | ADR-008 — CLI Adapter : Typer + Rich dans `adapters/cli/` | 11 avril 2026 | ✅ Décision prise |
+| [2026-04-11_adr_009_tui-adapter-textual-rich.md](./2026-04-11_adr_009_tui-adapter-textual-rich.md) | ADR-009 — TUI Adapter : Textual + Rich dans `adapters/tui/` | 11 avril 2026 | ✅ Décision prise |
+| [2026-04-11_adr_010_gui-adapter-nicegui.md](./2026-04-11_adr_010_gui-adapter-nicegui.md) | ADR-010 — GUI Adapter : NiceGUI dans `adapters/gui/` | 11 avril 2026 | ✅ Décision prise |
+| [2026-04-11_adr_011_api-adapter-fastapi-sqlite.md](./2026-04-11_adr_011_api-adapter-fastapi-sqlite.md) | ADR-011 — API Adapter : FastAPI + SQLite dans `adapters/api/` | 11 avril 2026 | ✅ Décision prise |
+| [2026-04-12_adr_012_rename-persistence-to-storage.md](./2026-04-12_adr_012_rename-persistence-to-storage.md) | ADR-012 — Renommage `persistence` → `storage` dans tout le codebase | 12 avril 2026 | ✅ Décision prise |
 
 ---
 
