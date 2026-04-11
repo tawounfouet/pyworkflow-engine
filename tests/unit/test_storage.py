@@ -1,7 +1,7 @@
 """
-Comprehensive test suite for all persistence backends.
+Comprehensive test suite for all storage backends.
 
-Tests the persistence layer with all backends to ensure consistent
+Tests the storage layer with all backends to ensure consistent
 behavior and API compatibility.
 """
 
@@ -36,11 +36,11 @@ except ImportError:
 
 
 class StorageBackendTests:
-    """Mixin de tests communs pour tous les backends de persistence.
+    """Mixin de tests communs pour tous les backends de storage.
 
     Cette classe n'est **pas** collectée par pytest (absence de préfixe
     ``Test``). Les sous-classes héritent de l'ensemble des cas de test et
-    fournissent leur propre fixture ``persistence``.
+    fournissent leur propre fixture ``storage``.
 
     Sous-classes concrètes :
         - ``TestInMemoryStorage``
@@ -116,13 +116,13 @@ class StorageBackendTests:
             step_runs=step_runs,
         )
 
-    def test_save_and_get_job(self, persistence: BaseStorage, sample_job: Job):
+    def test_save_and_get_job(self, storage: BaseStorage, sample_job: Job):
         """Test saving and retrieving a job."""
         # Save job
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Retrieve job
-        retrieved_job = persistence.get_job(sample_job.name)
+        retrieved_job = storage.get_job(sample_job.name)
 
         assert retrieved_job is not None
         assert retrieved_job.name == sample_job.name
@@ -141,26 +141,26 @@ class StorageBackendTests:
             assert orig_step.dependencies == retr_step.dependencies
             assert orig_step.timeout == retr_step.timeout
 
-    def test_get_nonexistent_job(self, persistence: BaseStorage):
+    def test_get_nonexistent_job(self, storage: BaseStorage):
         """Test retrieving a job that doesn't exist."""
-        result = persistence.get_job("nonexistent_job")
+        result = storage.get_job("nonexistent_job")
         assert result is None
 
-    def test_list_jobs(self, persistence: BaseStorage, sample_job: Job):
+    def test_list_jobs(self, storage: BaseStorage, sample_job: Job):
         """Test listing jobs."""
         # Initially empty
-        jobs = persistence.list_jobs()
+        jobs = storage.list_jobs()
         assert len(jobs) == 0
 
         # Save job
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Should have one job
-        jobs = persistence.list_jobs()
+        jobs = storage.list_jobs()
         assert len(jobs) == 1
         assert jobs[0].name == sample_job.name
 
-    def test_list_jobs_pagination(self, persistence: BaseStorage):
+    def test_list_jobs_pagination(self, storage: BaseStorage):
         """Test job listing with pagination."""
         # Create multiple jobs
         for i in range(5):
@@ -178,52 +178,52 @@ class StorageBackendTests:
                 ],
                 metadata={},
             )
-            persistence.save_job(job)
+            storage.save_job(job)
 
         # Test pagination
-        page1 = persistence.list_jobs(limit=2, offset=0)
+        page1 = storage.list_jobs(limit=2, offset=0)
         assert len(page1) == 2
         assert page1[0].name == "job_00"
         assert page1[1].name == "job_01"
 
-        page2 = persistence.list_jobs(limit=2, offset=2)
+        page2 = storage.list_jobs(limit=2, offset=2)
         assert len(page2) == 2
         assert page2[0].name == "job_02"
         assert page2[1].name == "job_03"
 
         # Test without pagination
-        all_jobs = persistence.list_jobs()
+        all_jobs = storage.list_jobs()
         assert len(all_jobs) == 5
 
-    def test_delete_job(self, persistence: BaseStorage, sample_job: Job):
+    def test_delete_job(self, storage: BaseStorage, sample_job: Job):
         """Test deleting a job."""
         # Save job
-        persistence.save_job(sample_job)
-        assert persistence.get_job(sample_job.name) is not None
+        storage.save_job(sample_job)
+        assert storage.get_job(sample_job.name) is not None
 
         # Delete job
-        result = persistence.delete_job(sample_job.name)
+        result = storage.delete_job(sample_job.name)
         assert result is True
 
         # Should be gone
-        assert persistence.get_job(sample_job.name) is None
+        assert storage.get_job(sample_job.name) is None
 
         # Delete non-existent job
-        result = persistence.delete_job("nonexistent")
+        result = storage.delete_job("nonexistent")
         assert result is False
 
     def test_save_and_get_job_run(
-        self, persistence: BaseStorage, sample_job: Job, sample_job_run: JobRun
+        self, storage: BaseStorage, sample_job: Job, sample_job_run: JobRun
     ):
         """Test saving and retrieving a job run."""
         # Save job first (some backends require it)
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Save job run
-        persistence.save_job_run(sample_job_run)
+        storage.save_job_run(sample_job_run)
 
         # Retrieve job run
-        retrieved_run = persistence.get_job_run(sample_job_run.job_run_id)
+        retrieved_run = storage.get_job_run(sample_job_run.job_run_id)
 
         assert retrieved_run is not None
         assert retrieved_run.job_run_id == sample_job_run.job_run_id
@@ -246,36 +246,36 @@ class StorageBackendTests:
             assert orig_step_run.output_data == retr_step_run.output_data
             assert orig_step_run.metadata == retr_step_run.metadata
 
-    def test_get_nonexistent_job_run(self, persistence: BaseStorage):
+    def test_get_nonexistent_job_run(self, storage: BaseStorage):
         """Test retrieving a job run that doesn't exist."""
-        result = persistence.get_job_run("nonexistent_run")
+        result = storage.get_job_run("nonexistent_run")
         assert result is None
 
     def test_list_job_runs(
-        self, persistence: BaseStorage, sample_job: Job, sample_job_run: JobRun
+        self, storage: BaseStorage, sample_job: Job, sample_job_run: JobRun
     ):
         """Test listing job runs."""
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Initially empty
-        runs = persistence.list_job_runs()
+        runs = storage.list_job_runs()
         assert len(runs) == 0
 
         # Save job run
-        persistence.save_job_run(sample_job_run)
+        storage.save_job_run(sample_job_run)
 
         # Should have one run
-        runs = persistence.list_job_runs()
+        runs = storage.list_job_runs()
         assert len(runs) == 1
         assert runs[0].id == sample_job_run.id
 
     def test_list_job_runs_filtering(
-        self, persistence: BaseStorage, sample_job: Job
+        self, storage: BaseStorage, sample_job: Job
     ):
         """Test listing job runs with filters."""
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Create multiple job runs
         now = datetime.now(UTC)  # Use timezone-aware datetime
@@ -305,32 +305,32 @@ class StorageBackendTests:
                 created_at=run_data["created_at"],  # Use specified created_at
                 updated_at=run_data["created_at"],  # Set updated_at to same time
             )
-            persistence.save_job_run(job_run)
+            storage.save_job_run(job_run)
 
         # Test filtering by status
-        success_runs = persistence.list_job_runs(status="success")
+        success_runs = storage.list_job_runs(status="success")
         assert len(success_runs) == 1
         assert success_runs[0].job_run_id == "run1"
 
-        failed_runs = persistence.list_job_runs(status="failed")
+        failed_runs = storage.list_job_runs(status="failed")
         assert len(failed_runs) == 1
         assert failed_runs[0].job_run_id == "run2"
 
         # Test filtering by job name
-        job_runs = persistence.list_job_runs(job_name=sample_job.name)
+        job_runs = storage.list_job_runs(job_name=sample_job.name)
         assert len(job_runs) == 3
 
         # Test filtering by time
-        recent_runs = persistence.list_job_runs(since=now - timedelta(minutes=30))
+        recent_runs = storage.list_job_runs(since=now - timedelta(minutes=30))
         assert len(recent_runs) == 1
         assert recent_runs[0].id == "run3"
 
     def test_list_job_runs_pagination(
-        self, persistence: BaseStorage, sample_job: Job
+        self, storage: BaseStorage, sample_job: Job
     ):
         """Test job run listing with pagination."""
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Create multiple job runs
         for i in range(5):  # noqa: B007
@@ -342,50 +342,50 @@ class StorageBackendTests:
                 metadata={},
                 step_runs=[],
             )
-            persistence.save_job_run(job_run)
+            storage.save_job_run(job_run)
 
         # Test pagination (newest first)
-        page1 = persistence.list_job_runs(limit=2, offset=0)
+        page1 = storage.list_job_runs(limit=2, offset=0)
         assert len(page1) == 2
         assert page1[0].id == "run_4"  # Newest (created last)
         assert page1[1].id == "run_3"
 
-        page2 = persistence.list_job_runs(limit=2, offset=2)
+        page2 = storage.list_job_runs(limit=2, offset=2)
         assert len(page2) == 2
         assert page2[0].id == "run_2"
         assert page2[1].id == "run_1"
 
     def test_delete_job_run(
-        self, persistence: BaseStorage, sample_job: Job, sample_job_run: JobRun
+        self, storage: BaseStorage, sample_job: Job, sample_job_run: JobRun
     ):
         """Test deleting a job run."""
         # Save job and job run
-        persistence.save_job(sample_job)
-        persistence.save_job_run(sample_job_run)
+        storage.save_job(sample_job)
+        storage.save_job_run(sample_job_run)
 
-        assert persistence.get_job_run(sample_job_run.id) is not None
+        assert storage.get_job_run(sample_job_run.id) is not None
 
         # Delete job run
-        result = persistence.delete_job_run(sample_job_run.id)
+        result = storage.delete_job_run(sample_job_run.id)
         assert result is True
 
         # Should be gone
-        assert persistence.get_job_run(sample_job_run.id) is None
+        assert storage.get_job_run(sample_job_run.id) is None
 
         # Delete non-existent run
-        result = persistence.delete_job_run("nonexistent")
+        result = storage.delete_job_run("nonexistent")
         assert result is False
 
-    def test_get_job_run_count(self, persistence: BaseStorage, sample_job: Job):
+    def test_get_job_run_count(self, storage: BaseStorage, sample_job: Job):
         """Test getting job run count."""
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Initially zero
-        count = persistence.get_job_run_count()
+        count = storage.get_job_run_count()
         assert count == 0
 
-        count_for_job = persistence.get_job_run_count(job_name=sample_job.name)
+        count_for_job = storage.get_job_run_count(job_name=sample_job.name)
         assert count_for_job == 0
 
         # Add some runs
@@ -398,19 +398,19 @@ class StorageBackendTests:
                 metadata={},
                 step_runs=[],
             )
-            persistence.save_job_run(job_run)
+            storage.save_job_run(job_run)
 
         # Should have 3 total
-        count = persistence.get_job_run_count()
+        count = storage.get_job_run_count()
         assert count == 3
 
-        count_for_job = persistence.get_job_run_count(job_name=sample_job.name)
+        count_for_job = storage.get_job_run_count(job_name=sample_job.name)
         assert count_for_job == 3
 
-    def test_cleanup_old_runs(self, persistence: BaseStorage, sample_job: Job):
+    def test_cleanup_old_runs(self, storage: BaseStorage, sample_job: Job):
         """Test cleaning up old job runs."""
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Create runs with different ages
         now = datetime.now(UTC)  # Use timezone-aware datetime
@@ -441,22 +441,22 @@ class StorageBackendTests:
             updated_at=recent_time,
         )
 
-        persistence.save_job_run(old_run)
-        persistence.save_job_run(recent_run)
+        storage.save_job_run(old_run)
+        storage.save_job_run(recent_run)
 
         # Should have 2 runs
-        assert persistence.get_job_run_count() == 2
+        assert storage.get_job_run_count() == 2
 
         # Cleanup runs older than 1 day
         cutoff = now - timedelta(days=1)
-        deleted_count = persistence.cleanup_old_runs(cutoff)
+        deleted_count = storage.cleanup_old_runs(cutoff)
 
         assert deleted_count == 1
-        assert persistence.get_job_run_count() == 1
+        assert storage.get_job_run_count() == 1
 
         # Recent run should still exist
-        assert persistence.get_job_run("recent_run") is not None
-        assert persistence.get_job_run("old_run") is None
+        assert storage.get_job_run("recent_run") is not None
+        assert storage.get_job_run("old_run") is None
 
     # ------------------------------------------------------------------
     # cleanup_old_runs — dry_run parametrized tests
@@ -479,14 +479,14 @@ class StorageBackendTests:
 
     @pytest.mark.parametrize("dry_run", [True, False])
     def test_cleanup_old_runs_dry_run(
-        self, persistence: BaseStorage, sample_job: Job, dry_run: bool
+        self, storage: BaseStorage, sample_job: Job, dry_run: bool
     ):
         """Test cleanup_old_runs avec dry_run=True et dry_run=False.
 
         dry_run=True  → compte uniquement, aucune suppression.
         dry_run=False → supprime réellement les runs éligibles.
         """
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         old_run = self._make_old_run(sample_job.name, "old_dr_run", age_days=5)
         now = datetime.now(UTC)
@@ -499,37 +499,37 @@ class StorageBackendTests:
             updated_at=now,
         )
 
-        persistence.save_job_run(old_run)
-        persistence.save_job_run(recent_run)
-        assert persistence.get_job_run_count() == 2
+        storage.save_job_run(old_run)
+        storage.save_job_run(recent_run)
+        assert storage.get_job_run_count() == 2
 
         cutoff = now - timedelta(days=1)
-        count = persistence.cleanup_old_runs(cutoff, dry_run=dry_run)
+        count = storage.cleanup_old_runs(cutoff, dry_run=dry_run)
 
         assert count == 1, f"Expected 1 old run counted, got {count}"
 
         if dry_run:
             # dry_run=True → rien supprimé
-            assert persistence.get_job_run_count() == 2
-            assert persistence.get_job_run("old_dr_run") is not None
+            assert storage.get_job_run_count() == 2
+            assert storage.get_job_run("old_dr_run") is not None
         else:
             # dry_run=False → old_run supprimé
-            assert persistence.get_job_run_count() == 1
-            assert persistence.get_job_run("old_dr_run") is None
-            assert persistence.get_job_run("recent_dr_run") is not None
+            assert storage.get_job_run_count() == 1
+            assert storage.get_job_run("old_dr_run") is None
+            assert storage.get_job_run("recent_dr_run") is not None
 
-    def test_health_check(self, persistence: BaseStorage):
+    def test_health_check(self, storage: BaseStorage):
         """Test health check functionality."""
-        health = persistence.health_check()
+        health = storage.health_check()
 
         assert isinstance(health, dict)
         assert "status" in health
         assert "backend" in health
         assert health["status"] in ["healthy", "unhealthy"]
 
-    def test_get_statistics(self, persistence: BaseStorage):
+    def test_get_statistics(self, storage: BaseStorage):
         """Test statistics functionality."""
-        stats = persistence.get_statistics()
+        stats = storage.get_statistics()
 
         assert isinstance(stats, dict)
         assert "backend" in stats
@@ -540,7 +540,7 @@ class TestInMemoryStorage(StorageBackendTests):
 
     @pytest.fixture
     def storage(self) -> InMemoryStorage:
-        """Create an in-memory persistence instance."""
+        """Create an in-memory storage instance."""
         return InMemoryStorage()
 
 
@@ -549,20 +549,20 @@ class TestJSONFileStorage(StorageBackendTests):
 
     @pytest.fixture
     def storage(self) -> JSONFileStorage:
-        """Create a JSON file persistence instance with temporary directory."""
+        """Create a JSON file storage instance with temporary directory."""
         temp_dir = tempfile.mkdtemp()
         # Store for cleanup - pytest will handle this
         return JSONFileStorage(storage_dir=temp_dir)
 
     def test_file_based_storage(
-        self, persistence: JSONFileStorage, sample_job: Job
+        self, storage: JSONFileStorage, sample_job: Job
     ):
         """Test that data is actually stored in files."""
         # Save job
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Check that file exists
-        jobs_file = Path(persistence.storage_dir) / "jobs" / f"{sample_job.name}.json"
+        jobs_file = Path(storage.storage_dir) / "jobs" / f"{sample_job.name}.json"
         assert jobs_file.exists()
 
         # File should contain job data
@@ -578,16 +578,16 @@ class TestSQLiteStorage(StorageBackendTests):
 
     @pytest.fixture
     def storage(self) -> SQLiteStorage:
-        """Create a SQLite persistence instance with in-memory database."""
+        """Create a SQLite storage instance with in-memory database."""
         return SQLiteStorage(":memory:")
 
-    def test_database_initialization(self, persistence: SQLiteStorage):
+    def test_database_initialization(self, storage: SQLiteStorage):
         """Test that database tables are properly created."""
         # Basic test - if we can create the instance, tables should be created
-        assert persistence is not None
+        assert storage is not None
 
         # Test health check which verifies database connectivity
-        health = persistence.health_check()
+        health = storage.health_check()
         assert health["status"] == "healthy"
 
 
@@ -598,32 +598,32 @@ class TestSQLAlchemyStorage(StorageBackendTests):
 
     @pytest.fixture
     def storage(self):
-        """Create a SQLAlchemy persistence instance with in-memory SQLite."""
+        """Create a SQLAlchemy storage instance with in-memory SQLite."""
         from pyworkflow_engine.adapters.storage.sqlalchemy import SQLAlchemyStorage
 
         return SQLAlchemyStorage("sqlite:///:memory:")
 
-    def test_database_initialization(self, persistence):
+    def test_database_initialization(self, storage):
         """Test that database is properly initialized."""
         from sqlalchemy import text
 
-        with persistence.engine.connect() as conn:
+        with storage.engine.connect() as conn:
             result = conn.execute(
                 text("SELECT name FROM sqlite_master WHERE type='table'")
             )
             table_names = [row[0] for row in result.fetchall()]
 
             expected_tables = [
-                f"{persistence.table_prefix}jobs",
-                f"{persistence.table_prefix}job_runs",
-                f"{persistence.table_prefix}step_runs",
-                f"{persistence.table_prefix}schema_version",
+                f"{storage.table_prefix}jobs",
+                f"{storage.table_prefix}job_runs",
+                f"{storage.table_prefix}step_runs",
+                f"{storage.table_prefix}schema_version",
             ]
 
             for table in expected_tables:
                 assert table in table_names
 
-    def test_bulk_operations(self, persistence, sample_job: Job):
+    def test_bulk_operations(self, storage, sample_job: Job):
         """Test bulk operations performance."""
         import time
 
@@ -641,26 +641,26 @@ class TestSQLAlchemyStorage(StorageBackendTests):
             job_runs.append(job_run)
 
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         # Bulk save
         start_time = time.time()
         for job_run in job_runs:
-            persistence.save_job_run(job_run)
+            storage.save_job_run(job_run)
         end_time = time.time()
 
         # Should complete reasonably quickly
         assert end_time - start_time < 5.0  # Less than 5 seconds
 
         # Verify count
-        count = persistence.get_job_run_count()
+        count = storage.get_job_run_count()
         assert count == 100
 
-    def test_advanced_querying(self, persistence, sample_job: Job):
+    def test_advanced_querying(self, storage, sample_job: Job):
         """Test advanced querying capabilities."""
 
         # Save job first
-        persistence.save_job(sample_job)
+        storage.save_job(sample_job)
 
         now = datetime.now(UTC)
 
@@ -676,26 +676,26 @@ class TestSQLAlchemyStorage(StorageBackendTests):
                 step_runs=[],
                 created_at=now - timedelta(hours=i),
             )
-            persistence.save_job_run(job_run)
+            storage.save_job_run(job_run)
 
         # Test status filtering
-        success_runs = persistence.list_job_runs(status="success")
+        success_runs = storage.list_job_runs(status="success")
         assert len(success_runs) == 10
 
         # Test time filtering — only runs created within the last 5 hours
         # i=0..4 → created_at within 5 hours → max 5 runs (indices 0-4)
         recent_time = now - timedelta(hours=5)
-        recent_runs = persistence.list_job_runs(since=recent_time)
+        recent_runs = storage.list_job_runs(since=recent_time)
         assert len(recent_runs) <= 6  # Runs from last 5 hours
 
-    def test_connection_pooling(self, persistence):
+    def test_connection_pooling(self, storage):
         """Test connection pooling functionality."""
         # Engine should have pool configuration
-        assert persistence.engine.pool is not None
+        assert storage.engine.pool is not None
 
         # Multiple operations should work
         for _ in range(10):
-            health = persistence.health_check()
+            health = storage.health_check()
             assert health["status"] == "healthy"
 
 
@@ -709,8 +709,8 @@ class TestTransactionBehavior:
             lambda: SQLiteStorage(":memory:"),
         ]
     )
-    def persistence(self, request):
-        """Parameterized fixture for different persistence backends."""
+    def storage(self, request):
+        """Parameterized fixture for different storage backends."""
         return request.param()
 
     @pytest.fixture
@@ -732,19 +732,19 @@ class TestTransactionBehavior:
         )
 
     def test_transaction_context_manager(
-        self, persistence: BaseStorage, sample_job: Job
+        self, storage: BaseStorage, sample_job: Job
     ):
         """Test transaction context manager."""
         # Test successful transaction
-        with persistence.transaction():
-            persistence.save_job(sample_job)
+        with storage.transaction():
+            storage.save_job(sample_job)
 
         # Job should be saved
-        assert persistence.get_job(sample_job.name) is not None
+        assert storage.get_job(sample_job.name) is not None
 
         # Test rollback on exception
         try:
-            with persistence.transaction() as _tx:
+            with storage.transaction() as _tx:
                 modified_job = Job(
                     name="test_rollback",
                     description="Should be rolled back",
@@ -759,7 +759,7 @@ class TestTransactionBehavior:
                     ],
                     metadata={},
                 )
-                persistence.save_job(modified_job)
+                storage.save_job(modified_job)
                 raise ValueError("Intentional error")
         except ValueError:
             pass
@@ -770,18 +770,18 @@ class TestTransactionBehavior:
 
 # Integration tests
 class TestPersistenceIntegration:
-    """Integration tests for persistence with the workflow engine."""
+    """Integration tests for storage with the workflow engine."""
 
     def test_engine_integration(self):
-        """Test persistence integration with WorkflowEngine."""
+        """Test storage integration with WorkflowEngine."""
         from pyworkflow_engine import WorkflowEngine
         from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
 
-        persistence = InMemoryStorage()
-        engine = WorkflowEngine(storage=persistence)
+        storage = InMemoryStorage()
+        engine = WorkflowEngine(storage=storage)
 
-        # Engine should use the persistence backend
-        assert engine.persistence is persistence
+        # Engine should use the storage backend
+        assert engine.storage is storage
 
         # Basic workflow execution should work
         # (This would require a more complete test setup)

@@ -1,5 +1,5 @@
 """
-Integration tests — round-trip persistence for all backends.
+Integration tests — round-trip storage for all backends.
 
 Each test saves a model, retrieves it, and asserts field equality.
 This validates that serialization ↔ deserialization is fully symmetric

@@ -166,7 +166,7 @@ class Settings:
         Examples:
             >>> from pyworkflow_engine.config.settings import settings
             >>> cfg = settings.workflow_config
-            >>> cfg.persistence.db_path == settings.DATABASE
+            >>> cfg.storage.db_path == settings.DATABASE
             True
         """
         from pyworkflow_engine.config.base import WorkflowConfig

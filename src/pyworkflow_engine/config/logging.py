@@ -26,8 +26,8 @@ class LoggingConfig:
         log_file_max_mb: Taille max d'un fichier de log avant rotation (Mo).
         log_file_backup_count: Nombre de fichiers de backup conservés.
         log_to_db: Si ``True``, persiste les logs dans la table
-            ``workflow_logs`` de la DB configurée dans ``PersistenceConfig``.
-            Ignoré si ``PersistenceConfig.db_path`` est ``None``.
+            ``workflow_logs`` de la DB configurée dans ``StorageConfig``.
+            Ignoré si ``StorageConfig.db_path`` est ``None``.
 
     Examples:
         >>> cfg = LoggingConfig(level="DEBUG", format="json")

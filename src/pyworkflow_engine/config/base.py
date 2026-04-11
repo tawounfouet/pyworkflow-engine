@@ -30,7 +30,7 @@ class WorkflowConfig:
     """Configuration complète de ``WorkflowEngine``.
 
     Composée de quatre sous-configs indépendantes, toutes optionnelles.
-    Quand ``persistence.db_path`` est fourni, le moteur crée automatiquement
+    Quand ``storage.db_path`` est fourni, le moteur crée automatiquement
     le backend SQLite et, si ``logging.log_to_db=True``, branche le handler
     de logs sur la même base.
 
@@ -38,13 +38,13 @@ class WorkflowConfig:
         engine: Paramètres d'exécution (retry, timeout, parallélisme).
         executor: Stratégie et dimensionnement des executors.
         logging: Niveau, format, fichier et stockage DB des logs.
-        persistence: Backend de persistence (chemin SQLite).
+        storage: Backend de stockage (chemin SQLite, mémoire, JSON…).
 
     Examples:
         >>> cfg = WorkflowConfig()
         >>> cfg.engine.parallel
         False
-        >>> cfg.persistence.db_path is None
+        >>> cfg.storage.db_path is None
         True
 
         >>> # Configuration clé en main — DB + logs fichier + logs en BD
@@ -52,14 +52,14 @@ class WorkflowConfig:
         ...     WorkflowConfig, StorageConfig, LoggingConfig
         ... )
         >>> cfg = WorkflowConfig(
-        ...     (StorageConfig)(db_path="workflow.db"),
+        ...     storage=StorageConfig(db_path="workflow.db"),
         ...     logging=LoggingConfig(
         ...         level="DEBUG",
         ...         log_dir="logs",
         ...         log_to_db=True,
         ...     ),
         ... )
-        >>> cfg.persistence.db_path
+        >>> cfg.storage.db_path
         'workflow.db'
         >>> cfg.logging.log_to_db
         True
