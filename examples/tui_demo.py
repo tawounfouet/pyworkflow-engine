@@ -8,7 +8,7 @@ Usage::
 from __future__ import annotations
 
 from pyworkflow_engine import WorkflowEngine
-from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
 from pyworkflow_engine.models import Job
 from pyworkflow_engine.models.enums import ExecutorType, StepType
 from pyworkflow_engine.models.step import Step
@@ -69,11 +69,11 @@ monitoring_job = Job(
 
 # ---------------------------------------------------------------------------
 # Instance WorkflowEngine — exposée au niveau module pour le loader CLI/TUI
-# InMemoryPersistence permet à list_jobs() / get_job() de fonctionner sans
+# InMemoryStorage permet à list_jobs() / get_job() de fonctionner sans
 # base de données externe.
 # ---------------------------------------------------------------------------
 
 engine = WorkflowEngine()
-engine.persistence = InMemoryPersistence()
+engine.storage = InMemoryStorage()
 engine.save_job(etl_job)
 engine.save_job(monitoring_job)

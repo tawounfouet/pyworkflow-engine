@@ -73,10 +73,10 @@ def launch_gui(
         engine = load_engine(app_path)
     else:
         from pyworkflow_engine import WorkflowEngine
-        from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+        from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
         _engine = WorkflowEngine()
-        _engine.persistence = SQLitePersistence(database_path=db)
+        _engine.storage = SQLiteStorage(database_path=db)
         engine = _engine
 
     # ── Bannière de démarrage ─────────────────────────────────────────────

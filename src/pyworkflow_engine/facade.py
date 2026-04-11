@@ -27,24 +27,29 @@ from pyworkflow_engine.engine.parallel_runner import ParallelRunner
 from pyworkflow_engine.engine.retry import RetryHandler
 from pyworkflow_engine.engine.runner import WorkflowRunner
 from pyworkflow_engine.engine.suspension import SuspensionManager
-from pyworkflow_engine.exceptions import DAGValidationError, WorkflowError, WorkflowFailed, WorkflowSuspended
+from pyworkflow_engine.exceptions import (
+    DAGValidationError,
+    WorkflowError,
+    WorkflowFailed,
+    WorkflowSuspended,
+)
 from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
-from pyworkflow_engine.ports.persistence import PersistenceError
+from pyworkflow_engine.ports.storage import StorageError
 from pyworkflow_engine.logging import get_logger
 from pyworkflow_engine.models import Job, JobRun, RunStatus, StepType
 from pyworkflow_engine.config import WorkflowConfig
 
 _logger = get_logger("engine.facade")
 
-NO_PERSISTENCE_ERROR = "No persistence backend configured"
-NO_PERSISTENCE_EXECUTION_ERROR = (
+NO_STORAGE_ERROR = "No persistence backend configured"
+NO_STORAGE_EXECUTION_ERROR = (
     "No persistence backend configured for persistent execution"
 )
 
 
 def _bootstrap_from_config(
     config: "WorkflowConfig",
-    explicit_persistence: Any | None,
+    explicit_storage: Any | None,
 ) -> Any:
     """Auto-provisionne persistence et logging depuis ``WorkflowConfig``.
 
@@ -52,18 +57,21 @@ def _bootstrap_from_config(
     imports lazy pour éviter les dépendances circulaires avec les adapters.
 
     Returns:
-        Instance de persistence à utiliser (``explicit_persistence`` si
-        fourni, sinon instance auto-créée depuis ``config.persistence``).
+        Instance de persistence à utiliser (``explicit_storage`` si
+        fourni, sinon instance auto-créée depuis ``config.storage``).
     """
-    persistence = explicit_persistence
+    backend = explicit_storage
 
-    # ── Persistence ──────────────────────────────────────────────────────
-    if persistence is None and config.persistence.db_path:
-        from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence  # noqa: PLC0415
-        persistence = SQLitePersistence(database_path=config.persistence.db_path)
+    # ── Storage ───────────────────────────────────────────────────────────
+    if backend is None and config.storage.db_path:
+        from pyworkflow_engine.adapters.storage.sqlite import (
+            SQLiteStorage,
+        )  # noqa: PLC0415
+
+        backend = SQLiteStorage(database_path=config.storage.db_path)
         _logger.debug(
-            "SQLitePersistence auto-configuré depuis WorkflowConfig",
-            extra={"db_path": config.persistence.db_path},
+            "SQLiteStorage auto-configuré depuis WorkflowConfig",
+            extra={"db_path": config.storage.db_path},
         )
 
     # ── Logging ──────────────────────────────────────────────────────────
@@ -78,7 +86,9 @@ def _bootstrap_from_config(
         import logging as _stdlib_logging  # noqa: PLC0415
         from pathlib import Path  # noqa: PLC0415
 
-        from pyworkflow_engine.logging.config import LoggingConfig as _LC  # noqa: PLC0415
+        from pyworkflow_engine.logging.config import (
+            LoggingConfig as _LC,
+        )  # noqa: PLC0415
         from pyworkflow_engine.logging.logger import configure_logging  # noqa: PLC0415
 
         log_file: str | None = None
@@ -97,20 +107,20 @@ def _bootstrap_from_config(
             )
         )
 
-        if log_cfg.log_to_db and config.persistence.db_path:
-            from pyworkflow_engine.logging.handlers import SQLiteLogHandler  # noqa: PLC0415
+        if log_cfg.log_to_db and config.storage.db_path:
+            from pyworkflow_engine.logging.handlers import (
+                SQLiteLogHandler,
+            )  # noqa: PLC0415
 
-            db_handler = SQLiteLogHandler(
-                db_path=config.persistence.db_path, batch_size=1
-            )
+            db_handler = SQLiteLogHandler(db_path=config.storage.db_path, batch_size=1)
             db_handler.setLevel(getattr(_stdlib_logging, log_cfg.level))
             _stdlib_logging.getLogger("pyworkflow_engine").addHandler(db_handler)
             _logger.debug(
                 "SQLiteLogHandler auto-configuré depuis WorkflowConfig",
-                extra={"db": config.persistence.db_path, "table": "workflow_logs"},
+                extra={"db": config.storage.db_path, "table": "workflow_logs"},
             )
 
-    return persistence
+    return backend
 
 
 class WorkflowEngine:
@@ -149,7 +159,7 @@ class WorkflowEngine:
         default_executor: Callable | None = None,
         step_executors: dict[StepType, Callable] | None = None,
         executor_registry: ExecutorRegistry | None = None,
-        persistence: Any | None = None,
+        storage: Any | None = None,
         parallel: bool = False,
         max_workers: int | None = None,
     ):
@@ -161,9 +171,9 @@ class WorkflowEngine:
         self._config = config or WorkflowConfig()
 
         # Auto-provision persistence + logging depuis WorkflowConfig
-        persistence = _bootstrap_from_config(self._config, persistence)
+        backend = _bootstrap_from_config(self._config, storage)
 
-        self._persistence = persistence
+        self._storage = backend
         self._executor_registry = executor_registry or ExecutorRegistry()
         runner_kwargs: dict[str, Any] = {
             "executor_registry": self._executor_registry,
@@ -176,7 +186,7 @@ class WorkflowEngine:
             else WorkflowRunner(**runner_kwargs)
         )
         self._retry = RetryHandler()
-        self._suspension = SuspensionManager(persistence)
+        self._suspension = SuspensionManager(backend)
         self._job_registry: dict[str, Job] = {}  # in-memory cache preserving handlers
 
     # ------------------------------------------------------------------
@@ -195,7 +205,7 @@ class WorkflowEngine:
         ni n'écrit dans aucun backend. Tout l'état reste en mémoire dans le
         ``JobRun`` retourné.
 
-        Utilisez :meth:`run_with_persistence` si vous souhaitez sauvegarder
+        Utilisez :meth:`run_with_storage` si vous souhaitez sauvegarder
         automatiquement le résultat.
 
         Args:
@@ -366,19 +376,19 @@ class WorkflowEngine:
     # ------------------------------------------------------------------
 
     @property
-    def persistence(self):
-        return self._persistence
+    def storage(self):
+        return self._storage
 
-    @persistence.setter
-    def persistence(self, backend):
-        self._persistence = backend
-        self._suspension.persistence = backend
+    @storage.setter
+    def storage(self, backend):
+        self._storage = backend
+        self._suspension.storage = backend
 
     def save_job(self, job: Job) -> None:
-        self._job_registry[job.name] = job  # preserve handlers for run_with_persistence
-        self._require_persistence("save_job")
+        self._job_registry[job.name] = job  # preserve handlers for run_with_storage
+        self._require_storage("save_job")
         try:
-            self._persistence.save_job(job)
+            self._storage.save_job(job)
         except Exception as e:
             raise WorkflowError(
                 f"Failed to save job '{job.name}': {e}",
@@ -386,9 +396,9 @@ class WorkflowEngine:
             ) from e
 
     def get_job(self, job_name: str) -> Job | None:
-        self._require_persistence("get_job")
+        self._require_storage("get_job")
         try:
-            return self._persistence.get_job(job_name)
+            return self._storage.get_job(job_name)
         except Exception as e:
             raise WorkflowError(
                 f"Failed to get job '{job_name}': {e}",
@@ -396,18 +406,18 @@ class WorkflowEngine:
             ) from e
 
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
-        self._require_persistence("list_jobs")
+        self._require_storage("list_jobs")
         try:
-            return self._persistence.list_jobs(limit=limit, offset=offset)
+            return self._storage.list_jobs(limit=limit, offset=offset)
         except Exception as e:
             raise WorkflowError(
                 f"Failed to list jobs: {e}", details={"operation": "list_jobs"}
             ) from e
 
     def delete_job(self, job_name: str) -> bool:
-        self._require_persistence("delete_job")
+        self._require_storage("delete_job")
         try:
-            return self._persistence.delete_job(job_name)
+            return self._storage.delete_job(job_name)
         except Exception as e:
             raise WorkflowError(
                 f"Failed to delete job '{job_name}': {e}",
@@ -415,9 +425,9 @@ class WorkflowEngine:
             ) from e
 
     def get_job_run(self, run_id: str) -> JobRun | None:
-        self._require_persistence("get_job_run")
+        self._require_storage("get_job_run")
         try:
-            return self._persistence.get_job_run(run_id)
+            return self._storage.get_job_run(run_id)
         except Exception as e:
             raise WorkflowError(
                 f"Failed to get job run '{run_id}': {e}",
@@ -432,9 +442,9 @@ class WorkflowEngine:
         offset: int = 0,
         since: datetime | None = None,
     ) -> list[JobRun]:
-        self._require_persistence("list_job_runs")
+        self._require_storage("list_job_runs")
         try:
-            return self._persistence.list_job_runs(
+            return self._storage.list_job_runs(
                 job_name=job_name,
                 status=status,
                 limit=limit,
@@ -447,7 +457,7 @@ class WorkflowEngine:
                 details={"operation": "list_job_runs"},
             ) from e
 
-    def run_with_persistence(
+    def run_with_storage(
         self,
         job_or_name: Job | str,
         initial_context: dict[str, Any] | None = None,
@@ -481,7 +491,7 @@ class WorkflowEngine:
                 ou si le job est introuvable par nom.
             WorkflowFailed: Si le workflow échoue.
         """
-        self._require_persistence("run_with_persistence")
+        self._require_storage("run_with_storage")
 
         if isinstance(job_or_name, str):
             # Prefer in-memory registry: handlers are preserved there.
@@ -557,21 +567,21 @@ class WorkflowEngine:
     # Internal
     # ------------------------------------------------------------------
 
-    def _require_persistence(self, operation: str) -> None:
-        if not self._persistence:
-            raise WorkflowError(NO_PERSISTENCE_ERROR, details={"operation": operation})
+    def _require_storage(self, operation: str) -> None:
+        if not self._storage:
+            raise WorkflowError(NO_STORAGE_ERROR, details={"operation": operation})
 
     def _ensure_job_persisted(self, job: Job) -> None:
         """Sauvegarde le job dans le backend s'il n'y est pas encore.
 
-        Appelé automatiquement par ``run_with_persistence()`` pour garantir
+        Appelé automatiquement par ``run_with_storage()`` pour garantir
         que la contrainte FK (job_run → job) est satisfaite avant le premier
         checkpoint du ``JobRun``.
         """
         try:
-            existing = self._persistence.get_job(job.name)
+            existing = self._storage.get_job(job.name)
             if not existing:
-                self._persistence.save_job(job)
+                self._storage.save_job(job)
                 _logger.debug("Auto-saved job '%s' before first checkpoint.", job.name)
         except Exception as e:
             _logger.warning(
@@ -584,16 +594,16 @@ class WorkflowEngine:
     def _save_job_run_checkpoint(self, job_run: JobRun) -> None:
         """Sauvegarde un checkpoint du JobRun dans le backend de persistence.
 
-        Ne lève jamais d'exception : les erreurs attendues (``PersistenceError``)
+        Ne lève jamais d'exception : les erreurs attendues (``StorageError``)
         sont loggées en WARNING, les erreurs inattendues en ERROR. Cela garantit
         que l'exécution du workflow n'est jamais interrompue par un échec de
         persistence.
         """
-        if not self._persistence:
+        if not self._storage:
             return
         try:
-            self._persistence.save_job_run(job_run)
-        except PersistenceError as e:
+            self._storage.save_job_run(job_run)
+        except StorageError as e:
             _logger.warning(
                 "Checkpoint failed for run '%s' (non-fatal): %s",
                 job_run.job_run_id,

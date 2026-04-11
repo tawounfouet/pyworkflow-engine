@@ -166,19 +166,21 @@ class Settings:
         Examples:
             >>> from pyworkflow_engine.config.settings import settings
             >>> cfg = settings.workflow_config
-            >>> cfg.persistence.db_path == settings.DATABASE
+            >>> cfg.storage.db_path == settings.DATABASE
             True
         """
         from pyworkflow_engine.config.base import WorkflowConfig
         from pyworkflow_engine.config.engine import EngineConfig
         from pyworkflow_engine.config.executor import ExecutorConfig
         from pyworkflow_engine.config.logging import LoggingConfig
-        from pyworkflow_engine.config.persistence import PersistenceConfig
+        from pyworkflow_engine.config.storage import StorageConfig
 
         return WorkflowConfig(
             engine=EngineConfig(
                 parallel=self.ENGINE_PARALLEL,
-                max_workers=self.ENGINE_MAX_WORKERS if self.ENGINE_MAX_WORKERS != 4 else None,
+                max_workers=(
+                    self.ENGINE_MAX_WORKERS if self.ENGINE_MAX_WORKERS != 4 else None
+                ),
                 max_retries=self.ENGINE_MAX_RETRIES,
                 default_timeout_seconds=self.ENGINE_TIMEOUT,
             ),
@@ -193,7 +195,7 @@ class Settings:
                 log_file_backup_count=self.LOGGING_FILE_BACKUP_COUNT,
                 log_to_db=self.LOGGING_TO_DB,
             ),
-            persistence=PersistenceConfig(
+            storage=StorageConfig(
                 db_path=self.DATABASE,
             ),
         )
@@ -259,7 +261,9 @@ class Settings:
 
         log_backup = _e("PYWORKFLOW_LOG_FILE_BACKUP_COUNT")
         if log_backup is not None:
-            self.LOGGING_FILE_BACKUP_COUNT = _int(log_backup, self.LOGGING_FILE_BACKUP_COUNT)
+            self.LOGGING_FILE_BACKUP_COUNT = _int(
+                log_backup, self.LOGGING_FILE_BACKUP_COUNT
+            )
 
         parallel = _e("PYWORKFLOW_ENGINE_PARALLEL")
         if parallel is not None:

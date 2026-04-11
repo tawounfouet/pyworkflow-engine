@@ -165,10 +165,10 @@ done < <(
 )
 
 log_info "Fichiers : ${#FILES_TO_RENAME[@]}"
-for f in "${FILES_TO_RENAME[@]}"; do log_info "  $f"; done
+for f in "${FILES_TO_RENAME[@]+"${FILES_TO_RENAME[@]}"}"; do log_info "  $f"; done
 
 log_info "Dossiers : ${#DIRS_TO_RENAME[@]}"
-for d in "${DIRS_TO_RENAME[@]}"; do log_info "  $d"; done
+for d in "${DIRS_TO_RENAME[@]+"${DIRS_TO_RENAME[@]}"}"; do log_info "  $d"; done
 
 # ---------------------------------------------------------------------------
 # Confirmation
@@ -250,7 +250,7 @@ log_ok "Remplacement dans les fichiers terminé"
 # ---------------------------------------------------------------------------
 log_step "Étape 3 : Renommage des fichiers"
 
-for filepath in "${FILES_TO_RENAME[@]}"; do
+for filepath in "${FILES_TO_RENAME[@]+"${FILES_TO_RENAME[@]}"}"; do
     [[ -f "${filepath}" ]] || { log_warn "Fichier introuvable (déjà renommé ?) : ${filepath}"; continue; }
     newpath="${filepath//persistence/storage}"
     newdir="$(dirname "${newpath}")"
@@ -264,7 +264,7 @@ done
 # ---------------------------------------------------------------------------
 log_step "Étape 4 : Renommage des dossiers"
 
-for dirpath in "${DIRS_TO_RENAME[@]}"; do
+for dirpath in "${DIRS_TO_RENAME[@]+"${DIRS_TO_RENAME[@]}"}"; do
     [[ -d "${dirpath}" ]] || { log_warn "Dossier introuvable (déjà renommé ?) : ${dirpath}"; continue; }
     newdir="${dirpath//persistence/storage}"
 

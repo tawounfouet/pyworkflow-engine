@@ -1,0 +1,30 @@
+# Configuration de la source Stripe
+source:
+  name: "stripe"
+  type: "api"
+  base_url: "https://api.stripe.com"
+
+entities:
+  - name: "payments"
+    endpoint: "/v1/charges"
+    method: "GET"
+    pagination:
+      type: "cursor"
+      page_size: 100
+
+  - name: "subscriptions"
+    endpoint: "/v1/subscriptions"
+    method: "GET"
+    pagination:
+      type: "cursor"
+      page_size: 100
+
+validation:
+  payments:
+    required_fields: ["id", "amount", "currency", "created"]
+  subscriptions:
+    required_fields: ["id", "customer", "status"]
+
+rate_limit:
+  requests_per_second: 25
+  retry_after_429: true

@@ -45,12 +45,12 @@ result = engine.run(job)  # ✅ WORKING
 
 ### **✅ InMemory Persistence**
 ```python
-from pyworkflow_engine.persistence import InMemoryPersistence
+from pyworkflow_engine.persistence import InMemoryStorage
 
 # ✅ Full persistence functionality
-persistence = InMemoryPersistence()
+persistence = InMemoryStorage()
 engine.persistence = persistence
-result = engine.run_with_persistence(job)  # ✅ WORKING
+result = engine.run_with_storage(job)  # ✅ WORKING
 ```
 
 ### **✅ Advanced Executors**
@@ -69,12 +69,12 @@ engine.register_executor('thread_pool', executor)  # ✅ WORKING
 ### **API Consistency Issues (Minor)**
 - **Issue**: Some persistence backends have API inconsistencies 
 - **Status**: Core functionality works, edge cases need refinement
-- **Impact**: InMemoryPersistence fully functional, others need minor fixes
+- **Impact**: InMemoryStorage fully functional, others need minor fixes
 
 ### **Example Corrections Needed**
-- **File**: `examples/persistence_backends.py`
+- **File**: `examples/storage_backends.py`
 - **Issue**: Uses old API patterns (`StepType.PYTHON_FUNCTION` vs `StepType.FUNCTION`)
-- **Status**: `examples/persistence_simple.py` created as working alternative
+- **Status**: `examples/storage_simple.py` created as working alternative
 - **Priority**: Low (core functionality demonstrated in working examples)
 
 ---

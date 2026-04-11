@@ -48,7 +48,7 @@ def inspect_job(
     job = engine.get_job(name)
 
     if job is None:
-        from pyworkflow_engine.ports.persistence import JobNotFoundError
+        from pyworkflow_engine.ports.storage import JobNotFoundError
 
         raise JobNotFoundError(f"Job '{name}' introuvable dans le backend.")
 
@@ -73,7 +73,7 @@ def validate_job(
     job = engine.get_job(name)
 
     if job is None:
-        from pyworkflow_engine.ports.persistence import JobNotFoundError
+        from pyworkflow_engine.ports.storage import JobNotFoundError
 
         raise JobNotFoundError(f"Job '{name}' introuvable dans le backend.")
 
@@ -97,7 +97,7 @@ def execution_plan(
     job = engine.get_job(name)
 
     if job is None:
-        from pyworkflow_engine.ports.persistence import JobNotFoundError
+        from pyworkflow_engine.ports.storage import JobNotFoundError
 
         raise JobNotFoundError(f"Job '{name}' introuvable dans le backend.")
 

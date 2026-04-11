@@ -42,7 +42,7 @@ def run_start(
         False,
         "--persist",
         "-p",
-        help="Utiliser run_with_persistence() pour checkpoint automatique.",
+        help="Utiliser run_with_storage() pour checkpoint automatique.",
     ),
 ) -> None:
     """Lance un run pour le job donné et affiche le résultat."""
@@ -62,7 +62,7 @@ def run_start(
             raise typer.Exit(4) from exc
 
     if persist:
-        job_run = engine.run_with_persistence(
+        job_run = engine.run_with_storage(
             job_name,
             initial_context=initial_context,
             run_id=run_id,
@@ -70,7 +70,7 @@ def run_start(
     else:
         job = engine.get_job(job_name)
         if job is None:
-            from pyworkflow_engine.ports.persistence import JobNotFoundError
+            from pyworkflow_engine.ports.storage import JobNotFoundError
 
             raise JobNotFoundError(f"Job '{job_name}' introuvable dans le backend.")
         job_run = engine.run(job, initial_context=initial_context, run_id=run_id)

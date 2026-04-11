@@ -31,8 +31,8 @@ class HealthResponse(BaseModel):
 
     status: str = "healthy"
     version: str
-    persistence_backend: str
-    persistence_status: str
+    storage_backend: str
+    storage_status: str
     timestamp: datetime
     stats: dict[str, Any] | None = None
 

@@ -1,16 +1,16 @@
 """
-Adapter persistence — implémentations concrètes du port BasePersistence.
+Adapter persistence — implémentations concrètes du port BaseStorage.
 
 Chaque backend implémente le contrat défini dans
-``pyworkflow_engine.ports.persistence.BasePersistence``.
+``pyworkflow_engine.ports.storage.BaseStorage``.
 
 Backends disponibles (sans dépendances optionnelles) :
-    - :class:`InMemoryPersistence`  — stockage en mémoire (tests/dev)
-    - :class:`JSONFilePersistence`  — stockage JSON sur disque
-    - :class:`SQLitePersistence`    — SQLite via stdlib ``sqlite3``
+    - :class:`InMemoryStorage`  — stockage en mémoire (tests/dev)
+    - :class:`JSONFileStorage`  — stockage JSON sur disque
+    - :class:`SQLiteStorage`    — SQLite via stdlib ``sqlite3``
 
 Backend optionnel (``pip install pyworkflow-engine[sqlalchemy]``) :
-    - :class:`SQLAlchemyPersistence` — PostgreSQL / MySQL / SQLite via SQLAlchemy
+    - :class:`SQLAlchemyStorage` — PostgreSQL / MySQL / SQLite via SQLAlchemy
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ from __future__ import annotations
 def __getattr__(name: str):
     """Lazy import — évite de charger SQLAlchemy si non installé."""
     _LAZY = {
-        "InMemoryPersistence": (".memory", "InMemoryPersistence"),
-        "JSONFilePersistence": (".json_file", "JSONFilePersistence"),
-        "SQLitePersistence": (".sqlite", "SQLitePersistence"),
-        "SQLAlchemyPersistence": (".sqlalchemy", "SQLAlchemyPersistence"),
+        "InMemoryStorage": (".memory", "InMemoryStorage"),
+        "JSONFileStorage": (".json_file", "JSONFileStorage"),
+        "SQLiteStorage": (".sqlite", "SQLiteStorage"),
+        "SQLAlchemyStorage": (".sqlalchemy", "SQLAlchemyStorage"),
     }
 
     if name in _LAZY:
@@ -45,8 +45,8 @@ def __getattr__(name: str):
 
 
 __all__ = [
-    "InMemoryPersistence",
-    "JSONFilePersistence",
-    "SQLitePersistence",
-    "SQLAlchemyPersistence",
+    "InMemoryStorage",
+    "JSONFileStorage",
+    "SQLiteStorage",
+    "SQLAlchemyStorage",
 ]

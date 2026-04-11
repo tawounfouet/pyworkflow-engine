@@ -60,11 +60,11 @@ src/pyworkflow_engine/
 │
 ├── persistence/                   # 🔴 COUCHE STOCKAGE — OÙ persister
 │   ├── __init__.py
-│   ├── base.py                    #   BasePersistence (ABC)
-│   ├── memory.py                  #   InMemoryPersistence
-│   ├── json_file.py               #   JSONFilePersistence
-│   ├── sqlite.py                  #   SQLitePersistence
-│   └── sqlalchemy.py              #   SQLAlchemyPersistence (opt: pip install [sqlalchemy])
+│   ├── base.py                    #   BaseStorage (ABC)
+│   ├── memory.py                  #   InMemoryStorage
+│   ├── json_file.py               #   JSONFileStorage
+│   ├── sqlite.py                  #   SQLiteStorage
+│   └── sqlalchemy.py              #   SQLAlchemyStorage (opt: pip install [sqlalchemy])
 │
 ├── logging/                       # 🟣 COUCHE OBSERVABILITÉ
 │   ├── __init__.py
@@ -93,7 +93,7 @@ src/pyworkflow_engine/
 - [x] Correction complète des backends `sqlite.py` et `sqlalchemy.py` (anciens noms de champs, enums inexistants)
 - [x] Correction de `memory.py` (filtrage, pagination, cleanup)
 - [x] Correction des fixtures pytest abstraites (18 errors → 0)
-- [x] Correction des exemples cassés (`persistence_backends.py`, etc.)
+- [x] Correction des exemples cassés (`storage_backends.py`, etc.)
 - [x] Création de `models/serialization.py` centralisé (depuis remplacé — voir Sprint 2)
 - [x] Création de `tests/integration/test_persistence_roundtrip.py`
 
@@ -166,7 +166,7 @@ facade.py:
 
 #### 3.3 `cleanup_old_runs` — correction LSP
 
-> `SQLitePersistence.cleanup_old_runs(older_than)` manque le paramètre `dry_run: bool` du contrat `BasePersistence`.
+> `SQLiteStorage.cleanup_old_runs(older_than)` manque le paramètre `dry_run: bool` du contrat `BaseStorage`.
 
 - [x] Aligner la signature dans `sqlite.py` et `sqlalchemy.py`
 - [x] Tests paramétrés `dry_run=True` / `dry_run=False`
@@ -178,13 +178,13 @@ facade.py:
 - [x] Évaluer l'impact (nombre de callsites)
 - [x] Si adopté : renommer + alias déprécié via `__post_init__`
 
-#### 3.5 Contrat `run()` vs `run_with_persistence()`
+#### 3.5 Contrat `run()` vs `run_with_storage()`
 
 > Le comportement actuel n'est pas documenté.
 
 - [x] `run()` : exécution pure, sans side-effect de persistence → docstring explicite
-- [x] `run_with_persistence()` : exécution + sauvegarde → docstring explicite
-- [x] Ajouter checkpoints intermédiaires dans `run_with_persistence()` (step-level persist)
+- [x] `run_with_storage()` : exécution + sauvegarde → docstring explicite
+- [x] Ajouter checkpoints intermédiaires dans `run_with_storage()` (step-level persist)
 
 ---
 

@@ -10,7 +10,7 @@ Couverture :
 - Mode legacy fn(context) dans un @job
 - Cohabitation impérative + déclarative dans le même test
 - @job avec ParallelRunner
-- @job avec run_with_persistence
+- @job avec run_with_storage
 - Gestion des retries (retry_count sur @step)
 - Step avec timeout
 - Workflow multi-étapes avec chaîne de dépendances
@@ -23,7 +23,7 @@ import pytest
 from pyworkflow_engine import WorkflowEngine
 from pyworkflow_engine.decorators import job, step
 from pyworkflow_engine.models.enums import RunStatus
-from pyworkflow_engine.adapters.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.adapters.storage.memory import InMemoryStorage
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -43,7 +43,7 @@ def parallel_engine():
 
 @pytest.fixture
 def persistent_engine():
-    return WorkflowEngine(persistence=InMemoryPersistence())
+    return WorkflowEngine(storage=InMemoryStorage())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -368,7 +368,7 @@ class TestDecoratorWithParallelRunner:
 
 class TestDecoratorWithPersistence:
 
-    def test_run_with_persistence(self, persistent_engine):
+    def test_run_with_storage(self, persistent_engine):
         @step(name="compute")
         def compute(x: int = 0) -> dict:
             return {"result": x * 2}
@@ -377,7 +377,7 @@ class TestDecoratorWithPersistence:
         def workflow():
             compute()
 
-        result = persistent_engine.run_with_persistence(
+        result = persistent_engine.run_with_storage(
             workflow.build(),
             initial_context={"x": 21},
         )
@@ -393,7 +393,7 @@ class TestDecoratorWithPersistence:
         def workflow():
             fn()
 
-        result = persistent_engine.run_with_persistence(workflow.build())
+        result = persistent_engine.run_with_storage(workflow.build())
         retrieved = persistent_engine.get_job_run(result.job_run_id)
         assert retrieved is not None
         assert retrieved.status == RunStatus.SUCCESS

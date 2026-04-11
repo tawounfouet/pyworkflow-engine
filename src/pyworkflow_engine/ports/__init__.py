@@ -11,7 +11,7 @@ Règle hexagonale fondamentale :
     - ``facade.py`` assemble domaine + ports + adapters.
 
 Contenu :
-    - :mod:`ports.persistence` — ``BasePersistence``, ``PersistenceError``,
+    - :mod:`ports.storage` — ``BaseStorage``, ``StorageError``,
       ``JobNotFoundError``, ``TransactionError``, ``TransactionContext``
     - :mod:`ports.executor`    — ``BaseExecutor``, ``ExecutorRegistry``
     - :mod:`ports.trigger`     — ``BaseTrigger``, ``TriggerState``
@@ -20,10 +20,10 @@ Contenu :
 from __future__ import annotations
 
 from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
-from pyworkflow_engine.ports.persistence import (
-    BasePersistence,
+from pyworkflow_engine.ports.storage import (
+    BaseStorage,
     JobNotFoundError,
-    PersistenceError,
+    StorageError,
     TransactionContext,
     TransactionError,
 )
@@ -31,8 +31,8 @@ from pyworkflow_engine.ports.trigger import BaseTrigger, TriggerState
 
 __all__ = [
     # Persistence port
-    "BasePersistence",
-    "PersistenceError",
+    "BaseStorage",
+    "StorageError",
     "JobNotFoundError",
     "TransactionError",
     "TransactionContext",

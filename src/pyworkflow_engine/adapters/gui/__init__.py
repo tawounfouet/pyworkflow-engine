@@ -9,7 +9,7 @@ Usage::
     from pyworkflow_engine.adapters.gui import WorkflowGUI
     from pyworkflow_engine import WorkflowEngine
 
-    engine = WorkflowEngine(persistence=my_backend)
+    engine = WorkflowEngine(storage=my_backend)
     gui = WorkflowGUI(engine)
     gui.run(port=8080)
 """

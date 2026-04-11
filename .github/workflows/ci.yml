@@ -53,8 +53,8 @@ jobs:
         # Test core seulement (zero dépendance)
         uv run pytest tests/unit/ -v --cov=ias_workflow_engine.core --cov-fail-under=90
         
-        # Test executors et persistence
-        uv run pytest tests/executors/ tests/persistence/ -v --cov-fail-under=85
+        # Test executors et storage
+        uv run pytest tests/executors/ tests/storage/ -v --cov-fail-under=85
         
         # Test adapters si extras installés
         if [ "${{ matrix.extras }}" == "django" ]; then

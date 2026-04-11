@@ -7,7 +7,7 @@ Usage::
     from pyworkflow_engine.adapters.tui import WorkflowTUI
     from pyworkflow_engine import WorkflowEngine
 
-    engine = WorkflowEngine(persistence=my_backend)
+    engine = WorkflowEngine(storage=my_backend)
     app = WorkflowTUI(engine)
     app.run()
 """

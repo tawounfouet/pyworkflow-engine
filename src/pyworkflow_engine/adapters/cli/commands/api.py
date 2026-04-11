@@ -63,21 +63,21 @@ def serve(
 
     # ── Résolution du moteur ──────────────────────────────────────────────
     # Si --app est fourni, on charge l'instance existante de l'utilisateur.
-    # Sinon on crée un WorkflowEngine autonome avec SQLitePersistence
+    # Sinon on crée un WorkflowEngine autonome avec SQLiteStorage
     # (comportement par défaut : serveur "standalone" persisté sur disque).
     app_path = ctx.obj.get("app_path") if ctx.obj else None
     if app_path:
         engine = load_engine(app_path)
     else:
         from pyworkflow_engine import WorkflowEngine
-        from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence
+        from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
         _console.print(
             f"[dim]ℹ  Aucun --app fourni — moteur autonome avec SQLite "
             f"([cyan]{db}[/cyan])[/dim]"
         )
         _engine = WorkflowEngine()
-        _engine.persistence = SQLitePersistence(database_path=db)
+        _engine.storage = SQLiteStorage(database_path=db)
         engine = _engine
 
     config = APIConfig(

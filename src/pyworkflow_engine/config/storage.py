@@ -1,5 +1,5 @@
 """
-PersistenceConfig — configuration du backend de persistence.
+StorageConfig — configuration du backend de persistence.
 """
 
 from __future__ import annotations
@@ -10,11 +10,11 @@ VALID_BACKENDS = ("sqlite", "memory", "json")
 
 
 @dataclass(frozen=True)
-class PersistenceConfig:
+class StorageConfig:
     """Configuration du backend de persistence pour ``WorkflowEngine``.
 
     Quand ``db_path`` est fourni dans ``WorkflowConfig``, le moteur crée
-    automatiquement un ``SQLitePersistence`` sans configuration manuelle.
+    automatiquement un ``SQLiteStorage`` sans configuration manuelle.
 
     Args:
         db_path: Chemin vers le fichier SQLite. ``None`` = pas de persistence
@@ -23,11 +23,11 @@ class PersistenceConfig:
             pour ``"memory"`` ou ``"json"``, fournir le backend manuellement.
 
     Examples:
-        >>> cfg = PersistenceConfig(db_path="workflow.db")
+        >>> cfg = StorageConfig(db_path="workflow.db")
         >>> cfg.db_path
         'workflow.db'
 
-        >>> cfg = PersistenceConfig()  # sans persistence
+        >>> cfg = StorageConfig()  # sans persistence
         >>> cfg.db_path is None
         True
     """
@@ -38,6 +38,6 @@ class PersistenceConfig:
     def __post_init__(self) -> None:
         if self.backend not in VALID_BACKENDS:
             raise ValueError(
-                f"PersistenceConfig.backend must be one of {VALID_BACKENDS}, "
+                f"StorageConfig.backend must be one of {VALID_BACKENDS}, "
                 f"got '{self.backend}'"
             )

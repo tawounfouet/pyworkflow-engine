@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from pyworkflow_engine import WorkflowEngine
-from pyworkflow_engine.adapters.persistence import SQLitePersistence
+from pyworkflow_engine.adapters.storage import SQLiteStorage
 from pyworkflow_engine.decorators import job, step
 
 _DB_PATH = str(Path(__file__).parent.parent / "workflow.db")
@@ -203,8 +203,8 @@ def notification_dispatch_workflow():
 
 
 def _build_engine() -> WorkflowEngine:
-    persistence = SQLitePersistence(database_path=_DB_PATH)
-    eng = WorkflowEngine(persistence=persistence)
+    storage = SQLiteStorage(database_path=_DB_PATH)
+    eng = WorkflowEngine(storage=storage)
 
     audit_job = data_quality_audit_workflow.build()
     notif_job = notification_dispatch_workflow.build()
@@ -219,8 +219,8 @@ def _build_engine() -> WorkflowEngine:
     if not existing:
         print("  [decorator_demo] Seeding demo runs …")
         for _ in range(2):
-            eng.run_with_persistence(audit_job)
-        eng.run_with_persistence(notif_job)
+            eng.run_with_storage(audit_job)
+        eng.run_with_storage(notif_job)
         print("  [decorator_demo] Seeding complete.")
     else:
         print(f"  [decorator_demo] Existing runs in {_DB_PATH!r} — skipping seed.")

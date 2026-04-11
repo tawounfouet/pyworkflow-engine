@@ -1,0 +1,97 @@
+# ──────────────────────────────────────────────────────────────────────────
+# jobs/manifest.yaml — Registre des jobs de la plateforme data
+#
+# Ce fichier référence tous les jobs déclarés dans `jobs/`.
+# Il sert de catalogue consultable (schedule, owner, tags) et peut être
+# utilisé par un orchestrateur externe (Airflow, Dagster, cron…).
+# ──────────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ── Ingestion ────────────────────────────────────────────────────────
+
+  - name: ingestion-stripe-payments
+    module: jobs.ingestion.stripe.extract_payments
+    schedule: "0 1 * * *"        # Quotidien à 01h00 UTC
+    owner: data-team@company.com
+    tags: [ingestion, stripe, payments]
+    description: "API Stripe /v1/charges → Data Lake raw/stripe/payments/"
+
+  - name: ingestion-books-toscrape
+    module: jobs.ingestion.books_toscrape.extract_books
+    schedule: "0 2 * * *"        # Quotidien à 02h00 UTC
+    owner: data-team@company.com
+    tags: [ingestion, books, scraping, http]
+    description: "Scraping books.toscrape.com → Data Lake raw/books_toscrape/books/"
+
+  # ── Transformation — Staging ─────────────────────────────────────────
+
+  - name: transform-stg-payments
+    module: jobs.transformation.staging.stg_payments
+    schedule: "0 3 * * *"        # Quotidien à 03h00 UTC (après ingestion)
+    owner: data-team@company.com
+    tags: [transformation, staging, payments]
+    depends_on: [ingestion-stripe-payments]
+    description: "Raw payments → Staging DWH (nettoyage, typage, dédup)"
+
+  - name: transform-stg-books
+    module: jobs.transformation.staging.stg_books
+    schedule: "0 4 * * *"        # Quotidien à 04h00 UTC (après ingestion books)
+    owner: data-team@company.com
+    tags: [transformation, staging, books, catalog]
+    depends_on: [ingestion-books-toscrape]
+    description: "Raw books → Staging DWH (nettoyage, typage, dédup sur upc)"
+
+  # ── Transformation — Marts ───────────────────────────────────────────
+
+  - name: transform-mart-finance-revenue
+    module: jobs.transformation.marts.finance.mart_revenue
+    schedule: "0 4 * * *"        # Quotidien à 04h00 UTC (après staging)
+    owner: data-team@company.com
+    tags: [transformation, mart, finance, revenue]
+    depends_on: [transform-stg-payments]
+    description: "Staging → Mart revenue agrégé par jour et devise"
+
+  - name: transform-mart-catalog-books
+    module: jobs.transformation.marts.catalog.mart_books_by_category
+    schedule: "0 5 * * *"        # Quotidien à 05h00 UTC (après staging books)
+    owner: data-team@company.com
+    tags: [transformation, mart, catalog, books]
+    depends_on: [transform-stg-books]
+    description: "Staging books → Mart agrégé par catégorie (prix, stock, note)"
+
+  # ── Quality ──────────────────────────────────────────────────────────
+
+  - name: quality-check-completeness
+    module: jobs.transformation.quality.check_completeness
+    schedule: "0 5 * * *"        # Quotidien à 05h00 UTC (après marts)
+    owner: data-team@company.com
+    tags: [quality, completeness, staging]
+    depends_on: [transform-mart-finance-revenue]
+    description: "Vérification de complétude et taux de NULL"
+
+# ── Pipelines ────────────────────────────────────────────────────────────
+
+pipelines:
+  - name: daily-stripe-to-dwh
+    module: pipelines.daily.stripe_to_dwh
+    schedule: "0 1 * * *"
+    owner: data-team@company.com
+    tags: [daily, stripe, dwh, end-to-end]
+    jobs:
+      - ingestion-stripe-payments
+      - transform-stg-payments
+      - transform-mart-finance-revenue
+      - quality-check-completeness
+    description: "Pipeline complète Stripe → DataLake → Staging → Mart → QC"
+
+  - name: daily-books-to-dwh
+    module: pipelines.daily.books_to_dwh
+    schedule: "0 2 * * *"
+    owner: data-team@company.com
+    tags: [daily, books, scraping, dwh, end-to-end]
+    jobs:
+      - ingestion-books-toscrape
+      - transform-stg-books
+      - transform-mart-catalog-books
+      - quality-check-completeness
+    description: "Pipeline complète Books.toscrape → DataLake → Staging → Mart → QC"

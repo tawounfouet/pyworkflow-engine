@@ -59,7 +59,7 @@
 **Thème : Renommage et couche de persistance complète**
 
 - **Breaking** : renommage `ias_workflow_engine` → `pyworkflow_engine`
-- 4 backends de persistance : `InMemoryPersistence`, `JSONFilePersistence`, `SQLitePersistence`, `SQLAlchemyPersistence`
+- 4 backends de persistance : `InMemoryStorage`, `JSONFileStorage`, `SQLiteStorage`, `SQLAlchemyStorage`
 - Timeout par step via thread daemon + `Queue`
 - Executors avancés : `ThreadPool`, `ProcessPool`, `Async`, `RetryableExecutor`, `ExecutorRegistry`
 - **185+ tests**, couverture 88%
@@ -104,7 +104,7 @@
 - `LoggingConfig` (dataclass `frozen`) avec `with_overrides()`
 - Utilitaires : `logged_operation`, `StepLogBridge`, `LoggingConfigBuilder`
 
-### ✅ Persistance — InMemoryPersistence
+### ✅ Persistance — InMemoryStorage
 - Thread-safe (verrous internes)
 - Support transactionnel (context manager)
 - Estimation de la mémoire consommée
@@ -115,10 +115,10 @@
 ## 4. Problèmes connus
 
 ### ⚠️ Incohérences d'API dans les backends de persistance (JSONFile, SQLite, SQLAlchemy)
-- **Impact :** Les backends autres qu'`InMemoryPersistence` peuvent présenter des comportements inattendus sur des cas limites.
+- **Impact :** Les backends autres qu'`InMemoryStorage` peuvent présenter des comportements inattendus sur des cas limites.
 - **Exemple :** `StepType.PYTHON_FUNCTION` au lieu de `StepType.FUNCTION` dans certains anciens exemples.
-- **Fichier concerné :** `examples/persistence_backends.py`
-- **Workaround :** Utiliser `examples/persistence_simple.py` comme référence.
+- **Fichier concerné :** `examples/storage_backends.py`
+- **Workaround :** Utiliser `examples/storage_simple.py` comme référence.
 - **Priorité :** 🔴 Haute
 
 ### ⚠️ Adapters vides

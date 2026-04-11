@@ -36,11 +36,11 @@ src/pyworkflow_engine/
 │   ├── manual.py           # ManualTrigger
 │   └── schedule.py         # ScheduleTrigger, CronExpression
 ├── persistence/            # Backends de persistence
-│   ├── base.py             # BasePersistence (ABC)
-│   ├── memory.py           # InMemoryPersistence
-│   ├── json_file.py        # JSONFilePersistence
-│   ├── sqlite.py           # SQLitePersistence
-│   └── sqlalchemy.py       # SQLAlchemyPersistence
+│   ├── base.py             # BaseStorage (ABC)
+│   ├── memory.py           # InMemoryStorage
+│   ├── json_file.py        # JSONFileStorage
+│   ├── sqlite.py           # SQLiteStorage
+│   └── sqlalchemy.py       # SQLAlchemyStorage
 ├── logging/                # Système de logging structuré
 └── adapters/               # Intégrations optionnelles (celery, snowflake, structlog)
 ```
@@ -75,11 +75,11 @@ src/pyworkflow_engine/
 - [x] `ExecutorRegistry` (lookup par nom)
 
 ### Persistence
-- [x] `InMemoryPersistence` ✅
-- [x] `JSONFilePersistence` ✅
-- [x] `SQLitePersistence` ✅
-- [x] `SQLAlchemyPersistence` ✅
-- [x] Checkpoints step-by-step dans `run_with_persistence()`
+- [x] `InMemoryStorage` ✅
+- [x] `JSONFileStorage` ✅
+- [x] `SQLiteStorage` ✅
+- [x] `SQLAlchemyStorage` ✅
+- [x] Checkpoints step-by-step dans `run_with_storage()`
 - [x] `cleanup_old_runs(older_than, dry_run=False)` — contrat LSP aligné sur tous les backends
 
 ### Qualité & tests

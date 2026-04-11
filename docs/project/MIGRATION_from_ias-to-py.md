@@ -16,14 +16,14 @@ The workflow engine has been renamed from `ias_workflow_engine` to `pyworkflow_e
 ```python
 from ias_workflow_engine import WorkflowEngine, Job, Step
 from ias_workflow_engine.core.executors import ThreadPoolStepExecutor
-from ias_workflow_engine.persistence import InMemoryPersistence
+from ias_workflow_engine.persistence import InMemoryStorage
 ```
 
 **After (v0.2.0+):**
 ```python
 from pyworkflow_engine import WorkflowEngine, Job, Step
 from pyworkflow_engine.core.executors import ThreadPoolStepExecutor
-from pyworkflow_engine.persistence import InMemoryPersistence
+from pyworkflow_engine.persistence import InMemoryStorage
 ```
 
 ### Installation
@@ -139,15 +139,15 @@ print(f"Status: {result.status}")
 ```python
 # ✅ New v0.2.0+ syntax
 from pyworkflow_engine import WorkflowEngine
-from pyworkflow_engine.persistence import InMemoryPersistence
+from pyworkflow_engine.persistence import InMemoryStorage
 from pyworkflow_engine.core.models import Job, Step, StepType
 
 # Setup with persistence
 engine = WorkflowEngine()
-engine.persistence = InMemoryPersistence()
+engine.persistence = InMemoryStorage()
 
 job = Job(name="persistent_job", steps=[...])
-result = engine.run_with_persistence(job)
+result = engine.run_with_storage(job)
 ```
 
 ## Support

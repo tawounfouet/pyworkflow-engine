@@ -121,7 +121,7 @@ Corriger les inconsistances API maintenant évite les problèmes futurs
 Base solide pour tous les développements suivants
 Impact Immédiat ⚡
 
-JSONFilePersistence et SQLitePersistence deviendraient 100% fonctionnels
+JSONFileStorage et SQLiteStorage deviendraient 100% fonctionnels
 Compléter les 7/18 tests de persistence restants
 Atteindre >90% de couverture de tests
 Valeur Enterprise 🏢
@@ -150,7 +150,7 @@ Parfait ! Cette analyse confirme exactement pourquoi l'Option C (Persistence Lay
 ❌ Job.parameters n'existe pas (doit être Job.config)
 ❌ Fixtures de tests manquantes ou mal configurées
 2. Impact Quantifié
-InMemoryPersistence : 11/17 tests passent (65% fonctionnel)
+InMemoryStorage : 11/17 tests passent (65% fonctionnel)
 JSON/SQLite Persistence : 0% fonctionnel (bloqués par API inconsistency)
 Test coverage actuel : Seulement 29% (vs 88% affiché précédemment)
 🎯 Plan d'Action Concret - Option C
@@ -213,7 +213,7 @@ Voici pourquoi c'est le **meilleur choix stratégique** à ce stade :
    - Base solide pour tous les développements suivants
 
 2. **Impact Immédiat** ⚡
-   - **JSONFilePersistence** et **SQLitePersistence** deviendraient 100% fonctionnels
+   - **JSONFileStorage** et **SQLiteStorage** deviendraient 100% fonctionnels
    - Compléter les **7/18 tests de persistence** restants
    - Atteindre **>90% de couverture de tests**
 
@@ -238,7 +238,7 @@ Voici pourquoi c'est le **meilleur choix stratégique** à ce stade :
 - ❌ Fixtures de tests manquantes ou mal configurées
 
 ### **2. Impact Quantifié**
-- **InMemoryPersistence** : 11/17 tests passent (65% fonctionnel)
+- **InMemoryStorage** : 11/17 tests passent (65% fonctionnel)
 - **JSON/SQLite Persistence** : 0% fonctionnel (bloqués par API inconsistency)
 - **Test coverage actuel** : Seulement 29% (vs 88% affiché précédemment)
 

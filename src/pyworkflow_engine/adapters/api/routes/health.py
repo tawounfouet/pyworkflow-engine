@@ -20,31 +20,31 @@ router = APIRouter(
     "",
     response_model=HealthResponse,
     summary="Health check",
-    description="Vérifie la santé du serveur API et du backend de persistence.",
+    description="Vérifie la santé du serveur API et du backend de stockage.",
 )
 def health_check(
     engine: WorkflowEngine = Depends(get_engine),
 ) -> HealthResponse:
     """Retourne l'état de santé du serveur."""
-    persistence = engine.persistence
-    persistence_status = "healthy"
-    persistence_backend = "none"
+    storage = engine.storage
+    storage_status = "healthy"
+    storage_backend = "none"
     stats = None
 
-    if persistence is not None:
-        persistence_backend = type(persistence).__name__
+    if storage is not None:
+        storage_backend = type(storage).__name__
         try:
-            health = persistence.health_check()
-            persistence_status = health.get("status", "healthy")
-            stats = persistence.get_statistics()
+            health = storage.health_check()
+            storage_status = health.get("status", "healthy")
+            stats = storage.get_statistics()
         except Exception:
-            persistence_status = "unhealthy"
+            storage_status = "unhealthy"
 
     return HealthResponse(
         status="healthy",
         version="0.10.0",
-        persistence_backend=persistence_backend,
-        persistence_status=persistence_status,
+        storage_backend=storage_backend,
+        storage_status=storage_status,
         timestamp=datetime.now(UTC),
         stats=stats,
     )

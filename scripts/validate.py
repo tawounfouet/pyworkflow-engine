@@ -76,9 +76,9 @@ def test_logging_functionality():
         return False
 
 
-def test_sqlite_persistence():
-    """Test la persistence SQLite."""
-    print("\n🧪 Testing SQLite persistence...")
+def test_sqlite_storage():
+    """Test le stockage SQLite."""
+    print("\n🧪 Testing SQLite storage...")
     try:
         from pyworkflow_engine.logging.handlers import SQLiteLogHandler
         from pyworkflow_engine.logging import get_logger
@@ -91,12 +91,12 @@ def test_sqlite_persistence():
         logger.addHandler(handler)
         logger.setLevel("INFO")
 
-        logger.info("SQLite validation test", extra={"persistence": "sqlite"})
+        logger.info("SQLite validation test", extra={"storage": "sqlite"})
         handler.flush()
 
         records = handler.query_logs(limit=1)
         if len(records) == 1:
-            print("  ✅ SQLite persistence OK")
+            print("  ✅ SQLite storage OK")
             success = True
         else:
             print(f"  ❌ Expected 1 record, got {len(records)}")
@@ -219,7 +219,7 @@ def main():
     tests = [
         test_core_imports,
         test_logging_functionality,
-        test_sqlite_persistence,
+        test_sqlite_storage,
         test_package_info,
         test_core_models_functionality,
     ]

@@ -273,8 +273,8 @@ def _build_engine() -> WorkflowEngine:
     if not existing_audit:
         print("  [decorator_demo] Seeding demo runs …")
         for _ in range(2):
-            eng.run_with_persistence(audit_job)
-        eng.run_with_persistence(notif_job)
+            eng.run_with_storage(audit_job)
+        eng.run_with_storage(notif_job)
         print("  [decorator_demo] Seeding complete.")
     else:
         print(f"  [decorator_demo] Runs already exist for {audit_job.name!r} — skipping seed.")

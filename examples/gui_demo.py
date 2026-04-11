@@ -31,7 +31,7 @@ from pyworkflow_engine import WorkflowEngine, WorkflowContext
 from pyworkflow_engine.models import Job
 from pyworkflow_engine.models.enums import ExecutorType, Priority, StepType
 from pyworkflow_engine.models.step import Step
-from pyworkflow_engine.adapters.persistence import SQLitePersistence
+from pyworkflow_engine.adapters.storage import SQLiteStorage
 
 # ---------------------------------------------------------------------------
 # Configuration de la base SQLite démo
@@ -421,32 +421,32 @@ def _seed_runs(eng: WorkflowEngine) -> None:
 
     # ETL — 3 succès successifs
     for i in range(3):
-        eng.run_with_persistence(etl_job)
+        eng.run_with_storage(etl_job)
         print(f"    ✓ etl_pipeline run {i + 1}/3")
 
     # Health check — 5 exécutions rapides (simule un cron 5-min)
     for i in range(5):
-        eng.run_with_persistence(health_check_job)
+        eng.run_with_storage(health_check_job)
         print(f"    ✓ health_check run {i + 1}/5")
 
     # ML pipeline — 2 exécutions (les accuracy varient aléatoirement)
     for i in range(2):
-        eng.run_with_persistence(ml_pipeline_job)
+        eng.run_with_storage(ml_pipeline_job)
         print(f"    ✓ ml_training_pipeline run {i + 1}/2")
 
     # Weekly report — 1 exécution
-    eng.run_with_persistence(reporting_job)
+    eng.run_with_storage(reporting_job)
     print("    ✓ weekly_report run 1/1")
 
     # Retry demo — 2 exécutions (la première tentative flaky échoue et retry)
     for i in range(2):
-        eng.run_with_persistence(retry_demo_job)
+        eng.run_with_storage(retry_demo_job)
         print(f"    ✓ flaky_integration run {i + 1}/2")
 
     # Failure demo — 2 exécutions délibérément en FAILED
     for i in range(2):
         try:
-            eng.run_with_persistence(failure_demo_job)
+            eng.run_with_storage(failure_demo_job)
         except Exception:
             pass  # échec attendu — le JobRun FAILED est déjà persisté
         print(f"    ✓ failing_pipeline run {i + 1}/2 (expected FAILED)")
@@ -457,8 +457,8 @@ def _seed_runs(eng: WorkflowEngine) -> None:
 def _build_engine() -> WorkflowEngine:
     """Construit et retourne le WorkflowEngine avec SQLite et données démo."""
     db_path = _DB_PATH
-    persistence = SQLitePersistence(database_path=db_path)
-    eng = WorkflowEngine(persistence=persistence)
+    persistence = SQLiteStorage(database_path=db_path)
+    eng = WorkflowEngine(storage=persistence)
 
     # Enregistre tous les jobs
     for job in _ALL_JOBS:

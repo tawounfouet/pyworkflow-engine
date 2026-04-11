@@ -1,0 +1,34 @@
+# Configuration de la source books.toscrape.com
+source:
+  name: "books_toscrape"
+  type: "http_scraping"
+  base_url: "http://books.toscrape.com/"
+  description: "Site de démonstration conçu pour le scraping (aucun accès réel refusé)"
+
+entities:
+  - name: "books"
+    path: "catalogue/"
+    pagination:
+      type: "page"
+      pattern: "page-{n}.html"
+    description: "Catalogue complet de livres (multi-catégories)"
+
+extraction:
+  books:
+    required_fields: ["upc", "title", "price_raw", "category", "rating_raw"]
+    optional_fields:
+      ["availability_raw", "price_excl_tax_raw", "tax_raw", "description", "img_url", "source_url"]
+
+rate_limit:
+  delay_between_requests_s: 0.1
+  max_pages_per_category: 0          # 0 = illimité
+
+env_vars:
+  BOOKS_BASE_URL: "URL de base du site (défaut: http://books.toscrape.com/)"
+  BOOKS_MAX_PAGES: "Nombre max de pages par catégorie (0 = toutes)"
+  BOOKS_CATEGORIES: "Catégories à scraper, séparées par virgule (vide = toutes)"
+
+output:
+  format: "json"
+  datalake_prefix: "raw/books_toscrape/books/"
+  partition_by: "date"               # partition par date d'ingestion

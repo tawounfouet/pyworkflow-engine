@@ -13,25 +13,25 @@ Successfully implemented the comprehensive persistence layer for the IAS Workflo
 
 ### ✅ Four Persistence Backend Implementations
 
-#### 1. InMemoryPersistence
+#### 1. InMemoryStorage
 - Thread-safe operations with proper locking
 - Full transaction support via snapshot mechanisms
 - Memory usage estimation and statistics
 - Perfect for development and testing
 
-#### 2. JSONFilePersistence  
+#### 2. JSONFileStorage  
 - Human-readable file storage
 - Atomic file operations for data integrity
 - Cross-platform compatibility
 - Organized directory structure (jobs/, runs/)
 
-#### 3. SQLitePersistence
+#### 3. SQLiteStorage
 - ACID transactions with WAL mode for better concurrency
 - Schema versioning and migrations support
 - Foreign key constraints and efficient indexing
 - Single-file deployment convenience
 
-#### 4. SQLAlchemyPersistence
+#### 4. SQLAlchemyStorage
 - Multiple database backend support (PostgreSQL, MySQL, SQLite)
 - Connection pooling and advanced query optimization
 - Bulk operations and enterprise-grade features
@@ -46,7 +46,7 @@ Successfully implemented the comprehensive persistence layer for the IAS Workflo
 
 ### ✅ WorkflowEngine Integration
 - **Seamless Integration**: Persistence property and configuration
-- **Automatic State Saving**: `run_with_persistence()` method
+- **Automatic State Saving**: `run_with_storage()` method
 - **Error Handling**: Proper constants and exception management
 - **Backward Compatibility**: Existing functionality unchanged
 
@@ -69,7 +69,7 @@ pip install pyworkflow-engine[mysql]
 
 ### Quick Start Example
 ```python
-from pyworkflow_engine.persistence import InMemoryPersistence
+from pyworkflow_engine.persistence import InMemoryStorage
 from pyworkflow_engine.core.models import Job, Step, StepType
 from pyworkflow_engine import WorkflowEngine
 
@@ -88,13 +88,13 @@ job = Job(
 )
 
 # Setup persistence backend
-persistence = InMemoryPersistence()
+persistence = InMemoryStorage()
 
 # Create engine with persistence
 engine = WorkflowEngine(persistence=persistence)
 
 # Run workflow with automatic state saving
-job_run = engine.run_with_persistence(job, {"source_file": "data.csv"})
+job_run = engine.run_with_storage(job, {"source_file": "data.csv"})
 print(f"Job run completed: {job_run.status}")
 ```
 
@@ -103,7 +103,7 @@ print(f"Job run completed: {job_run.status}")
 ### Clean Abstraction Layer
 ```python
 # Base persistence interface
-class BasePersistence(ABC):
+class BaseStorage(ABC):
     @abstractmethod
     def save_job(self, job: Job) -> None: ...
     
@@ -121,7 +121,7 @@ class BasePersistence(ABC):
 def __getattr__(name: str):
     """Lazy import for optional persistence backends."""
     _LAZY_IMPORTS = {
-        "SQLAlchemyPersistence": (".sqlalchemy", "SQLAlchemyPersistence"),
+        "SQLAlchemyStorage": (".sqlalchemy", "SQLAlchemyStorage"),
         # Only imported when actually used
     }
 ```
@@ -144,7 +144,7 @@ with persistence.transaction():
 - **Multiple Backend Testing**: Parameterized tests for all backends
 
 ### Production Examples
-- **Complete Demonstrations**: `examples/persistence_backends.py`
+- **Complete Demonstrations**: `examples/storage_backends.py`
 - **Real-World Scenarios**: Transaction handling, error recovery
 - **Performance Benchmarks**: Memory usage and operation timing
 
@@ -161,7 +161,7 @@ with persistence.transaction():
 - Memory usage monitoring and optimization
 
 ### Error Handling
-- Custom exception hierarchy (PersistenceError, JobNotFoundError)
+- Custom exception hierarchy (StorageError, JobNotFoundError)
 - Graceful degradation and recovery
 - Comprehensive logging and diagnostics
 
@@ -213,7 +213,7 @@ The persistence layer foundation is now complete and ready for:
 - `/pyproject.toml` - Updated with persistence optional dependencies
 
 ### Examples & Documentation
-- `/examples/persistence_backends.py` - Comprehensive usage demonstrations
+- `/examples/storage_backends.py` - Comprehensive usage demonstrations
 - `/tests/unit/test_persistence.py` - Complete test suite (835+ lines)
 
 ## Summary

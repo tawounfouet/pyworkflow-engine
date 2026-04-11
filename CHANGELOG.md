@@ -11,6 +11,52 @@ _(aucun changement planifié pour l'instant)_
 
 ---
 
+## [0.7.0] - 2026-04-12
+
+> Voir [ADR-012](docs/changelog/2026-04-12_adr_012_rename-persistence-to-storage.md) pour le contexte architectural complet.
+
+### Breaking Changes
+
+- **`adapters/persistence/` supprimé** — renommé en `adapters/storage/`
+- **`ports/persistence.py` supprimé** — renommé en `ports/storage.py`
+- **`config/persistence.py` supprimé** — renommé en `config/storage.py`
+- **`tests/persistence/` supprimé** — renommé en `tests/storage/`
+- **Tous les symboles `*Persistence*` renommés en `*Storage*`** — migration obligatoire :
+
+  | Avant (≤ 0.6.x) | Après (≥ 0.7.0) |
+  |---|---|
+  | `PersistenceConfig` | `StorageConfig` |
+  | `BasePersistence` | `BaseStorage` |
+  | `PersistencePort` | `StoragePort` |
+  | `PersistenceError` | `StorageError` |
+  | `SQLitePersistence` | `SQLiteStorage` |
+  | `InMemoryPersistence` | `InMemoryStorage` |
+  | `JSONFilePersistence` | `JSONFileStorage` |
+  | `SQLAlchemyPersistence` | `SQLAlchemyStorage` |
+  | `WorkflowConfig.persistence` | `WorkflowConfig.storage` |
+  | `WorkflowEngine(persistence=…)` | `WorkflowEngine(storage=…)` |
+  | `engine.persistence` | `engine.storage` |
+  | `run_with_persistence()` | `run_with_storage()` |
+
+- **Nouveaux chemins d'import obligatoires** :
+  ```python
+  # Avant
+  from pyworkflow_engine.adapters.persistence import SQLitePersistence
+  from pyworkflow_engine.config.persistence import PersistenceConfig
+  from pyworkflow_engine.ports.persistence import BasePersistence
+
+  # Après
+  from pyworkflow_engine.adapters.storage import SQLiteStorage
+  from pyworkflow_engine.config.storage import StorageConfig
+  from pyworkflow_engine.ports.storage import BaseStorage
+  ```
+
+### Motivation
+
+`PersistenceConfig(backend="memory")` était sémantiquement incohérent — on ne "persiste" pas en mémoire. Le terme `storage` est neutre et couvre tous les backends (sqlite, memory, json) sans contradiction. Voir ADR-012.
+
+---
+
 ## [0.6.0] - 2026-04-11
 
 > Voir [ADR-006](docs/changelog/2026-04-11_adr_006_hexagonal-ports-adapters.md) et [ADR-007](docs/changelog/2026-04-11_adr_007_celery-adapter-integration.md) pour le contexte architectural complet.
