@@ -1,0 +1,66 @@
+# Configuration de la source REST Countries API v3.1
+# Adapté depuis _archives/import_countries.py (commande Django)
+source:
+  name: "restcountries"
+  type: "http_api"
+  base_url: "https://restcountries.com/v3.1"
+  description: "API REST publique — 250+ pays (codes ISO, géographie, langues, devises, drapeaux)"
+
+entities:
+  - name: "countries"
+    description: "Tous les pays du monde (indépendants + territoires)"
+    endpoints:
+      independent:     "independent?status=true"
+      non_independent: "independent?status=false"
+
+extraction:
+  countries:
+    required_fields: ["cca2"]
+    identity_key: "cca2"           # dédoublonnage par code ISO Alpha-2
+    scope:
+      independent_only: false      # true = pays indépendants seulement
+    optional_fields:
+      - cca3
+      - ccn3
+      - name.common
+      - name.official
+      - translations.fra
+      - name.nativeName
+      - region
+      - subregion
+      - capital
+      - latlng
+      - area
+      - population
+      - borders
+      - currencies
+      - languages
+      - flag
+      - flags
+      - coatOfArms
+      - tld
+      - idd
+      - timezones
+      - independent
+      - unMember
+      - status
+      - landlocked
+      - continents
+      - maps
+      - startOfWeek
+      - car
+
+rate_limit:
+  timeout_s: 30
+  retry_on_failure: true
+  max_retries: 3
+
+env_vars:
+  RESTCOUNTRIES_BASE_URL: "URL de base de l'API (défaut: https://restcountries.com/v3.1)"
+  RESTCOUNTRIES_INDEPENDENT_ONLY: "true = pays indépendants seulement (défaut: false)"
+  RESTCOUNTRIES_TIMEOUT: "Timeout HTTP en secondes (défaut: 30)"
+
+output:
+  datalake_path: "raw/restcountries/countries/{date}/"
+  format: "json"
+  partition_key: "ingest_date"
