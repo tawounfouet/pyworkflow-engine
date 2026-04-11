@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyworkflow-engine"
-version = "0.5.0"
+version = "0.6.0"
 description = "PyWorkflow Engine - Library-first workflow orchestration with zero framework dependencies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -30,7 +30,7 @@ dependencies = []
 # Adapters — chaque intégration est opt-in
 django = ["django>=4.2", "djangorestframework>=3.14"]
 fastapi = ["fastapi>=0.100", "uvicorn>=0.20"]
-celery = ["celery>=5.3"]
+celery = ["celery>=5.3", "redis>=5.0"]
 streamlit = ["streamlit>=1.30"]
 structlog = ["structlog>=24.0"]
 
@@ -38,6 +38,7 @@ structlog = ["structlog>=24.0"]
 sqlalchemy = ["sqlalchemy>=2.0"]
 postgresql = ["sqlalchemy>=2.0", "psycopg2-binary>=2.9"]
 mysql = ["sqlalchemy>=2.0", "PyMySQL>=1.0"]
+snowflake = ["snowflake-connector-python>=3.0"]
 
 # CLI
 cli = ["click>=8.0", "rich>=13.0"]
@@ -60,7 +61,7 @@ docs = [
 
 # Tout installer
 all = [
-    "pyworkflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,streamlit,structlog,cli]",
+    "pyworkflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,snowflake,streamlit,structlog,cli]",
 ]
 
 [project.scripts]

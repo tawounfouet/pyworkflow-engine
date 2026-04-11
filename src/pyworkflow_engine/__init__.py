@@ -17,15 +17,20 @@ Usage basique:
     engine = WorkflowEngine()
     result = engine.run(job)
 
-Architecture modulaire:
-    - Core: Modèles et moteur d'exécution (zero dépendance)
-    - Executors: Comment les étapes sont exécutées (local, thread, async, human, etc.)
-    - Triggers: Comment les workflows sont déclenchés (manuel, API, schedule, etc.)
-    - Persistence: Où les données sont stockées (memory, JSON, SQLite, etc.)
-    - Adapters: Intégrations framework-spécifiques (Django, FastAPI, Celery, etc.)
+Architecture hexagonale (v0.6.0 — ADR-006):
+    - Ports: Interfaces abstraites (ABC/Protocol) — ``ports/``
+    - Engine: Logique cœur d'exécution (dépend uniquement de ports/) — ``engine/``
+    - Models: Structures de données (dataclasses) — ``models/``
+    - Decorators: API déclarative @step/@job — ``decorators/``
+    - Adapters: Implémentations concrètes des ports — ``adapters/``
+      - Executors: local, thread, process, async (stdlib)
+      - Persistence: memory, JSON, SQLite, SQLAlchemy
+      - Triggers: manual, schedule/cron
+      - Intégrations: Celery, Snowflake, structlog (extras opt-in)
+    - Facade: WorkflowEngine assemble engine + ports + adapters — ``facade.py``
 """
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 __author__ = "PyWorkflow Contributors"
 __email__ = "dev@pyworkflow.dev"
 
@@ -72,7 +77,10 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         "ExecutorRegistry": (".ports.executor", "ExecutorRegistry"),
         # Executors — adapters
         "LocalExecutor": (".adapters.executors.local", "LocalExecutor"),
-        "ThreadPoolStepExecutor": (".adapters.executors.thread_pool", "ThreadPoolStepExecutor"),
+        "ThreadPoolStepExecutor": (
+            ".adapters.executors.thread_pool",
+            "ThreadPoolStepExecutor",
+        ),
         "ProcessPoolStepExecutor": (
             ".adapters.executors.process_pool",
             "ProcessPoolStepExecutor",

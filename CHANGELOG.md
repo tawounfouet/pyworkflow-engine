@@ -11,9 +11,82 @@ _(aucun changement planifié pour l'instant)_
 
 ---
 
+## [0.6.0] - 2026-04-11
+
+> Voir [ADR-006](docs/changelog/2026-04-11_adr_006_hexagonal-ports-adapters.md) et [ADR-007](docs/changelog/2026-04-11_adr_007_celery-adapter-integration.md) pour le contexte architectural complet.
+
+### Breaking Changes
+
+- **`executors/` supprimé** à la racine du package — déplacé vers `adapters/executors/`
+- **`persistence/` supprimé** à la racine du package — déplacé vers `adapters/persistence/`
+- **`triggers/` supprimé** à la racine du package — déplacé vers `adapters/triggers/`
+- **Nouveaux chemins d'import obligatoires** :
+  - `from pyworkflow_engine.adapters.executors import LocalExecutor` (était `from pyworkflow_engine.executors import LocalExecutor`)
+  - `from pyworkflow_engine.adapters.persistence import InMemoryPersistence` (était `from pyworkflow_engine.persistence import InMemoryPersistence`)
+  - `from pyworkflow_engine.adapters.triggers import ManualTrigger` (était `from pyworkflow_engine.triggers import ManualTrigger`)
+  - `from pyworkflow_engine.ports import BasePersistence, BaseExecutor, BaseTrigger` (était dans chaque sous-package `base.py`)
+
+### Added
+
+#### 🏛️ Architecture hexagonale — Ports & Adapters (ADR-006)
+
+- **`ports/__init__.py`** — re-exports publics : `BasePersistence`, `BaseExecutor`, `BaseTrigger`, `ExecutorRegistry`, `TriggerState`, `PersistenceError`, `JobNotFoundError`, `TransactionError`, `TransactionContext`
+- **`ports/executor.py`** — port executor : `BaseExecutor` (ABC) + `ExecutorRegistry`
+- **`ports/persistence.py`** — port persistence : `BasePersistence` (ABC) + exceptions de contrat (`PersistenceError`, `JobNotFoundError`, `TransactionError`, `TransactionContext`)
+- **`ports/trigger.py`** — port trigger : `BaseTrigger` (ABC) + `TriggerState` (enum)
+
+#### 📂 Réorganisation `adapters/`
+
+- **`adapters/executors/`** — implémentations concrètes : `LocalExecutor`, `ThreadPoolStepExecutor`, `ProcessPoolStepExecutor`, `AsyncStepExecutor`, `RetryableExecutor`
+- **`adapters/persistence/`** — backends de stockage : `InMemoryPersistence`, `JSONFilePersistence`, `SQLitePersistence`, `SQLAlchemyPersistence`
+- **`adapters/triggers/`** — déclencheurs : `ManualTrigger`, `ScheduleTrigger`, `CronExpression`
+- **`adapters/celery/`** — placeholder pour l'intégration Celery (ADR-007, v0.7.0)
+- **`adapters/snowflake/`** — intégration Snowflake (existant, déplacé)
+- **`adapters/sqlalchemy/`** — intégration SQLAlchemy (existant, déplacé)
+- **`adapters/structlog/`** — intégration structlog (existant, déplacé)
+- **`adapters/api/`**, **`adapters/cli/`**, **`adapters/mcp/`**, **`adapters/gui/`**, **`adapters/tui/`** — placeholders pour les futurs adapters d'interface
+
+#### 📝 Documentation architecturale (ADR)
+
+- **ADR-006** — Architecture hexagonale : introduction `ports/` et réorganisation `adapters/`
+- **ADR-007** — Intégration Celery : adapter complexe vs simple executor, règle de placement (adapter simple vs complexe)
+- Convention de nommage ADR mise à jour : `YYYY-MM-DD_adr_NNN_<slug>.md`
+- Plan d'action v0.3.0 déplacé vers `docs/guides/`
+
+#### 📦 `pyproject.toml` — Extras mis à jour
+
+- Extra `celery` : ajout de `redis>=5.0` (broker par défaut)
+- Extra `snowflake` : nouveau (`snowflake-connector-python>=3.0`)
+- Extra `all` : inclut désormais `snowflake`
+
+### Changed
+
+- **Règle de dépendance hexagonale** :
+  - `engine/` → importe → `ports/` (abstractions uniquement, jamais `adapters/`)
+  - `adapters/` → importe → `ports/` (implémente les interfaces)
+  - `facade.py` → assemble `engine/` + `ports/` + `adapters/`
+- **`facade.py`** — imports mis à jour vers `ports/` et `adapters/`
+- **`engine/runner.py`** — imports mis à jour vers `ports/` et `adapters/`
+- **`logging/logger.py`** — imports mis à jour
+- **Index ADR** (`docs/changelog/README.md`) — liens et statuts corrigés pour ADR-001 à ADR-007
+
+### Removed
+
+- **`executors/`** à la racine du package (6 fichiers) — déplacé vers `adapters/executors/`
+- **`persistence/`** à la racine du package (6 fichiers) — déplacé vers `adapters/persistence/`
+- **`triggers/`** à la racine du package (4 fichiers) — déplacé vers `adapters/triggers/`
+
+### Tests
+
+- **535 passed**, 0 failed, 0 errors
+- Couverture : **84 %**
+- Tous les imports de tests mis à jour vers les nouveaux chemins
+
+---
+
 ## [0.5.0] - 2026-04-11
 
-> Voir [ADR-005](docs/changelog/2026-04-11-decorator-api.md) pour le contexte architectural complet.
+> Voir [ADR-005](docs/changelog/2026-04-11_adr_005_decorator-api.md) pour le contexte architectural complet.
 
 ### Added
 
