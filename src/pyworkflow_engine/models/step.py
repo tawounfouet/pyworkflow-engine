@@ -75,14 +75,26 @@ class Step:
     def to_dict(self) -> dict[str, Any]:
         """Sérialise en dict JSON-compatible.
 
-        Le handler est volontairement exclu (non portable).
-        Une représentation string est conservée pour le debug uniquement.
+        Le handler est stocké sous forme de nom qualifié importable
+        (``"module.qualname"``) quand c'est possible, ``None`` sinon
+        (lambdas, fonctions ``__main__``, closures).
         """
-        handler_repr = str(self.handler) if self.handler is not None else None
+        handler_ref: str | None = None
+        if self.handler is not None:
+            module = getattr(self.handler, "__module__", None)
+            qualname = getattr(self.handler, "__qualname__", None)
+            if (
+                module
+                and qualname
+                and module != "__main__"
+                and "<" not in module
+                and "<" not in qualname
+            ):
+                handler_ref = f"{module}.{qualname}"
         return {
             "name": self.name,
             "step_type": self.step_type.value,
-            "handler": handler_repr,
+            "handler": handler_ref,
             "config": dict(self.config),
             "dependencies": list(self.dependencies),
             "executor_type": self.executor_type.value,
@@ -98,14 +110,17 @@ class Step:
     def from_dict(cls, data: dict[str, Any]) -> Step:
         """Désérialise depuis un dict.
 
-        ``handler`` est toujours ``None`` après désérialisation (non restaurable).
+        Tente de restaurer ``handler`` via son nom qualifié importable.
+        Retombe sur ``None`` si le module n'est pas importable (ex. script
+        ``__main__``, lambda, fonction locale).
         """
         timeout_secs = data.get("timeout")
         retry_delay_secs = data.get("retry_delay", 1.0)
+        handler = _restore_handler(data.get("handler"))
         return cls(
             name=data["name"],
             step_type=StepType(data["step_type"]),
-            handler=None,  # Non restaurable depuis la persistence
+            handler=handler,
             config=data.get("config", {}),
             dependencies=data.get("dependencies", []),
             executor_type=ExecutorType(
@@ -118,6 +133,56 @@ class Step:
             retry_delay=timedelta(seconds=retry_delay_secs),
             metadata=data.get("metadata", {}),
         )
+
+
+def _restore_handler(handler_ref: str | None) -> "Callable | None":
+    """Restaure un handler depuis son nom qualifié importable.
+
+    Parcourt le chemin ``"a.b.c.fn"`` en testant progressivement les préfixes
+    de module (``a.b.c`` → ``a.b`` → ``a``) jusqu'à un import réussi, puis
+    résout les attributs restants.
+
+    Si la fonction importée est décorée par ``@step`` (présence de
+    ``__step_spec__``), reconstruit le context-adapter via
+    ``_make_context_adapter`` (import lazy pour éviter la dépendance
+    circulaire ``models.step`` → ``decorators.job_decorator``).
+
+    Returns:
+        Le callable restauré, ou ``None`` si l'import échoue (module non
+        importable, lambda, script ``__main__``, etc.).
+    """
+    if not handler_ref or not isinstance(handler_ref, str) or handler_ref.startswith("<"):
+        return None
+
+    import importlib
+
+    parts = handler_ref.split(".")
+    # Teste les points de coupure de droite à gauche :
+    # "a.b.c.fn" → module="a.b.c", attrs=["fn"]
+    #            → module="a.b",   attrs=["c", "fn"]  …
+    for split in range(len(parts) - 1, 0, -1):
+        module_name = ".".join(parts[:split])
+        attr_path = parts[split:]
+        try:
+            obj: Any = importlib.import_module(module_name)
+            for attr in attr_path:
+                obj = getattr(obj, attr)
+        except (ImportError, AttributeError):
+            continue
+
+        # Détecte les fonctions décorées par @step et reconstruit l'adapter
+        step_spec = getattr(obj, "__step_spec__", None)
+        if step_spec is not None:
+            # Import lazy — évite la circularité models.step → decorators
+            from pyworkflow_engine.decorators.job_decorator import (  # noqa: PLC0415
+                _make_context_adapter,
+            )
+            wrapped = getattr(obj, "__wrapped_fn__", obj)
+            return _make_context_adapter(wrapped, step_spec)
+
+        return obj  # fonction ordinaire (context: WorkflowContext)
+
+    return None
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,7 @@ Usage basique:
     engine = WorkflowEngine()
     result = engine.run(job)
 
-Architecture hexagonale (v0.6.0 — ADR-006):
+Architecture hexagonale (v0.7.0 — ADR-006/ADR-007):
     - Ports: Interfaces abstraites (ABC/Protocol) — ``ports/``
     - Engine: Logique cœur d'exécution (dépend uniquement de ports/) — ``engine/``
     - Models: Structures de données (dataclasses) — ``models/``
@@ -30,7 +30,7 @@ Architecture hexagonale (v0.6.0 — ADR-006):
     - Facade: WorkflowEngine assemble engine + ports + adapters — ``facade.py``
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 __author__ = "PyWorkflow Contributors"
 __email__ = "dev@pyworkflow.dev"
 
@@ -100,6 +100,9 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         "BasePersistence": (".ports.persistence", "BasePersistence"),
         # Persistence — adapters
         "InMemoryPersistence": (".adapters.persistence.memory", "InMemoryPersistence"),
+        # Celery adapter (ADR-007) — opt-in, requiert pip install pyworkflow-engine[celery]
+        "CeleryExecutor": (".adapters.celery.executor", "CeleryExecutor"),
+        "CeleryConfig": (".adapters.celery.config", "CeleryConfig"),
         # Decorators API (ADR-005)
         "step": (".decorators.step_decorator", "step"),
         "job": (".decorators.job_decorator", "job"),
@@ -169,4 +172,7 @@ __all__ = [
     "job",
     "StepSpec",
     "JobBuilder",
+    # Celery adapter (ADR-007) — opt-in
+    "CeleryExecutor",
+    "CeleryConfig",
 ]

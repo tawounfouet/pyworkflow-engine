@@ -185,8 +185,31 @@ class WorkflowRunner:
             # Fall through to named executor lookup (already handled above)
             return None
 
-        # CELERY, KUBERNETES, HUMAN, EXTERNAL → not implemented in core
+        if et == ExecutorType.CELERY:
+            return self._resolve_celery_executor(step)
+
+        # KUBERNETES, HUMAN, EXTERNAL → not implemented in core
         return None
+
+    def _resolve_celery_executor(self, step: Step) -> BaseExecutor:
+        """Charge le CeleryExecutor par lazy import.
+
+        Séparé de ``_resolve_executor`` pour limiter la complexité cognitive.
+
+        Raises:
+            StepExecutionError: Si celery n'est pas installé.
+        """
+        try:
+            from pyworkflow_engine.adapters.celery import CeleryExecutor
+
+            return CeleryExecutor()
+        except ImportError as exc:
+            raise StepExecutionError(
+                f"Step '{step.name}' requires the Celery adapter. "
+                "Install it with: pip install pyworkflow-engine[celery]",
+                details={"executor_type": "celery", "error_type": "ImportError"},
+                step_name=step.name,
+            ) from exc
 
     # ------------------------------------------------------------------
     # Internal helpers

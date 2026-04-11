@@ -42,6 +42,77 @@ NO_PERSISTENCE_EXECUTION_ERROR = (
 )
 
 
+def _bootstrap_from_config(
+    config: "WorkflowConfig",
+    explicit_persistence: Any | None,
+) -> Any:
+    """Auto-provisionne persistence et logging depuis ``WorkflowConfig``.
+
+    Appelé une seule fois dans ``WorkflowEngine.__init__``. Utilise des
+    imports lazy pour éviter les dépendances circulaires avec les adapters.
+
+    Returns:
+        Instance de persistence à utiliser (``explicit_persistence`` si
+        fourni, sinon instance auto-créée depuis ``config.persistence``).
+    """
+    persistence = explicit_persistence
+
+    # ── Persistence ──────────────────────────────────────────────────────
+    if persistence is None and config.persistence.db_path:
+        from pyworkflow_engine.adapters.persistence.sqlite import SQLitePersistence  # noqa: PLC0415
+        persistence = SQLitePersistence(database_path=config.persistence.db_path)
+        _logger.debug(
+            "SQLitePersistence auto-configuré depuis WorkflowConfig",
+            extra={"db_path": config.persistence.db_path},
+        )
+
+    # ── Logging ──────────────────────────────────────────────────────────
+    log_cfg = config.logging
+    needs_setup = (
+        log_cfg.level != "INFO"
+        or log_cfg.format != "text"
+        or log_cfg.log_dir is not None
+        or log_cfg.log_to_db
+    )
+    if needs_setup:
+        import logging as _stdlib_logging  # noqa: PLC0415
+        from pathlib import Path  # noqa: PLC0415
+
+        from pyworkflow_engine.logging.config import LoggingConfig as _LC  # noqa: PLC0415
+        from pyworkflow_engine.logging.logger import configure_logging  # noqa: PLC0415
+
+        log_file: str | None = None
+        if log_cfg.log_dir:
+            log_dir = Path(log_cfg.log_dir)
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = str(log_dir / "pyworkflow.log")
+
+        configure_logging(
+            _LC(
+                level=log_cfg.level,
+                json_output=(log_cfg.format == "json"),
+                log_file=log_file,
+                log_file_max_bytes=log_cfg.log_file_max_mb * 1024 * 1024,
+                log_file_backup_count=log_cfg.log_file_backup_count,
+            )
+        )
+
+        if log_cfg.log_to_db and config.persistence.db_path:
+            from pyworkflow_engine.logging.handlers import SQLiteLogHandler  # noqa: PLC0415
+
+            db_handler = SQLiteLogHandler(
+                db_path=config.persistence.db_path, batch_size=1
+            )
+            db_handler.setLevel(getattr(_stdlib_logging, log_cfg.level))
+            _stdlib_logging.getLogger("pyworkflow_engine").addHandler(db_handler)
+            _logger.debug(
+                "SQLiteLogHandler auto-configuré depuis WorkflowConfig",
+                extra={"db": config.persistence.db_path, "table": "workflow_logs"},
+            )
+
+    return persistence
+
+
 class WorkflowEngine:
     """Façade principale du moteur de workflow PyWorkflow.
 
@@ -88,6 +159,10 @@ class WorkflowEngine:
         _workers = _engine_cfg.max_workers if _engine_cfg else max_workers
 
         self._config = config or WorkflowConfig()
+
+        # Auto-provision persistence + logging depuis WorkflowConfig
+        persistence = _bootstrap_from_config(self._config, persistence)
+
         self._persistence = persistence
         self._executor_registry = executor_registry or ExecutorRegistry()
         runner_kwargs: dict[str, Any] = {
@@ -102,6 +177,7 @@ class WorkflowEngine:
         )
         self._retry = RetryHandler()
         self._suspension = SuspensionManager(persistence)
+        self._job_registry: dict[str, Job] = {}  # in-memory cache preserving handlers
 
     # ------------------------------------------------------------------
     # Core execution
@@ -299,6 +375,7 @@ class WorkflowEngine:
         self._suspension.persistence = backend
 
     def save_job(self, job: Job) -> None:
+        self._job_registry[job.name] = job  # preserve handlers for run_with_persistence
         self._require_persistence("save_job")
         try:
             self._persistence.save_job(job)
@@ -407,7 +484,9 @@ class WorkflowEngine:
         self._require_persistence("run_with_persistence")
 
         if isinstance(job_or_name, str):
-            job = self.get_job(job_or_name)
+            # Prefer in-memory registry: handlers are preserved there.
+            # Persistence round-trips lose callables (Step.from_dict sets handler=None).
+            job = self._job_registry.get(job_or_name) or self.get_job(job_or_name)
             if not job:
                 raise WorkflowError(
                     f"Job '{job_or_name}' not found in persistence backend",
