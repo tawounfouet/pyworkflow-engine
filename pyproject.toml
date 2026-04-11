@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyworkflow-engine"
-version = "0.6.0"
+version = "0.7.0"
 description = "PyWorkflow Engine - Library-first workflow orchestration with zero framework dependencies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -41,7 +41,22 @@ mysql = ["sqlalchemy>=2.0", "PyMySQL>=1.0"]
 snowflake = ["snowflake-connector-python>=3.0"]
 
 # CLI
-cli = ["click>=8.0", "rich>=13.0"]
+cli = ["typer>=0.9", "rich>=13.0"]
+
+# API REST adapter (ADR-011)
+api = ["fastapi>=0.100", "uvicorn[standard]>=0.20", "sse-starlette>=2.0"]
+
+# TUI adapter (ADR-009)
+tui = ["textual>=1.0", "rich>=13.0"]
+
+# GUI adapter (ADR-010)
+gui = ["nicegui>=2.0"]
+
+# Data Platform (jobs + pipelines)
+dataplatform = ["duckdb>=1.0", "pyarrow>=15.0"]
+dataplatform-pg = ["psycopg2-binary>=2.9"]
+dataplatform-stripe = ["stripe>=8.0"]
+dataplatform-scraping = ["requests>=2.31", "beautifulsoup4>=4.12", "lxml>=5.0"]
 
 # Dev / Tests
 dev = [
@@ -61,11 +76,11 @@ docs = [
 
 # Tout installer
 all = [
-    "pyworkflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,snowflake,streamlit,structlog,cli]",
+    "pyworkflow-engine[django,fastapi,celery,sqlalchemy,postgresql,mysql,snowflake,streamlit,structlog,cli,api,tui,gui]",
 ]
 
 [project.scripts]
-workflow = "pyworkflow_engine.cli.main:cli"
+pyworkflow = "pyworkflow_engine.adapters.cli.main:app"
 
 [project.urls]
 Homepage = "https://github.com/awf/pyworkflow-engine"
@@ -77,6 +92,7 @@ packages = ["src/pyworkflow_engine"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".", "jobs", "pipelines"]
 asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
@@ -90,7 +106,7 @@ addopts = [
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "jobs", "pipelines"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "TCH", "C4", "PIE", "TID"]
@@ -99,6 +115,8 @@ ignore = ["E501"]  # Line too long (handled by formatter)
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["S101"]          # Allow assert statements in tests
 "**/__init__.py" = ["TID252"]    # Re-exports relatifs tolérés dans les __init__.py
+"jobs/**/*" = ["S608"]           # SQL injection check relaxed for DWH queries
+"pipelines/**/*" = ["S608"]      # SQL injection check relaxed for DWH queries
 
 # ADR-004 — interdire les imports relatifs hors __init__.py (ban-relative-imports = "parents")
 # Passer à "all" une fois la migration complète vers les imports absolus.
@@ -138,5 +156,6 @@ exclude_lines = [
 
 [dependency-groups]
 dev = [
+    "duckdb>=1.5.1",
     "structlog>=25.5.0",
 ]
