@@ -88,6 +88,11 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         # Persistence
         "InMemoryPersistence": (".persistence.memory", "InMemoryPersistence"),
         "BasePersistence": (".persistence.base", "BasePersistence"),
+        # Decorators API (ADR-005)
+        "step": (".decorators.step_decorator", "step"),
+        "job": (".decorators.job_decorator", "job"),
+        "StepSpec": (".decorators.step_decorator", "StepSpec"),
+        "JobBuilder": (".decorators.job_decorator", "JobBuilder"),
     }
 
     if name in _LAZY_IMPORTS:
@@ -147,4 +152,9 @@ __all__ = [
     # Built-in persistence
     "InMemoryPersistence",
     "BasePersistence",
+    # Decorators API (ADR-005)
+    "step",
+    "job",
+    "StepSpec",
+    "JobBuilder",
 ]
