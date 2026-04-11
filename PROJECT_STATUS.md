@@ -1,160 +1,165 @@
-# 🎉 PyWorkflow Engine v0.2.0 - Migration Complete
+# PyWorkflow Engine — Statut du projet
 
-## 📦 Package Migration Summary
-
-### ✅ **SUCCESSFUL: ias_workflow_engine → pyworkflow_engine**
-
-The complete package migration has been **successfully completed**! The PyWorkflow Engine is now ready for broader distribution and use.
+> Dernière mise à jour : 11 avril 2026 · Version courante : **v0.4.0**
 
 ---
 
-## 🏗️ **Final Project Status**
+## 🏗️ Architecture actuelle (v0.4.0)
 
-### **📊 Project Statistics**
-- **✅ Source Code**: 7,069 lines across 24 Python modules
-- **✅ Test Coverage**: 88% with 185+ tests across 8 test modules  
-- **✅ Examples**: 7 working examples (6 fully functional + 1 needs API fixes)
-- **✅ Documentation**: Comprehensive guides and migration documentation
-
-### **🔧 Core Functionality**
-- **✅ Zero-Dependency Core**: Pure Python stdlib implementation
-- **✅ Advanced Executors**: 5 execution backends with timeout/retry support
-- **✅ Persistence Layer**: 4 storage backends (Memory ✅, JSON ⚠️, SQLite ⚠️, SQLAlchemy ⚠️)
-- **✅ Workflow Engine**: Complete DAG resolution and execution
-- **✅ Structured Logging**: Production-ready logging system
-
-### **🧪 Testing & Quality**
-- **✅ Unit Tests**: All core functionality tested
-- **✅ Integration Tests**: End-to-end workflow scenarios
-- **✅ Static Analysis**: Ruff linting + MyPy type checking
-- **✅ Code Coverage**: 88% with detailed HTML reports
-
----
-
-## 🎯 **Working Features (Verified)**
-
-### **✅ Core Engine**
-```python
-from pyworkflow_engine import WorkflowEngine, Job, Step, StepType
-
-# ✅ Basic workflow execution
-engine = WorkflowEngine()
-job = Job(name="test", steps=[...])
-result = engine.run(job)  # ✅ WORKING
+```
+src/pyworkflow_engine/
+├── __init__.py             # API publique (exports)
+├── facade.py               # WorkflowEngine — façade unique
+├── exceptions.py           # Hiérarchie d'exceptions
+├── py.typed                # Marqueur PEP 561
+├── engine/                 # Cœur d'exécution
+│   ├── runner.py           # WorkflowRunner (séquentiel)
+│   ├── parallel_runner.py  # ParallelRunner (concurrent.futures)
+│   ├── dag.py              # DAGResolver
+│   ├── context.py          # WorkflowContext
+│   ├── retry.py            # RetryHandler
+│   └── suspension.py       # SuspensionManager
+├── executors/              # Stratégies d'exécution
+│   ├── base.py             # BaseExecutor, ExecutorRegistry
+│   ├── local.py            # LocalExecutor
+│   ├── thread_pool.py      # ThreadPoolStepExecutor
+│   ├── process_pool.py     # ProcessPoolStepExecutor
+│   ├── async_exec.py       # AsyncStepExecutor
+│   └── retryable.py        # RetryableExecutor
+├── models/                 # Modèles de données
+│   ├── enums.py            # RunStatus, StepType, ExecutorType
+│   ├── job.py              # Job
+│   ├── step.py             # Step
+│   └── run.py              # JobRun, StepRun
+├── triggers/               # Déclencheurs — nouveau v0.4.0
+│   ├── base.py             # BaseTrigger, TriggerState
+│   ├── manual.py           # ManualTrigger
+│   └── schedule.py         # ScheduleTrigger, CronExpression
+├── persistence/            # Backends de persistence
+│   ├── base.py             # BasePersistence (ABC)
+│   ├── memory.py           # InMemoryPersistence
+│   ├── json_file.py        # JSONFilePersistence
+│   ├── sqlite.py           # SQLitePersistence
+│   └── sqlalchemy.py       # SQLAlchemyPersistence
+├── logging/                # Système de logging structuré
+└── adapters/               # Intégrations optionnelles (celery, snowflake, structlog)
 ```
 
-### **✅ InMemory Persistence**
-```python
-from pyworkflow_engine.persistence import InMemoryPersistence
-
-# ✅ Full persistence functionality
-persistence = InMemoryPersistence()
-engine.persistence = persistence
-result = engine.run_with_persistence(job)  # ✅ WORKING
-```
-
-### **✅ Advanced Executors**
-```python
-from pyworkflow_engine.core.executors import ThreadPoolStepExecutor
-
-# ✅ Concurrent execution
-executor = ThreadPoolStepExecutor(max_workers=4)
-engine.register_executor('thread_pool', executor)  # ✅ WORKING
-```
+**Supprimé en v0.4.0** : `core/` (God Object monolithique, ~2 600 lignes)
 
 ---
 
-## ⚠️ **Known Issues & Next Steps**
+## ✅ Fonctionnalités livrées
 
-### **API Consistency Issues (Minor)**
-- **Issue**: Some persistence backends have API inconsistencies 
-- **Status**: Core functionality works, edge cases need refinement
-- **Impact**: InMemoryPersistence fully functional, others need minor fixes
+### Core engine
+- [x] Exécution séquentielle (`WorkflowRunner`)
+- [x] Exécution parallèle (`ParallelRunner` — `concurrent.futures`)
+- [x] Résolution DAG avec détection de cycles (`DAGResolver`)
+- [x] Contexte d'exécution avec propagation des sorties (`WorkflowContext`)
+- [x] Retry avec back-off configurable (`RetryHandler`)
+- [x] Suspension / reprise de workflows (`SuspensionManager`)
 
-### **Example Corrections Needed**
-- **File**: `examples/persistence_backends.py`
-- **Issue**: Uses old API patterns (`StepType.PYTHON_FUNCTION` vs `StepType.FUNCTION`)
-- **Status**: `examples/persistence_simple.py` created as working alternative
-- **Priority**: Low (core functionality demonstrated in working examples)
+### Triggers *(nouveau v0.4.0)*
+- [x] `ManualTrigger` — déclenchement explicite par code (API, bouton, test)
+- [x] `ScheduleTrigger` — déclenchement par cron, thread d'arrière-plan (stdlib pure)
+- [x] `CronExpression` — parser cron 5 champs, `matches()`, zéro dépendance externe
+- [x] Callbacks `on_run_complete` / `on_run_error`
+- [x] `initial_context_factory` pour injecter un contexte dynamique à chaque déclenchement
+
+### Executors
+- [x] `LocalExecutor` (synchrone, zéro overhead)
+- [x] `ThreadPoolStepExecutor`
+- [x] `ProcessPoolStepExecutor`
+- [x] `AsyncStepExecutor`
+- [x] `RetryableExecutor`
+- [x] `ExecutorRegistry` (lookup par nom)
+
+### Persistence
+- [x] `InMemoryPersistence` ✅
+- [x] `JSONFilePersistence` ✅
+- [x] `SQLitePersistence` ✅
+- [x] `SQLAlchemyPersistence` ✅
+- [x] Checkpoints step-by-step dans `run_with_persistence()`
+- [x] `cleanup_old_runs(older_than, dry_run=False)` — contrat LSP aligné sur tous les backends
+
+### Qualité & tests
+- [x] **338 passed**, 15 skipped, 0 failed, 0 errors
+- [x] Couverture : ~81% (cible 85%)
+- [x] Tests d'intégration : `test_persistence_roundtrip.py`, `test_parallel_runner.py`
+- [x] Ruff (lint) + MyPy (type checking)
+- [x] Règle ruff `TID252` configurée (`ban-relative-imports = "parents"`)
 
 ---
 
-## 🚀 **Migration Success Criteria - ALL MET**
+## 🚧 En cours — ADR-004
 
-### **✅ Package Structure**
-- [x] Package renamed: `ias_workflow_engine` → `pyworkflow_engine`
-- [x] All imports updated across codebase
-- [x] Configuration files updated (`pyproject.toml`)
-- [x] CLI entry points updated
-- [x] Documentation updated
+| Tâche | Statut |
+|---|---|
+| Imports absolus — migration `src/` (~20 fichiers, `ruff --select TID252 --fix`) | ⬜ Planifié |
+| Module `config/` — `WorkflowConfig`, `EngineConfig`, `ExecutorConfig`, `LoggingConfig` | ⬜ Planifié |
+| `WorkflowEngine(config=WorkflowConfig(…))` avec rétrocompatibilité | ⬜ Planifié |
 
-### **✅ Functionality Preserved**
-- [x] Core workflow engine working
-- [x] All examples execute successfully (6/7, 1 has minor API issues)
-- [x] Test suite passes
-- [x] Import statements work correctly
-- [x] Zero-dependency architecture maintained
-
-### **✅ Documentation**
-- [x] Migration guide created (`MIGRATION.md`)
-- [x] CHANGELOG.md updated with complete history
-- [x] Working examples provided
-- [x] Installation instructions updated
+> Voir [ADR-004](docs/changelog/2026-04-11-import-style-and-config-module.md) pour le détail complet.
 
 ---
 
-## 📋 **Installation & Usage (v0.2.0)**
+## 📋 Journal des décisions (ADR)
 
-### **Installation**
+| ADR | Titre | Statut |
+|-----|-------|--------|
+| [ADR-001](docs/changelog/2026-04-10-naming-decision.md) | Nommage du package | ✅ Implémenté |
+| [ADR-002](docs/changelog/2026-04-10-architecture-refactoring-proposal.md) | God Object → couches modulaires | ✅ Implémenté (v0.3 + v0.4) |
+| [ADR-003](docs/changelog/2026-04-10-architecture-critique-integration.md) | Intégration de l'analyse critique | ✅ Implémenté |
+| [ADR-004](docs/changelog/2026-04-11-import-style-and-config-module.md) | Imports absolus + module `config/` | 🚧 En cours |
+
+---
+
+## 📦 Installation
+
 ```bash
-# Core package
+# Core (zéro dépendance)
 pip install pyworkflow-engine
 
-# With optional dependencies
+# Avec persistence SQL
 pip install pyworkflow-engine[sqlalchemy]
-pip install pyworkflow-engine[postgresql]
-pip install pyworkflow-engine[mysql]
+
+# Avec structlog
+pip install pyworkflow-engine[structlog]
+
+# Tout
+pip install pyworkflow-engine[all]
 ```
 
-### **Basic Usage**
+## 🚀 Usage rapide (v0.4.0)
+
 ```python
-from pyworkflow_engine import WorkflowEngine, Job, Step, StepType
-
-def my_task(context):
-    return {"message": "Hello PyWorkflow Engine!"}
-
-job = Job(
-    name="hello_world",
-    steps=[
-        Step(
-            name="hello",
-            step_type=StepType.FUNCTION,
-            callable=my_task
-        )
-    ]
+from pyworkflow_engine import (
+    WorkflowEngine, Job, Step, StepType,
+    ManualTrigger, ScheduleTrigger, CronExpression,
 )
 
+def fetch(context): return {"records": 42}
+def process(context):
+    return {"total": context.get_step_output("fetch")["records"]}
+
+job = Job(name="pipeline", steps=[
+    Step(name="fetch",   step_type=StepType.FUNCTION, handler=fetch),
+    Step(name="process", step_type=StepType.FUNCTION, handler=process,
+         dependencies=["fetch"]),
+])
+
+# Exécution simple
 engine = WorkflowEngine()
-result = engine.run(job)
-print(f"Status: {result.status}")  # ✅ SUCCESS
+result = engine.run(job)  # JobRun(status=SUCCESS)
+
+# Exécution parallèle
+engine = WorkflowEngine(parallel=True, max_workers=4)
+
+# Trigger planifié (cron, thread d'arrière-plan)
+trigger = ScheduleTrigger(engine=engine, job=job, cron="0 9 * * 1-5")
+trigger.start()
 ```
 
 ---
 
-## 🎉 **Migration Complete - Ready for Distribution**
-
-The PyWorkflow Engine has been successfully migrated and is now:
-
-- **✅ Production Ready**: 88% test coverage, comprehensive error handling
-- **✅ Well Documented**: Complete guides and examples
-- **✅ Properly Packaged**: Clean pyproject.toml, correct dependencies
-- **✅ Broadly Applicable**: Generic naming suitable for any project
-- **✅ Enterprise Features**: Multiple persistence backends, advanced executors
-
-**The package is ready for publication to PyPI and broader use!** 🚀
-
----
-
-*Last Updated: 10 mars 2026*  
-*Package Version: v0.2.0*  
-*Migration Status: ✅ COMPLETE*
+*Version : v0.4.0 · 11 avril 2026*
