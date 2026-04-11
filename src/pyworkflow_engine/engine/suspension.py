@@ -23,8 +23,8 @@ class SuspensionManager:
     Sans backend, utilise un dict en mémoire (fonctionnement v0.2 inchangé).
     """
 
-    def __init__(self, persistence: Any | None = None):
-        self._storage = persistence
+    def __init__(self, storage: Any | None = None):
+        self._storage = storage
         self._in_memory: dict[str, JobRun] = {}
 
     @property
@@ -32,7 +32,7 @@ class SuspensionManager:
         return self._storage
 
     @storage.setter
-    def persistence(self, backend: Any | None) -> None:
+    def storage(self, backend: Any | None) -> None:
         self._storage = backend
 
     # ------------------------------------------------------------------

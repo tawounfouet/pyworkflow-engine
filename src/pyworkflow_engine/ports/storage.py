@@ -304,20 +304,20 @@ class TransactionContext:
         self._in_transaction = False
 
     def __enter__(self) -> BaseStorage:
-        self.persistence.begin_transaction()
+        self.storage.begin_transaction()
         self._in_transaction = True
-        return self.persistence
+        return self.storage
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._in_transaction:
             if exc_type is None:
                 try:
-                    self.persistence.commit_transaction()
+                    self.storage.commit_transaction()
                 except Exception:
                     with contextlib.suppress(Exception):
-                        self.persistence.rollback_transaction()
+                        self.storage.rollback_transaction()
                     raise
             else:
                 with contextlib.suppress(Exception):
-                    self.persistence.rollback_transaction()
+                    self.storage.rollback_transaction()
             self._in_transaction = False

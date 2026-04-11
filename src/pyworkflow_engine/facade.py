@@ -27,7 +27,12 @@ from pyworkflow_engine.engine.parallel_runner import ParallelRunner
 from pyworkflow_engine.engine.retry import RetryHandler
 from pyworkflow_engine.engine.runner import WorkflowRunner
 from pyworkflow_engine.engine.suspension import SuspensionManager
-from pyworkflow_engine.exceptions import DAGValidationError, WorkflowError, WorkflowFailed, WorkflowSuspended
+from pyworkflow_engine.exceptions import (
+    DAGValidationError,
+    WorkflowError,
+    WorkflowFailed,
+    WorkflowSuspended,
+)
 from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
 from pyworkflow_engine.ports.storage import StorageError
 from pyworkflow_engine.logging import get_logger
@@ -55,12 +60,15 @@ def _bootstrap_from_config(
         Instance de persistence à utiliser (``explicit_storage`` si
         fourni, sinon instance auto-créée depuis ``config.storage``).
     """
-    persistence = explicit_storage
+    backend = explicit_storage
 
-    # ── Persistence ──────────────────────────────────────────────────────
+    # ── Storage ───────────────────────────────────────────────────────────
     if backend is None and config.storage.db_path:
-        from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage  # noqa: PLC0415
-        persistence = SQLiteStorage(database_path=config.storage.db_path)
+        from pyworkflow_engine.adapters.storage.sqlite import (
+            SQLiteStorage,
+        )  # noqa: PLC0415
+
+        backend = SQLiteStorage(database_path=config.storage.db_path)
         _logger.debug(
             "SQLiteStorage auto-configuré depuis WorkflowConfig",
             extra={"db_path": config.storage.db_path},
@@ -78,7 +86,9 @@ def _bootstrap_from_config(
         import logging as _stdlib_logging  # noqa: PLC0415
         from pathlib import Path  # noqa: PLC0415
 
-        from pyworkflow_engine.logging.config import LoggingConfig as _LC  # noqa: PLC0415
+        from pyworkflow_engine.logging.config import (
+            LoggingConfig as _LC,
+        )  # noqa: PLC0415
         from pyworkflow_engine.logging.logger import configure_logging  # noqa: PLC0415
 
         log_file: str | None = None
@@ -98,11 +108,11 @@ def _bootstrap_from_config(
         )
 
         if log_cfg.log_to_db and config.storage.db_path:
-            from pyworkflow_engine.logging.handlers import SQLiteLogHandler  # noqa: PLC0415
+            from pyworkflow_engine.logging.handlers import (
+                SQLiteLogHandler,
+            )  # noqa: PLC0415
 
-            db_handler = SQLiteLogHandler(
-                db_path=config.storage.db_path, batch_size=1
-            )
+            db_handler = SQLiteLogHandler(db_path=config.storage.db_path, batch_size=1)
             db_handler.setLevel(getattr(_stdlib_logging, log_cfg.level))
             _stdlib_logging.getLogger("pyworkflow_engine").addHandler(db_handler)
             _logger.debug(
@@ -370,7 +380,7 @@ class WorkflowEngine:
         return self._storage
 
     @storage.setter
-    def persistence(self, backend):
+    def storage(self, backend):
         self._storage = backend
         self._suspension.storage = backend
 
