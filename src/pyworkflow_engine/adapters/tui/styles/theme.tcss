@@ -1,0 +1,59 @@
+/* Theme PyWorkflow Engine TUI
+ *
+ * Conventions :
+ *   - .screen-title  : titre en haut de chaque screen
+ *   - .panel         : conteneur bordé (grille, sections)
+ *   - DataTable      : prend tout l'espace vertical disponible
+ *   - StatusBar      : footer ancré en bas
+ */
+
+Screen {
+    background: $surface;
+}
+
+.screen-title {
+    dock: top;
+    height: 3;
+    content-align: center middle;
+    background: $primary-background;
+    color: $text;
+    text-style: bold;
+    padding: 1;
+}
+
+.panel {
+    width: 1fr;
+    height: 1fr;
+    margin: 1;
+    border: solid $primary;
+    padding: 1;
+}
+
+DataTable {
+    height: 1fr;
+}
+
+DataTable > .datatable--cursor {
+    background: $accent;
+    color: $text;
+}
+
+RichLog {
+    height: 1fr;
+    border: solid $secondary;
+    padding: 0 1;
+}
+
+StatusBar {
+    dock: bottom;
+    height: 1;
+    background: $primary-background;
+    color: $text-muted;
+    content-align: center middle;
+    padding: 0 2;
+}
+
+Tree {
+    height: 1fr;
+    padding: 1;
+}
