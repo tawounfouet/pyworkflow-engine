@@ -144,6 +144,10 @@ done < <(
         -not -path "./.venv/*" \
         -not -path "./venv/*" \
         -not -path "./__pycache__/*" \
+        -not -path "*/__pycache__/*" \
+        -not -path "./htmlcov/*" \
+        -not -path "./docs/changelog/*" \
+        -not -name "CHANGELOG.md" \
         -not -name "$(basename "$0")" \
     | sort
 )
@@ -156,6 +160,7 @@ done < <(
         -not -path "./.git/*" \
         -not -path "./.venv/*" \
         -not -path "./venv/*" \
+        -not -path "*/__pycache__/*" \
     | sort -r   # plus profond en premier
 )
 
