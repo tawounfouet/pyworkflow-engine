@@ -18,7 +18,7 @@ from datetime import timedelta
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pyworkflow_engine import WorkflowEngine, Job, Step, StepType
-from pyworkflow_engine.core.executors import (
+from pyworkflow_engine.executors import (
     ThreadPoolStepExecutor,
     ProcessPoolStepExecutor,
     AsyncStepExecutor,
@@ -69,7 +69,7 @@ def unreliable_function():
 
 def main():
     """Demonstrate timeout handling and advanced executors."""
-    print("=== IAS Workflow Engine - Timeout & Advanced Executors ===\n")
+    print("=== PyWorkflow Engine - Timeout & Advanced Executors ===\n")
 
     engine = WorkflowEngine()
 

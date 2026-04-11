@@ -1,11 +1,11 @@
 """Tests for retry mechanisms in the workflow engine."""
 
-import pytest
 from datetime import timedelta
-from unittest.mock import Mock
 
-from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, RunStatus
-from pyworkflow_engine.core.exceptions import StepExecutionError
+import pytest
+
+from pyworkflow_engine import Job, RunStatus, Step, StepType, WorkflowEngine
+from pyworkflow_engine.exceptions import StepExecutionError
 
 
 class TestRetryMechanisms:
@@ -31,7 +31,7 @@ class TestRetryMechanisms:
                 Step(
                     name="unstable_step",
                     step_type=StepType.FUNCTION,
-                    callable=unstable_function,
+                    handler=unstable_function,
                     retry_count=3,
                     retry_delay=timedelta(milliseconds=1),  # Very short delay for tests
                 )
@@ -67,7 +67,7 @@ class TestRetryMechanisms:
                 Step(
                     name="failing_step",
                     step_type=StepType.FUNCTION,
-                    callable=always_fail_function,
+                    handler=always_fail_function,
                     retry_count=2,  # Only 2 retries
                     retry_delay=timedelta(milliseconds=1),
                 )
@@ -99,7 +99,7 @@ class TestRetryMechanisms:
                 Step(
                     name="success_step",
                     step_type=StepType.FUNCTION,
-                    callable=success_function,
+                    handler=success_function,
                     retry_count=5,  # High retry count, but shouldn't be used
                 )
             ],
@@ -130,7 +130,7 @@ class TestRetryMechanisms:
                 Step(
                     name="fail_step",
                     step_type=StepType.FUNCTION,
-                    callable=fail_function,
+                    handler=fail_function,
                     retry_count=0,  # No retries
                 )
             ],
@@ -166,7 +166,7 @@ class TestRetryMechanisms:
                 Step(
                     name="context_step",
                     step_type=StepType.FUNCTION,
-                    callable=context_dependent_function,
+                    handler=context_dependent_function,
                     retry_count=2,
                 )
             ],
@@ -200,7 +200,7 @@ class TestRetryMechanisms:
                 Step(
                     name="timing_step",
                     step_type=StepType.FUNCTION,
-                    callable=time_tracking_function,
+                    handler=time_tracking_function,
                     retry_count=3,
                     retry_delay=timedelta(milliseconds=50),  # 50ms delay
                 )
@@ -248,12 +248,12 @@ class TestRetryMechanisms:
             name="complex_retry_workflow",
             steps=[
                 Step(
-                    name="step_a", step_type=StepType.FUNCTION, callable=reliable_step_a
+                    name="step_a", step_type=StepType.FUNCTION, handler=reliable_step_a
                 ),
                 Step(
                     name="step_b",
                     step_type=StepType.FUNCTION,
-                    callable=unreliable_step_b,
+                    handler=unreliable_step_b,
                     dependencies=["step_a"],
                     retry_count=3,
                     retry_delay=timedelta(milliseconds=1),
@@ -261,7 +261,7 @@ class TestRetryMechanisms:
                 Step(
                     name="step_c",
                     step_type=StepType.FUNCTION,
-                    callable=final_step_c,
+                    handler=final_step_c,
                     dependencies=["step_a", "step_b"],
                 ),
             ],

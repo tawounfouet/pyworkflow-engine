@@ -1,5 +1,5 @@
 """
-IAS Workflow Engine — Module Logging.
+PyWorkflow Engine — Module Logging.
 
 Architecture en 3 couches respectant le principe zero-dépendance :
 
@@ -25,9 +25,9 @@ Usage avancé avec configuration :
     ))
 """
 
-from .logger import get_logger, configure_logging, shutdown_logging
 from .config import LoggingConfig
-from .utils import logged_operation, StepLogBridge, LoggingConfigBuilder
+from .logger import configure_logging, get_logger, shutdown_logging
+from .utils import LoggingConfigBuilder, StepLogBridge, logged_operation
 
 __all__ = [
     "get_logger",

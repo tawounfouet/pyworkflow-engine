@@ -6,9 +6,10 @@ tri topologique et analyse du graphe de workflow.
 """
 
 import pytest
-from pyworkflow_engine.core.models import Job, Step, StepType
-from pyworkflow_engine.core.dag import DAGResolver
-from pyworkflow_engine.core.exceptions import DAGValidationError
+
+from pyworkflow_engine.engine.dag import DAGResolver
+from pyworkflow_engine.exceptions import DAGValidationError
+from pyworkflow_engine.models import Job, Step, StepType
 
 
 class TestDAGResolver:
@@ -23,17 +24,17 @@ class TestDAGResolver:
         job = Job(
             name="Linear Workflow",
             steps=[
-                Step(name="step1", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="step1", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="step2",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["step1"],
                 ),
                 Step(
                     name="step3",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["step2"],
                 ),
             ],
@@ -62,23 +63,23 @@ class TestDAGResolver:
         job = Job(
             name="Parallel Workflow",
             steps=[
-                Step(name="start", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="start", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="parallel1",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["start"],
                 ),
                 Step(
                     name="parallel2",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["start"],
                 ),
                 Step(
                     name="end",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["parallel1", "parallel2"],
                 ),
             ],
@@ -108,23 +109,23 @@ class TestDAGResolver:
         job = Job(
             name="Diamond Workflow",
             steps=[
-                Step(name="A", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="A", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="B",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="C",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="D",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["B", "C"],
                 ),
             ],
@@ -155,19 +156,19 @@ class TestDAGResolver:
                 Step(
                     name="A",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["C"],
                 ),
                 Step(
                     name="B",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="C",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["B"],
                 ),
             ],
@@ -188,7 +189,7 @@ class TestDAGResolver:
             Step(
                 name="self",
                 step_type=StepType.FUNCTION,
-                callable=dummy_func,
+                handler=dummy_func,
                 dependencies=["self"],
             )
 
@@ -206,11 +207,11 @@ class TestDAGResolver:
             Job(
                 name="Missing Dependency",
                 steps=[
-                    Step(name="A", step_type=StepType.FUNCTION, callable=dummy_func),
+                    Step(name="A", step_type=StepType.FUNCTION, handler=dummy_func),
                     Step(
                         name="B",
                         step_type=StepType.FUNCTION,
-                        callable=dummy_func,
+                        handler=dummy_func,
                         dependencies=["nonexistent"],
                     ),
                 ],
@@ -233,12 +234,12 @@ class TestDAGResolver:
                     Step(
                         name="duplicate",
                         step_type=StepType.FUNCTION,
-                        callable=dummy_func,
+                        handler=dummy_func,
                     ),
                     Step(
                         name="duplicate",
                         step_type=StepType.FUNCTION,
-                        callable=dummy_func,
+                        handler=dummy_func,
                     ),
                 ],
             )
@@ -254,36 +255,36 @@ class TestDAGResolver:
         job = Job(
             name="Complex Workflow",
             steps=[
-                Step(name="extract1", step_type=StepType.FUNCTION, callable=dummy_func),
-                Step(name="extract2", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="extract1", step_type=StepType.FUNCTION, handler=dummy_func),
+                Step(name="extract2", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="transform1",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["extract1"],
                 ),
                 Step(
                     name="transform2",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["extract2"],
                 ),
                 Step(
                     name="merge",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["transform1", "transform2"],
                 ),
                 Step(
                     name="validate",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["merge"],
                 ),
                 Step(
                     name="load",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["validate"],
                 ),
             ],
@@ -310,17 +311,17 @@ class TestDAGResolver:
         job = Job(
             name="Can Execute Test",
             steps=[
-                Step(name="A", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="A", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="B",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="C",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A", "B"],
                 ),
             ],
@@ -353,18 +354,18 @@ class TestDAGResolver:
         job = Job(
             name="Ready Steps Test",
             steps=[
-                Step(name="A", step_type=StepType.FUNCTION, callable=dummy_func),
-                Step(name="B", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="A", step_type=StepType.FUNCTION, handler=dummy_func),
+                Step(name="B", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="C",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="D",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A", "B"],
                 ),
             ],
@@ -393,23 +394,23 @@ class TestDAGResolver:
         job = Job(
             name="Dependencies Test",
             steps=[
-                Step(name="A", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="A", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="B",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="C",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["A"],
                 ),
                 Step(
                     name="D",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["B", "C"],
                 ),
             ],
@@ -452,7 +453,7 @@ class TestDAGResolver:
 
         job = Job(
             name="Single Step",
-            steps=[Step(name="only", step_type=StepType.FUNCTION, callable=dummy_func)],
+            steps=[Step(name="only", step_type=StepType.FUNCTION, handler=dummy_func)],
         )
 
         resolver = DAGResolver(job)
@@ -476,35 +477,35 @@ class TestDAGResolver:
         job = Job(
             name="Critical Path Test",
             steps=[
-                Step(name="start", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="start", step_type=StepType.FUNCTION, handler=dummy_func),
                 Step(
                     name="short",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["start"],
                 ),
                 Step(
                     name="long1",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["start"],
                 ),
                 Step(
                     name="long2",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["long1"],
                 ),
                 Step(
                     name="long3",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["long2"],
                 ),
                 Step(
                     name="end",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["short", "long3"],
                 ),
             ],
@@ -528,32 +529,32 @@ class TestDAGResolver:
             name="Parallel Groups",
             steps=[
                 # Niveau 0
-                Step(name="init1", step_type=StepType.FUNCTION, callable=dummy_func),
-                Step(name="init2", step_type=StepType.FUNCTION, callable=dummy_func),
+                Step(name="init1", step_type=StepType.FUNCTION, handler=dummy_func),
+                Step(name="init2", step_type=StepType.FUNCTION, handler=dummy_func),
                 # Niveau 1
                 Step(
                     name="proc1",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["init1"],
                 ),
                 Step(
                     name="proc2",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["init2"],
                 ),
                 Step(
                     name="proc3",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["init1", "init2"],
                 ),
                 # Niveau 2
                 Step(
                     name="final",
                     step_type=StepType.FUNCTION,
-                    callable=dummy_func,
+                    handler=dummy_func,
                     dependencies=["proc1", "proc2", "proc3"],
                 ),
             ],

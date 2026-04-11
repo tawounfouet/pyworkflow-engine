@@ -1,7 +1,7 @@
 """
 Simple Workflow Examples: Demonstrating Core Features
 
-Collection of simple examples showing the basic features of the IAS Workflow Engine.
+Collection of simple examples showing the basic features of the PyWorkflow Engine.
 """
 
 from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
@@ -229,7 +229,7 @@ def example_3_context_sharing():
 
 def main():
     """Run all simple workflow examples."""
-    print("🚀 IAS Workflow Engine - Simple Examples")
+    print("🚀 PyWorkflow Engine - Simple Examples")
     print("Demonstrating core workflow features\n")
 
     # Run examples

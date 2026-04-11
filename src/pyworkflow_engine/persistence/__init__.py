@@ -1,5 +1,5 @@
 """
-Persistence layer for the IAS Workflow Engine.
+Persistence layer for the PyWorkflow Engine.
 
 This module provides a pluggable persistence architecture that allows workflows
 to be stored and retrieved from various backends while maintaining the zero-dependency
@@ -53,7 +53,7 @@ def __getattr__(name: str):
         except ImportError as e:
             if "sqlalchemy" in module_path:
                 raise ImportError(
-                    f"SQLAlchemy persistence requires: pip install ias-workflow-engine[sqlalchemy]"
+                    "SQLAlchemy persistence requires: pip install ias-workflow-engine[sqlalchemy]"
                 ) from e
             raise
 

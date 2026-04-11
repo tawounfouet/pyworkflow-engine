@@ -9,7 +9,7 @@ Utilise la hiérarchie d'exceptions standard Python — zero dépendance externe
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class WorkflowError(Exception):
@@ -28,9 +28,9 @@ class WorkflowError(Exception):
     def __init__(
         self,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
-        job_name: Optional[str] = None,
-        step_name: Optional[str] = None,
+        details: dict[str, Any] | None = None,
+        job_name: str | None = None,
+        step_name: str | None = None,
     ):
         super().__init__(message)
         self.message = message
@@ -65,7 +65,6 @@ class WorkflowValidationError(WorkflowError):
         ... )
     """
 
-    pass
 
 
 class WorkflowExecutionError(WorkflowError):
@@ -75,7 +74,6 @@ class WorkflowExecutionError(WorkflowError):
     Classe de base pour les erreurs d'exécution spécifiques.
     """
 
-    pass
 
 
 class StepExecutionError(WorkflowExecutionError):
@@ -93,9 +91,9 @@ class StepExecutionError(WorkflowExecutionError):
         self,
         message: str,
         step_name: str,
-        job_name: Optional[str] = None,
-        original_exception: Optional[Exception] = None,
-        step_run_id: Optional[str] = None,
+        job_name: str | None = None,
+        original_exception: Exception | None = None,
+        step_run_id: str | None = None,
         retry_count: int = 0,
         **kwargs,
     ):
@@ -132,8 +130,8 @@ class WorkflowFailed(WorkflowExecutionError):
     def __init__(
         self,
         message: str,
-        error_step: Optional[str] = None,
-        traceback_info: Optional[str] = None,
+        error_step: str | None = None,
+        traceback_info: str | None = None,
         **kwargs,
     ):
         super().__init__(message, **kwargs)
@@ -159,9 +157,9 @@ class WorkflowSuspended(WorkflowError):
     def __init__(
         self,
         message: str,
-        reason: Optional[str] = None,
-        suspend_data: Optional[Dict[str, Any]] = None,
-        resume_callback: Optional[str] = None,
+        reason: str | None = None,
+        suspend_data: dict[str, Any] | None = None,
+        resume_callback: str | None = None,
         **kwargs,
     ):
         super().__init__(message, **kwargs)
@@ -185,7 +183,6 @@ class WorkflowSuspendedHuman(WorkflowSuspended):
         ... )
     """
 
-    pass
 
 
 class WorkflowSuspendedExternal(WorkflowSuspended):
@@ -203,7 +200,6 @@ class WorkflowSuspendedExternal(WorkflowSuspended):
         ... )
     """
 
-    pass
 
 
 class WorkflowTimeoutError(WorkflowExecutionError):
@@ -243,7 +239,7 @@ class WorkflowCancelled(WorkflowError):
         self,
         message: str,
         cancelled_by: str = "system",
-        cancel_reason: Optional[str] = None,
+        cancel_reason: str | None = None,
         **kwargs,
     ):
         super().__init__(message, **kwargs)
@@ -264,8 +260,8 @@ class DAGValidationError(WorkflowValidationError):
     def __init__(
         self,
         message: str,
-        cycle_steps: Optional[list[str]] = None,
-        orphan_steps: Optional[list[str]] = None,
+        cycle_steps: list[str] | None = None,
+        orphan_steps: list[str] | None = None,
         **kwargs,
     ):
         super().__init__(message, **kwargs)
@@ -287,7 +283,7 @@ class ExecutorError(WorkflowExecutionError):
         self,
         message: str,
         executor_type: str,
-        executor_details: Optional[Dict[str, Any]] = None,
+        executor_details: dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(message, **kwargs)
@@ -324,7 +320,7 @@ class ContextError(WorkflowError):
     def __init__(
         self,
         message: str,
-        context_key: Optional[str] = None,
+        context_key: str | None = None,
         context_operation: str = "access",
         **kwargs,
     ):
@@ -338,7 +334,7 @@ def create_step_failed_error(
     step_name: str,
     job_name: str,
     original_exception: Exception,
-    step_run_id: Optional[str] = None,
+    step_run_id: str | None = None,
     retry_count: int = 0,
 ) -> StepExecutionError:
     """Crée une StepExecutionError standardisée."""
@@ -357,8 +353,8 @@ def create_timeout_error(
     entity_type: str,
     timeout_seconds: float,
     elapsed_seconds: float,
-    job_name: Optional[str] = None,
-    step_name: Optional[str] = None,
+    job_name: str | None = None,
+    step_name: str | None = None,
 ) -> WorkflowTimeoutError:
     """Crée une WorkflowTimeoutError standardisée."""
     return WorkflowTimeoutError(
@@ -372,9 +368,9 @@ def create_timeout_error(
 
 def create_validation_error(
     message: str,
-    job_name: Optional[str] = None,
-    step_name: Optional[str] = None,
-    details: Optional[Dict[str, Any]] = None,
+    job_name: str | None = None,
+    step_name: str | None = None,
+    details: dict[str, Any] | None = None,
 ) -> WorkflowValidationError:
     """Crée une WorkflowValidationError standardisée."""
     return WorkflowValidationError(

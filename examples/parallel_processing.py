@@ -1,171 +1,159 @@
 """
-Parallel Processing Example: Data Processing Pipeline
+Exemple v0.4.0 : Exécution parallèle avec ParallelRunner
 
-This example demonstrates parallel execution capabilities with multiple
-concurrent data processing steps.
+Démontre WorkflowEngine(parallel=True) qui utilise ParallelRunner +
+concurrent.futures pour exécuter simultanément les steps sans dépendances
+mutuelles. Compare aussi les durées séquentielle vs parallèle.
+
+Structure du DAG :
+    load_data
+    ├── regional_analysis  ┐ groupe parallèle
+    └── product_analysis   ┘
+         └── final_report
 """
 
-from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
 import time
 import random
+from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext
 
+
+# ---------------------------------------------------------------------------
+# Step functions
+# ---------------------------------------------------------------------------
 
 def load_dataset(context: WorkflowContext) -> dict:
-    """Load initial dataset."""
-    print("📊 Loading dataset...")
-    time.sleep(0.2)  # Simulate I/O time
-
+    """Charge le dataset initial (simulé)."""
+    print("  [load_data] Chargement du dataset...")
+    time.sleep(0.1)
     dataset = {
         "sales_data": [
             {
                 "id": i,
-                "product": f"Product-{i%5}",
-                "amount": random.uniform(10, 500),
-                "region": random.choice(["North", "South", "East", "West"]),
+                "product": f"Produit-{i % 5}",
+                "amount": round(random.uniform(10, 500), 2),
+                "region": random.choice(["Nord", "Sud", "Est", "Ouest"]),
             }
-            for i in range(50)  # Small dataset for demo
+            for i in range(60)
         ],
-        "total_records": 50,
+        "total_records": 60,
     }
-
-    print(f"📊 Loaded {dataset['total_records']} records")
+    print(f"  [load_data] {dataset['total_records']} enregistrements chargés")
     return dataset
 
 
 def analyze_regions(context: WorkflowContext) -> dict:
-    """Analyze data by region (parallel task)."""
-    print("🌍 Analyzing regions...")
-    time.sleep(0.3)
-
+    """Analyse les ventes par région (step parallèle)."""
+    print("  [regional_analysis] Début...")
+    time.sleep(0.4)  # Simule un traitement I/O-bound
     dataset = context.get_step_output("load_data")
-    regional_stats = {}
-
+    stats: dict = {}
     for record in dataset["sales_data"]:
-        region = record["region"]
-        if region not in regional_stats:
-            regional_stats[region] = {"count": 0, "total": 0}
-        regional_stats[region]["count"] += 1
-        regional_stats[region]["total"] += record["amount"]
-
-    print(f"🌍 Processed {len(regional_stats)} regions")
-    return {"regional_stats": regional_stats}
+        r = record["region"]
+        stats.setdefault(r, {"count": 0, "total": 0.0})
+        stats[r]["count"] += 1
+        stats[r]["total"] += record["amount"]
+    print(f"  [regional_analysis] {len(stats)} régions analysées")
+    return {"regional_stats": stats}
 
 
 def analyze_products(context: WorkflowContext) -> dict:
-    """Analyze data by product (parallel task)."""
-    print("📦 Analyzing products...")
-    time.sleep(0.4)
-
+    """Analyse les ventes par produit (step parallèle)."""
+    print("  [product_analysis] Début...")
+    time.sleep(0.5)  # Un peu plus long pour montrer le gain parallèle
     dataset = context.get_step_output("load_data")
-    product_stats = {}
-
+    stats: dict = {}
     for record in dataset["sales_data"]:
-        product = record["product"]
-        if product not in product_stats:
-            product_stats[product] = {"count": 0, "total": 0}
-        product_stats[product]["count"] += 1
-        product_stats[product]["total"] += record["amount"]
-
-    print(f"📦 Processed {len(product_stats)} products")
-    return {"product_stats": product_stats}
+        p = record["product"]
+        stats.setdefault(p, {"count": 0, "total": 0.0})
+        stats[p]["count"] += 1
+        stats[p]["total"] += record["amount"]
+    print(f"  [product_analysis] {len(stats)} produits analysés")
+    return {"product_stats": stats}
 
 
 def generate_report(context: WorkflowContext) -> dict:
-    """Generate final report combining all analyses."""
-    print("📋 Generating final report...")
+    """Consolide les deux analyses en un rapport final."""
+    print("  [final_report] Génération du rapport...")
+    regional = context.get_step_output("regional_analysis")
+    products = context.get_step_output("product_analysis")
 
-    regional_data = context.get_step_output("regional_analysis")
-    product_data = context.get_step_output("product_analysis")
-
-    # Find top performers
-    top_region = max(
-        regional_data["regional_stats"].items(), key=lambda x: x[1]["total"]
-    )
-    top_product = max(
-        product_data["product_stats"].items(), key=lambda x: x[1]["total"]
-    )
+    top_region = max(regional["regional_stats"].items(), key=lambda x: x[1]["total"])
+    top_product = max(products["product_stats"].items(), key=lambda x: x[1]["total"])
 
     report = {
-        "top_region": {"name": top_region[0], "sales": top_region[1]["total"]},
-        "top_product": {"name": top_product[0], "sales": top_product[1]["total"]},
-        "total_regions": len(regional_data["regional_stats"]),
-        "total_products": len(product_data["product_stats"]),
+        "top_region": {"name": top_region[0], "sales": round(top_region[1]["total"], 2)},
+        "top_product": {"name": top_product[0], "sales": round(top_product[1]["total"], 2)},
+        "regions_count": len(regional["regional_stats"]),
+        "products_count": len(products["product_stats"]),
     }
-
-    print(
-        f"📋 Report generated - Top region: {top_region[0]}, Top product: {top_product[0]}"
-    )
+    print(f"  [final_report] Top région : {top_region[0]}, Top produit : {top_product[0]}")
     return report
 
 
+# ---------------------------------------------------------------------------
+# Job definition
+# ---------------------------------------------------------------------------
+
+def build_job() -> Job:
+    return Job(
+        name="Analytics Pipeline",
+        steps=[
+            Step(name="load_data",          step_type=StepType.FUNCTION, handler=load_dataset),
+            Step(name="regional_analysis",  step_type=StepType.FUNCTION, handler=analyze_regions,
+                 dependencies=["load_data"]),
+            Step(name="product_analysis",   step_type=StepType.FUNCTION, handler=analyze_products,
+                 dependencies=["load_data"]),
+            Step(name="final_report",       step_type=StepType.FUNCTION, handler=generate_report,
+                 dependencies=["regional_analysis", "product_analysis"]),
+        ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main():
-    """Run the parallel processing workflow example."""
-    print("🚀 Parallel Processing Workflow Example\n")
+    random.seed(42)
+    job = build_job()
 
-    # Create workflow with parallel steps
-    steps = [
-        Step(name="load_data", step_type=StepType.FUNCTION, callable=load_dataset),
-        Step(
-            name="regional_analysis",
-            step_type=StepType.FUNCTION,
-            callable=analyze_regions,
-            dependencies=["load_data"],
-        ),
-        Step(
-            name="product_analysis",
-            step_type=StepType.FUNCTION,
-            callable=analyze_products,
-            dependencies=["load_data"],
-        ),
-        Step(
-            name="final_report",
-            step_type=StepType.FUNCTION,
-            callable=generate_report,
-            dependencies=["regional_analysis", "product_analysis"],
-        ),
-    ]
+    # --- Plan d'exécution ---------------------------------------------------
+    plan = WorkflowEngine().get_execution_plan(job)
+    print("Plan d'exécution")
+    print(f"  Ordre séquentiel : {' → '.join(plan['execution_order'])}")
+    print(f"  Chemin critique  : {' → '.join(plan['critical_path'][0])} ({plan['critical_path'][1]} step(s))")
+    print("  Groupes parallèles :")
+    for i, group in enumerate(plan["parallel_groups"], 1):
+        marker = "(parallèle)" if len(group) > 1 else ""
+        print(f"    Groupe {i}: {', '.join(group)} {marker}")
 
-    job = Job(name="Parallel Analytics Pipeline", steps=steps)
-    engine = WorkflowEngine()
+    # --- Exécution séquentielle (comportement par défaut) -------------------
+    print("\n--- Exécution SÉQUENTIELLE (WorkflowEngine()) ---")
+    t0 = time.perf_counter()
+    result_seq = WorkflowEngine().run(job)
+    dur_seq = time.perf_counter() - t0
+    print(f"  Statut : {result_seq.status.value}  |  Durée : {dur_seq:.2f}s")
 
-    # Show execution plan
-    plan = engine.get_execution_plan(job)
-    print(f"📋 Execution Order: {' → '.join(plan['execution_order'])}")
-    print(f"🎯 Critical Path: {' → '.join(plan['critical_path'][0])}")
+    # --- Exécution parallèle (ParallelRunner) --------------------------------
+    print("\n--- Exécution PARALLÈLE (WorkflowEngine(parallel=True)) ---")
+    random.seed(42)  # même seed pour comparaison équitable
+    t0 = time.perf_counter()
+    result_par = WorkflowEngine(parallel=True).run(job)
+    dur_par = time.perf_counter() - t0
+    print(f"  Statut : {result_par.status.value}  |  Durée : {dur_par:.2f}s")
 
-    if plan["parallel_groups"]:
-        print(f"🔀 Parallel Groups: {len(plan['parallel_groups'])}")
-        for i, group in enumerate(plan["parallel_groups"], 1):
-            print(f"   Group {i}: {', '.join(group)}")
+    # --- Comparaison --------------------------------------------------------
+    if dur_seq > 0:
+        gain = (dur_seq - dur_par) / dur_seq * 100
+        print(f"\nGain parallèle : {gain:.0f}%  ({dur_seq:.2f}s → {dur_par:.2f}s)")
 
-    # Execute workflow
-    print(f"\n▶️  Starting execution...")
-    start_time = time.time()
-
-    job_run = engine.run(job)
-
-    duration = time.time() - start_time
-
-    print(f"\n✅ Status: {job_run.status}")
-    print(f"⏱️  Duration: {duration:.2f} seconds")
-
-    # Show results
-    if job_run.status.value == "success":
-        report_step = next(
-            (s for s in job_run.step_runs if s.step_name == "final_report"), None
-        )
-        if report_step and report_step.output_data:
-            report = report_step.output_data
-            print(f"\n📊 Results:")
-            print(
-                f"   🏆 Top Region: {report['top_region']['name']} (${report['top_region']['sales']:.0f})"
-            )
-            print(
-                f"   🏆 Top Product: {report['top_product']['name']} (${report['top_product']['sales']:.0f})"
-            )
-            print(
-                f"   📈 Analysis completed in {duration:.1f}s with parallel processing"
-            )
+    # --- Résultats ----------------------------------------------------------
+    report_run = next(s for s in result_par.step_runs if s.step_name == "final_report")
+    if report_run.output_data:
+        r = report_run.output_data
+        print("\nRésultats :")
+        print(f"  Meilleure région  : {r['top_region']['name']} ({r['top_region']['sales']:.0f} €)")
+        print(f"  Meilleur produit  : {r['top_product']['name']} ({r['top_product']['sales']:.0f} €)")
 
 
 if __name__ == "__main__":

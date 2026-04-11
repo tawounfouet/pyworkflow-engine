@@ -3,7 +3,7 @@ Logger principal — stdlib logging uniquement, zero dépendance.
 
 Suit les best practices pour les bibliothèques Python (PEP 282) :
 - NullHandler par défaut → la lib est silencieuse sauf configuration explicite
-- Namespace hiérarchique → ``pyworkflow_engine.core.engine``
+- Namespace hiérarchique → ``pyworkflow_engine.engine``, ``pyworkflow_engine.persistence``…
 - Compatible structlog si installé (voir adapters/structlog/)
 
 Design :
@@ -20,7 +20,7 @@ import queue
 from typing import Any
 
 from .config import LoggingConfig
-from .formatters import StructuredFormatter, JSONFormatter
+from .formatters import JSONFormatter, StructuredFormatter
 
 # ── Namespace racine du package ──────────────────────────────────────────────
 _ROOT_LOGGER_NAME = "pyworkflow_engine"
@@ -39,15 +39,15 @@ def get_logger(name: str | None = None) -> logging.Logger:
 
     Args:
         name: Sous-namespace du logger. Si None, retourne le logger racine.
-              Exemples : ``"core.engine"``, ``"executors.thread"``.
+              Exemples : ``"engine.runner"``, ``"executors.thread"``.
 
     Returns:
         Logger stdlib configuré dans le bon namespace.
 
     Examples:
-        >>> logger = get_logger("core.engine")
+        >>> logger = get_logger("engine.runner")
         >>> logger.name
-        'pyworkflow_engine.core.engine'
+        'pyworkflow_engine.engine.runner'
 
         >>> logger = get_logger()
         >>> logger.name

@@ -12,8 +12,11 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 from .config import LoggingConfig
 
@@ -81,7 +84,7 @@ class StepLogBridge(logging.Handler):
         source: Préfixe source pour les StepLog (défaut: "logging").
 
     Examples:
-        >>> from pyworkflow_engine.core.models.runtime import StepRun
+        >>> from pyworkflow_engine.models.run import StepRun
         >>> step_run = StepRun(step_name="process_data", job_run_id="job-1")
         >>> bridge = StepLogBridge(step_run)
         >>> logger = logging.getLogger("my_step")

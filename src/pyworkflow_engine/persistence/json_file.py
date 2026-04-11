@@ -1,5 +1,5 @@
 """
-JSON file-based persistence implementation for the IAS Workflow Engine.
+JSON file-based persistence implementation for the PyWorkflow Engine.
 
 This persistence backend stores workflow data in JSON files on the filesystem.
 It's suitable for development, testing, and small-scale production deployments
@@ -18,13 +18,12 @@ from __future__ import annotations
 import json
 import os
 import threading
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Iterator
+from typing import Any
 
-from .base import BasePersistence, PersistenceError, JobNotFoundError, TransactionError
-from ..core.models import JobRun, StepRun, Job
+from ..models import Job, JobRun, StepRun
+from .base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
 
 
 class JSONFilePersistence(BasePersistence):
@@ -63,7 +62,7 @@ class JSONFilePersistence(BasePersistence):
 
         # Transaction state
         self._in_transaction = False
-        self._transaction_operations: List[Dict[str, Any]] = []
+        self._transaction_operations: list[dict[str, Any]] = []
 
     def _safe_filename(self, name: str) -> str:
         """Convert a name to a safe filename."""
@@ -81,251 +80,37 @@ class JSONFilePersistence(BasePersistence):
         safe_id = self._safe_filename(run_id)
         return self.runs_dir / f"{safe_id}.json"
 
-    def _serialize_job(self, job: Job) -> Dict[str, Any]:
+    def _serialize_job(self, job: Job) -> dict[str, Any]:
         """Serialize a job to JSON-compatible format."""
-        return {
-            "name": job.name,
-            "description": job.description,
-            "input_schema": job.input_schema,
-            "output_schema": job.output_schema,
-            "steps": [
-                {
-                    "name": step.name,
-                    "step_type": step.step_type.value,
-                    "callable": str(step.callable) if step.callable else None,
-                    "config": step.config,
-                    "dependencies": step.dependencies,
-                    "executor_type": step.executor_type.value,
-                    "timeout": step.timeout.total_seconds() if step.timeout else None,
-                    "retry_count": step.retry_count,
-                    "retry_delay": step.retry_delay.total_seconds(),
-                    "metadata": step.metadata,
-                }
-                for step in job.steps
-            ],
-            "sub_jobs": [
-                {
-                    "job_name": sub_job.job_name,
-                    "input_mapping": sub_job.input_mapping,
-                    "output_mapping": sub_job.output_mapping,
-                    "inherit_context": sub_job.inherit_context,
-                }
-                for sub_job in job.sub_jobs
-            ],
-            "triggers": [trigger.value for trigger in job.triggers],
-            "default_executor": job.default_executor.value,
-            "priority": job.priority.value,
-            "timeout": job.timeout.total_seconds() if job.timeout else None,
-            "max_concurrent_steps": job.max_concurrent_steps,
-            "tags": job.tags,
-            "metadata": job.metadata,
-            "version": job.version,
-            "enabled": job.enabled,
-        }
+        return job.to_dict()
 
-    def _deserialize_job(self, data: Dict[str, Any]) -> Job:
+    def _deserialize_job(self, data: dict[str, Any]) -> Job:
         """Deserialize a job from JSON format."""
-        from ..core.models import Step, SubJob
-        from ..core.models.enums import StepType, ExecutorType, TriggerType, Priority
-        from datetime import timedelta
+        return Job.from_dict(data)
 
-        steps = []
-        for step_data in data["steps"]:
-            step = Step(
-                name=step_data["name"],
-                step_type=StepType(step_data["step_type"]),
-                callable=None,  # Cannot restore callable from JSON
-                config=step_data.get("config", {}),
-                dependencies=step_data.get("dependencies", []),
-                executor_type=ExecutorType(step_data.get("executor_type", "local")),
-                timeout=(
-                    timedelta(seconds=step_data["timeout"])
-                    if step_data.get("timeout")
-                    else None
-                ),
-                retry_count=step_data.get("retry_count", 0),
-                retry_delay=timedelta(seconds=step_data.get("retry_delay", 1)),
-                metadata=step_data.get("metadata", {}),
-            )
-            steps.append(step)
-
-        sub_jobs = []
-        for sub_job_data in data.get("sub_jobs", []):
-            sub_job = SubJob(
-                job_name=sub_job_data["job_name"],
-                input_mapping=sub_job_data.get("input_mapping", {}),
-                output_mapping=sub_job_data.get("output_mapping", {}),
-                inherit_context=sub_job_data.get("inherit_context", True),
-            )
-            sub_jobs.append(sub_job)
-
-        return Job(
-            name=data["name"],
-            description=data.get("description", ""),
-            steps=steps,
-            sub_jobs=sub_jobs,
-            triggers=[TriggerType(t) for t in data.get("triggers", ["manual"])],
-            default_executor=ExecutorType(data.get("default_executor", "local")),
-            priority=Priority(data.get("priority", "normal")),
-            timeout=timedelta(seconds=data["timeout"]) if data.get("timeout") else None,
-            max_concurrent_steps=data.get("max_concurrent_steps", 10),
-            input_schema=data.get("input_schema"),
-            output_schema=data.get("output_schema"),
-            tags=data.get("tags", []),
-            metadata=data.get("metadata", {}),
-            version=data.get("version", "1.0.0"),
-            enabled=data.get("enabled", True),
-        )
-
-    def _serialize_job_run(self, job_run: JobRun) -> Dict[str, Any]:
+    def _serialize_job_run(self, job_run: JobRun) -> dict[str, Any]:
         """Serialize a job run to JSON-compatible format."""
-        return {
-            "id": job_run.id,
-            "job_run_id": job_run.job_run_id,
-            "job_name": job_run.job_name,
-            "job_version": job_run.job_version,
-            "status": job_run.status.value,
-            "input_data": job_run.input_data,
-            "output_data": job_run.output_data,
-            "context": job_run.context,
-            "error": job_run.error,
-            "start_time": (
-                job_run.start_time.isoformat() if job_run.start_time else None
-            ),
-            "end_time": job_run.end_time.isoformat() if job_run.end_time else None,
-            "duration_ms": job_run.duration_ms,
-            "triggered_by": job_run.triggered_by,
-            "trigger_data": job_run.trigger_data,
-            "priority": job_run.priority,
-            "executor_config": job_run.executor_config,
-            "metadata": job_run.metadata,
-            "created_at": job_run.created_at.isoformat(),
-            "updated_at": job_run.updated_at.isoformat(),
-            "step_runs": [
-                self._serialize_step_run(step_run) for step_run in job_run.step_runs
-            ],
-        }
+        return job_run.to_dict()
 
-    def _serialize_step_run(self, step_run: StepRun) -> Dict[str, Any]:
+    def _serialize_step_run(self, step_run: StepRun) -> dict[str, Any]:
         """Serialize a step run to JSON-compatible format."""
-        return {
-            "step_run_id": step_run.step_run_id,
-            "job_run_id": step_run.job_run_id,
-            "step_name": step_run.step_name,
-            "status": step_run.status.value,
-            "executor_type": step_run.executor_type.value,
-            "input_data": step_run.input_data,
-            "output_data": step_run.output_data,
-            "error": step_run.error,
-            "start_time": (
-                step_run.start_time.isoformat() if step_run.start_time else None
-            ),
-            "end_time": step_run.end_time.isoformat() if step_run.end_time else None,
-            "duration_ms": step_run.duration_ms,
-            "retry_count": step_run.retry_count,
-            "executor_info": step_run.executor_info,
-            "logs": [
-                {
-                    "timestamp": log.timestamp.isoformat(),
-                    "level": log.level,
-                    "message": log.message,
-                    "data": log.data,
-                    "source": log.source,
-                }
-                for log in step_run.logs
-            ],
-            "metadata": step_run.metadata,
-        }
+        return step_run.to_dict()
 
-    def _deserialize_job_run(self, data: Dict[str, Any]) -> JobRun:
+    def _deserialize_job_run(self, data: dict[str, Any]) -> JobRun:
         """Deserialize a job run from JSON format."""
-        from ..core.models import JobRun, StepRun, StepLog
-        from ..core.models.enums import RunStatus, ExecutorType
-        from datetime import datetime
+        return JobRun.from_dict(data)
 
-        # Deserialize step runs
-        step_runs = []
-        for step_data in data.get("step_runs", []):
-            logs = []
-            for log_data in step_data.get("logs", []):
-                log = StepLog(
-                    timestamp=datetime.fromisoformat(log_data["timestamp"]),
-                    level=log_data["level"],
-                    message=log_data["message"],
-                    data=log_data.get("data", {}),
-                    source=log_data.get("source", "step"),
-                )
-                logs.append(log)
-
-            step_run = StepRun(
-                step_run_id=step_data["step_run_id"],
-                step_name=step_data["step_name"],
-                job_run_id=step_data["job_run_id"],
-                status=RunStatus(step_data["status"]),
-                executor_type=ExecutorType(step_data.get("executor_type", "local")),
-                input_data=step_data.get("input_data", {}),
-                output_data=step_data.get("output_data", {}),
-                error=step_data.get("error"),
-                start_time=(
-                    datetime.fromisoformat(step_data["start_time"])
-                    if step_data.get("start_time")
-                    else None
-                ),
-                end_time=(
-                    datetime.fromisoformat(step_data["end_time"])
-                    if step_data.get("end_time")
-                    else None
-                ),
-                duration_ms=step_data.get("duration_ms"),
-                retry_count=step_data.get("retry_count", 0),
-                executor_info=step_data.get("executor_info", {}),
-                logs=logs,
-                metadata=step_data.get("metadata", {}),
-            )
-            step_runs.append(step_run)
-
-        # Deserialize job run
-        return JobRun(
-            job_run_id=data["job_run_id"],
-            job_name=data["job_name"],
-            job_version=data.get("job_version", "1.0.0"),
-            status=RunStatus(data["status"]),
-            input_data=data.get("input_data", {}),
-            output_data=data.get("output_data", {}),
-            context=data.get("context", {}),
-            error=data.get("error"),
-            start_time=(
-                datetime.fromisoformat(data["start_time"])
-                if data.get("start_time")
-                else None
-            ),
-            end_time=(
-                datetime.fromisoformat(data["end_time"])
-                if data.get("end_time")
-                else None
-            ),
-            duration_ms=data.get("duration_ms"),
-            triggered_by=data.get("triggered_by", "manual"),
-            trigger_data=data.get("trigger_data", {}),
-            priority=data.get("priority", 5),
-            executor_config=data.get("executor_config", {}),
-            metadata=data.get("metadata", {}),
-            created_at=datetime.fromisoformat(data["created_at"]),
-            updated_at=datetime.fromisoformat(data["updated_at"]),
-            step_runs=step_runs,
-        )
-
-    def _read_file_atomic(self, file_path: Path) -> Optional[Dict[str, Any]]:
+    def _read_file_atomic(self, file_path: Path) -> dict[str, Any] | None:
         """Atomically read a JSON file."""
         try:
             if not file_path.exists():
                 return None
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, json.JSONDecodeError) as e:
             raise PersistenceError(f"Failed to read {file_path}: {e}") from e
 
-    def _write_file_atomic(self, file_path: Path, data: Dict[str, Any]) -> None:
+    def _write_file_atomic(self, file_path: Path, data: dict[str, Any]) -> None:
         """Atomically write a JSON file."""
         try:
             # Write to temporary file first, then rename (atomic on most filesystems)
@@ -340,10 +125,10 @@ class JSONFilePersistence(BasePersistence):
         except OSError as e:
             # Clean up temp file if it exists
             if temp_path.exists():
-                try:
+                import contextlib
+
+                with contextlib.suppress(OSError):
                     temp_path.unlink()
-                except OSError:
-                    pass
             raise PersistenceError(f"Failed to write {file_path}: {e}") from e
 
     def _delete_file_atomic(self, file_path: Path) -> bool:
@@ -426,7 +211,7 @@ class JSONFilePersistence(BasePersistence):
             data = self._serialize_job(job)
             self._execute_operation("write", path=file_path, data=data)
 
-    def get_job(self, job_name: str) -> Optional[Job]:
+    def get_job(self, job_name: str) -> Job | None:
         """Retrieve a job definition by name."""
         with self._lock:
             file_path = self._job_file_path(job_name)
@@ -442,7 +227,7 @@ class JSONFilePersistence(BasePersistence):
             data = self._read_file_atomic(file_path)
             return self._deserialize_job(data) if data else None
 
-    def list_jobs(self, limit: Optional[int] = None, offset: int = 0) -> List[Job]:
+    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         """List all job definitions."""
         with self._lock:
             jobs = []
@@ -494,7 +279,7 @@ class JSONFilePersistence(BasePersistence):
             data = self._serialize_job_run(job_run)
             self._execute_operation("write", path=file_path, data=data)
 
-    def get_job_run(self, run_id: str) -> Optional[JobRun]:
+    def get_job_run(self, run_id: str) -> JobRun | None:
         """Retrieve a job run by ID."""
         with self._lock:
             file_path = self._run_file_path(run_id)
@@ -512,12 +297,12 @@ class JSONFilePersistence(BasePersistence):
 
     def list_job_runs(
         self,
-        job_name: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: Optional[int] = None,
+        job_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
         offset: int = 0,
-        since: Optional[datetime] = None,
-    ) -> List[JobRun]:
+        since: datetime | None = None,
+    ) -> list[JobRun]:
         """List job runs with optional filtering."""
         with self._lock:
             runs = []
@@ -562,7 +347,7 @@ class JSONFilePersistence(BasePersistence):
             else:
                 return self._delete_file_atomic(file_path)
 
-    def get_job_run_count(self, job_name: Optional[str] = None) -> int:
+    def get_job_run_count(self, job_name: str | None = None) -> int:
         """Get the total number of job runs."""
         with self._lock:
             count = 0
@@ -571,19 +356,25 @@ class JSONFilePersistence(BasePersistence):
                 for file_path in self.runs_dir.glob("*.json"):
                     try:
                         data = self._read_file_atomic(file_path)
-                        if data:
-                            if job_name is None or data.get("job_name") == job_name:
-                                count += 1
+                        if data and (
+                            job_name is None or data.get("job_name") == job_name
+                        ):
+                            count += 1
                     except PersistenceError:
                         # Skip corrupted files
                         continue
 
             return count
 
-    def cleanup_old_runs(self, older_than: datetime) -> int:
-        """Remove job runs older than the specified datetime."""
+    def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
+        """Remove job runs older than the specified datetime.
+
+        Args:
+            older_than: Delete runs created before this datetime.
+            dry_run: If True (default), only count without deleting.
+        """
         with self._lock:
-            deleted_count = 0
+            count = 0
 
             if self.runs_dir.exists():
                 for file_path in self.runs_dir.glob("*.json"):
@@ -591,16 +382,16 @@ class JSONFilePersistence(BasePersistence):
                         data = self._read_file_atomic(file_path)
                         if data:
                             created_at = datetime.fromisoformat(data["created_at"])
-                            if created_at < older_than:
-                                if self._delete_file_atomic(file_path):
-                                    deleted_count += 1
+                            if created_at < older_than and (
+                                dry_run or self._delete_file_atomic(file_path)
+                            ):
+                                count += 1
                     except (PersistenceError, ValueError):
-                        # Skip corrupted files
                         continue
 
-            return deleted_count
+            return count
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Check the health of the persistence backend."""
         try:
             # Test directory access
@@ -640,7 +431,7 @@ class JSONFilePersistence(BasePersistence):
                 "writable": False,
             }
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get persistence backend statistics."""
         health = self.health_check()
 

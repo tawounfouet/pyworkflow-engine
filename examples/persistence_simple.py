@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from pyworkflow_engine import WorkflowEngine
-from pyworkflow_engine.core.models import Job, Step, StepType
+from pyworkflow_engine.models import Job, Step, StepType
 from pyworkflow_engine.persistence import (
     InMemoryPersistence,
     JSONFilePersistence,

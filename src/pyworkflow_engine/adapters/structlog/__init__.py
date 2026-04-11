@@ -1,5 +1,5 @@
 """
-Adapter structlog — pip install ias-workflow-engine[structlog]
+Adapter structlog — pip install pyworkflow-engine[structlog]
 
 Bridge entre le stdlib logging du core et structlog pour les utilisateurs
 qui veulent un logging structuré avancé (processors, contextvars, etc.).
@@ -11,7 +11,7 @@ Usage :
 
     # À partir de là, tous les logs du core passent par structlog
     from pyworkflow_engine.logging import get_logger
-    logger = get_logger("core.engine")
+    logger = get_logger("engine.facade")
     logger.info("workflow started", job_id="abc-123")
     # → Formaté par structlog avec couleurs, contexte, etc.
 """

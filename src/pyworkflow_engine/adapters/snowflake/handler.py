@@ -12,8 +12,11 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class SnowflakeLogHandler(logging.Handler):
@@ -111,11 +114,17 @@ class SnowflakeLogHandler(logging.Handler):
             cursor.close()
             self._table_checked = True
         except Exception:
-            self.handleError(logging.LogRecord(
-                name="snowflake", level=logging.ERROR,
-                pathname="", lineno=0, msg="Table creation failed",
-                args=(), exc_info=None,
-            ))
+            self.handleError(
+                logging.LogRecord(
+                    name="snowflake",
+                    level=logging.ERROR,
+                    pathname="",
+                    lineno=0,
+                    msg="Table creation failed",
+                    args=(),
+                    exc_info=None,
+                )
+            )
 
     def emit(self, record: logging.LogRecord) -> None:
         """Accumule un log record dans le buffer et flush si nécessaire."""
@@ -135,9 +144,7 @@ class SnowflakeLogHandler(logging.Handler):
             if record.exc_info and record.exc_info[1] is not None:
                 exception_str = str(record.exc_info[1])
 
-            timestamp = datetime.fromtimestamp(
-                record.created, tz=timezone.utc
-            ).isoformat()
+            timestamp = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
 
             row = (
                 timestamp,
@@ -182,12 +189,18 @@ class SnowflakeLogHandler(logging.Handler):
             # En cas d'erreur, garder le buffer pour retry
             # mais limiter sa taille pour éviter une fuite mémoire
             if len(self._buffer) > self._batch_size * 10:
-                self._buffer = self._buffer[-self._batch_size:]
-            self.handleError(logging.LogRecord(
-                name="snowflake", level=logging.ERROR,
-                pathname="", lineno=0, msg="Snowflake flush failed",
-                args=(), exc_info=None,
-            ))
+                self._buffer = self._buffer[-self._batch_size :]
+            self.handleError(
+                logging.LogRecord(
+                    name="snowflake",
+                    level=logging.ERROR,
+                    pathname="",
+                    lineno=0,
+                    msg="Snowflake flush failed",
+                    args=(),
+                    exc_info=None,
+                )
+            )
 
     def flush(self) -> None:
         """Force le flush du buffer vers Snowflake."""

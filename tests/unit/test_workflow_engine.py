@@ -5,21 +5,21 @@ Test l'exécution de workflows, la gestion d'état, suspension/reprise,
 et gestion d'erreurs.
 """
 
-import pytest
-from unittest.mock import Mock, patch
-from datetime import datetime
+from unittest.mock import patch
 
-from pyworkflow_engine.core import (
-    WorkflowEngine,
-    Job,
-    Step,
-    StepType,
-    RunStatus,
-    WorkflowError,
-    WorkflowSuspended,
-    WorkflowFailed,
-    StepExecutionError,
+import pytest
+
+from pyworkflow_engine import (
     DAGValidationError,
+    Job,
+    RunStatus,
+    Step,
+    StepExecutionError,
+    StepType,
+    WorkflowEngine,
+    WorkflowError,
+    WorkflowFailed,
+    WorkflowSuspended,
 )
 
 
@@ -38,11 +38,11 @@ class TestWorkflowEngine:
         job = Job(
             name="Simple Workflow",
             steps=[
-                Step(name="hello", step_type=StepType.FUNCTION, callable=hello),
+                Step(name="hello", step_type=StepType.FUNCTION, handler=hello),
                 Step(
                     name="goodbye",
                     step_type=StepType.FUNCTION,
-                    callable=goodbye,
+                    handler=goodbye,
                     dependencies=["hello"],
                 ),
             ],
@@ -83,11 +83,11 @@ class TestWorkflowEngine:
         job = Job(
             name="Context Workflow",
             steps=[
-                Step(name="setter", step_type=StepType.FUNCTION, callable=set_data),
+                Step(name="setter", step_type=StepType.FUNCTION, handler=set_data),
                 Step(
                     name="getter",
                     step_type=StepType.FUNCTION,
-                    callable=use_data,
+                    handler=use_data,
                     dependencies=["setter"],
                 ),
             ],
@@ -112,7 +112,7 @@ class TestWorkflowEngine:
             name="Initial Context",
             steps=[
                 Step(
-                    name="use_config", step_type=StepType.FUNCTION, callable=use_initial
+                    name="use_config", step_type=StepType.FUNCTION, handler=use_initial
                 )
             ],
         )
@@ -143,24 +143,24 @@ class TestWorkflowEngine:
                 Step(
                     name="start",
                     step_type=StepType.FUNCTION,
-                    callable=track_execution("start"),
+                    handler=track_execution("start"),
                 ),
                 Step(
                     name="parallel1",
                     step_type=StepType.FUNCTION,
-                    callable=track_execution("parallel1"),
+                    handler=track_execution("parallel1"),
                     dependencies=["start"],
                 ),
                 Step(
                     name="parallel2",
                     step_type=StepType.FUNCTION,
-                    callable=track_execution("parallel2"),
+                    handler=track_execution("parallel2"),
                     dependencies=["start"],
                 ),
                 Step(
                     name="end",
                     step_type=StepType.FUNCTION,
-                    callable=track_execution("end"),
+                    handler=track_execution("end"),
                     dependencies=["parallel1", "parallel2"],
                 ),
             ],
@@ -186,11 +186,11 @@ class TestWorkflowEngine:
         job = Job(
             name="Failing Workflow",
             steps=[
-                Step(name="normal", step_type=StepType.FUNCTION, callable=normal_step),
+                Step(name="normal", step_type=StepType.FUNCTION, handler=normal_step),
                 Step(
                     name="failing",
                     step_type=StepType.FUNCTION,
-                    callable=failing_step,
+                    handler=failing_step,
                     dependencies=["normal"],
                 ),
             ],
@@ -218,13 +218,13 @@ class TestWorkflowEngine:
                 Step(
                     name="A",
                     step_type=StepType.FUNCTION,
-                    callable=dummy,
+                    handler=dummy,
                     dependencies=["B"],
                 ),
                 Step(
                     name="B",
                     step_type=StepType.FUNCTION,
-                    callable=dummy,
+                    handler=dummy,
                     dependencies=["A"],
                 ),
             ],
@@ -253,7 +253,7 @@ class TestWorkflowEngine:
                 Step(
                     name="conditional",
                     step_type=StepType.FUNCTION,
-                    callable=conditional_step,
+                    handler=conditional_step,
                     condition=condition,
                 )
             ],
@@ -281,7 +281,7 @@ class TestWorkflowEngine:
                 Step(
                     name="conditional",
                     step_type=StepType.FUNCTION,
-                    callable=conditional_step,
+                    handler=conditional_step,
                     condition=condition,
                 )
             ],
@@ -308,7 +308,7 @@ class TestWorkflowEngine:
                 Step(
                     name="conditional",
                     step_type=StepType.FUNCTION,
-                    callable=conditional_step,
+                    handler=conditional_step,
                     condition=bad_condition,
                 )
             ],
@@ -322,14 +322,24 @@ class TestWorkflowEngine:
         assert len(result.step_runs) == 0
 
     def test_step_without_callable(self):
-        """Test avec step FUNCTION sans callable."""
-        # Since Job model validation prevents creating Steps without callable,
-        # we test that the validation error is properly caught and handled
+        """Test avec step FUNCTION sans callable — la validation est à l'exécution.
 
-        with pytest.raises(ValueError) as exc_info:
-            Step(name="invalid", step_type=StepType.FUNCTION)  # Pas de callable
+        Par conception, ``Step(handler=None)`` est valide à la construction
+        pour permettre la désérialisation depuis la persistence (``from_dict``).
+        L'erreur est levée par le runner au moment de l'exécution.
+        """
+        from pyworkflow_engine.exceptions import StepExecutionError
 
-        assert "StepType.FUNCTION requires callable" in str(exc_info.value)
+        step = Step(name="invalid", step_type=StepType.FUNCTION)  # handler=None — valid
+        assert step.handler is None  # Construction OK
+
+        job = Job(name="No Callable Job", steps=[step])
+        engine = WorkflowEngine()
+
+        with pytest.raises(StepExecutionError) as exc_info:
+            engine.run(job)
+
+        assert "invalid" in str(exc_info.value)  # Le nom du step est dans le message
 
     def test_custom_run_id(self):
         """Test avec run_id personnalisé."""
@@ -339,7 +349,7 @@ class TestWorkflowEngine:
 
         job = Job(
             name="Custom ID",
-            steps=[Step(name="step", step_type=StepType.FUNCTION, callable=dummy)],
+            steps=[Step(name="step", step_type=StepType.FUNCTION, handler=dummy)],
         )
 
         custom_id = "custom-run-123"
@@ -360,7 +370,7 @@ class TestWorkflowEngine:
                 Step(
                     name="suspend",
                     step_type=StepType.FUNCTION,
-                    callable=suspending_step,
+                    handler=suspending_step,
                 )
             ],
         )
@@ -387,12 +397,12 @@ class TestWorkflowEngine:
                 Step(
                     name="suspend",
                     step_type=StepType.FUNCTION,
-                    callable=suspending_step,
+                    handler=suspending_step,
                 ),
                 Step(
                     name="final",
                     step_type=StepType.FUNCTION,
-                    callable=final_step,
+                    handler=final_step,
                     dependencies=["suspend"],
                 ),
             ],
@@ -434,7 +444,7 @@ class TestWorkflowEngine:
                 Step(
                     name="suspend",
                     step_type=StepType.FUNCTION,
-                    callable=suspending_step,
+                    handler=suspending_step,
                 )
             ],
         )
@@ -468,7 +478,7 @@ class TestWorkflowEngine:
                 Step(
                     name="suspend",
                     step_type=StepType.FUNCTION,
-                    callable=suspending_step,
+                    handler=suspending_step,
                 )
             ],
         )
@@ -491,7 +501,7 @@ class TestWorkflowEngine:
         # Job valide
         valid_job = Job(
             name="Valid",
-            steps=[Step(name="step", step_type=StepType.FUNCTION, callable=dummy)],
+            steps=[Step(name="step", step_type=StepType.FUNCTION, handler=dummy)],
         )
 
         engine = WorkflowEngine()
@@ -524,13 +534,13 @@ class TestWorkflowEngine:
                 Step(
                     name="A",
                     step_type=StepType.FUNCTION,
-                    callable=dummy,
+                    handler=dummy,
                     dependencies=["B"],
                 ),
                 Step(
                     name="B",
                     step_type=StepType.FUNCTION,
-                    callable=dummy,
+                    handler=dummy,
                     dependencies=["A"],
                 ),
             ],
@@ -550,17 +560,17 @@ class TestWorkflowEngine:
         job = Job(
             name="Plan Test",
             steps=[
-                Step(name="start", step_type=StepType.FUNCTION, callable=dummy),
+                Step(name="start", step_type=StepType.FUNCTION, handler=dummy),
                 Step(
                     name="middle",
                     step_type=StepType.FUNCTION,
-                    callable=dummy,
+                    handler=dummy,
                     dependencies=["start"],
                 ),
                 Step(
                     name="end",
                     step_type=StepType.FUNCTION,
-                    callable=dummy,
+                    handler=dummy,
                     dependencies=["middle"],
                 ),
             ],
@@ -589,7 +599,7 @@ class TestWorkflowEngine:
         job = Job(
             name="Custom Executor",
             steps=[
-                Step(name="normal", step_type=StepType.FUNCTION, callable=dummy),
+                Step(name="normal", step_type=StepType.FUNCTION, handler=dummy),
                 Step(name="custom", step_type=StepType.HTTP_REQUEST),  # Pas de callable
             ],
         )
@@ -624,14 +634,14 @@ class TestWorkflowEngine:
         job = Job(
             name="Error Logging",
             steps=[
-                Step(name="fail", step_type=StepType.FUNCTION, callable=failing_step)
+                Step(name="fail", step_type=StepType.FUNCTION, handler=failing_step)
             ],
         )
 
         engine = WorkflowEngine()
 
-        # Capture les logs (mock pour l'instant)
-        with patch.object(engine, "_log_step_error") as mock_log:
+        # _log_step_error lives on the runner now
+        with patch.object(engine._runner, "_log_step_error") as mock_log:
             with pytest.raises(StepExecutionError):
                 engine.run(job)
 
@@ -645,7 +655,7 @@ class TestWorkflowEngine:
 
         job = Job(
             name="No Args",
-            steps=[Step(name="no_args", step_type=StepType.FUNCTION, callable=no_args)],
+            steps=[Step(name="no_args", step_type=StepType.FUNCTION, handler=no_args)],
         )
 
         engine = WorkflowEngine()
@@ -666,7 +676,7 @@ class TestWorkflowEngine:
                 Step(
                     name="with_context",
                     step_type=StepType.FUNCTION,
-                    callable=with_context,
+                    handler=with_context,
                 )
             ],
         )
@@ -708,17 +718,17 @@ class TestWorkflowEngineIntegration:
         job = Job(
             name="ETL Pipeline",
             steps=[
-                Step(name="extract", step_type=StepType.FUNCTION, callable=extract),
+                Step(name="extract", step_type=StepType.FUNCTION, handler=extract),
                 Step(
                     name="transform",
                     step_type=StepType.FUNCTION,
-                    callable=transform,
+                    handler=transform,
                     dependencies=["extract"],
                 ),
                 Step(
                     name="load",
                     step_type=StepType.FUNCTION,
-                    callable=load,
+                    handler=load,
                     dependencies=["transform"],
                 ),
             ],
@@ -758,18 +768,18 @@ class TestWorkflowEngineIntegration:
                 Step(
                     name="prepare",
                     step_type=StepType.FUNCTION,
-                    callable=prepare_request,
+                    handler=prepare_request,
                 ),
                 Step(
                     name="approval",
                     step_type=StepType.FUNCTION,
-                    callable=request_approval,
+                    handler=request_approval,
                     dependencies=["prepare"],
                 ),
                 Step(
                     name="process",
                     step_type=StepType.FUNCTION,
-                    callable=process_approved,
+                    handler=process_approved,
                     dependencies=["approval"],
                 ),
             ],

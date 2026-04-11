@@ -1,9 +1,9 @@
 """
 Configuration structlog ↔ stdlib bridge.
 
-Branche les processeurs structlog sur le système logging stdlib du core.
-Ainsi, tous les ``logging.getLogger()`` du core bénéficient de structlog
-sans que le core ne connaisse structlog.
+Branche les processeurs structlog sur le système logging stdlib du package.
+Ainsi, tous les ``logging.getLogger("pyworkflow_engine.*")`` bénéficient de
+structlog sans que le package ne connaisse structlog.
 
 Requires: pip install structlog
 """

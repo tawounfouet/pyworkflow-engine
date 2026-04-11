@@ -19,9 +19,11 @@ import logging.handlers
 import queue
 import sqlite3
 import threading
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class SQLiteLogHandler(logging.Handler):
@@ -84,13 +86,13 @@ class SQLiteLogHandler(logging.Handler):
         # Index sur timestamp et level pour les requêtes courantes
         self._conn.execute(
             f"""
-            CREATE INDEX IF NOT EXISTS idx_{self._table_name}_timestamp 
+            CREATE INDEX IF NOT EXISTS idx_{self._table_name}_timestamp
             ON {self._table_name} (timestamp)
         """
         )
         self._conn.execute(
             f"""
-            CREATE INDEX IF NOT EXISTS idx_{self._table_name}_level 
+            CREATE INDEX IF NOT EXISTS idx_{self._table_name}_level
             ON {self._table_name} (level)
         """
         )
@@ -114,9 +116,7 @@ class SQLiteLogHandler(logging.Handler):
                     self.format(record) if self.formatter else str(record.exc_info[1])
                 )
 
-            timestamp = datetime.fromtimestamp(
-                record.created, tz=timezone.utc
-            ).isoformat()
+            timestamp = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
 
             row = (
                 timestamp,
@@ -145,7 +145,7 @@ class SQLiteLogHandler(logging.Handler):
 
         self._conn.executemany(
             f"""
-            INSERT INTO {self._table_name} 
+            INSERT INTO {self._table_name}
             (timestamp, level, logger, message, extra, exception, module, func_name, line_no)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -204,7 +204,7 @@ class SQLiteLogHandler(logging.Handler):
             params,
         )
         columns = [desc[0] for desc in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
 
 
 def create_queue_handler(

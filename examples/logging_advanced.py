@@ -32,11 +32,13 @@ def example_config_builder():
     print("1. LoggingConfigBuilder (API Fluide)")
     print("=" * 60)
 
-    config = (LoggingConfigBuilder()
+    config = (
+        LoggingConfigBuilder()
         .level("DEBUG")
         .json_output(False)
         .extra_fields(service="etl-pipeline", env="demo")
-        .build())
+        .build()
+    )
 
     configure_logging(config)
     logger = get_logger("demo.builder")
@@ -114,7 +116,7 @@ def example_step_log_bridge():
     print("5. StepLogBridge (logging → StepRun)")
     print("=" * 60)
 
-    from pyworkflow_engine.core.models.runtime import StepRun
+    from pyworkflow_engine.models.run import StepRun
 
     # Créer un StepRun (comme le moteur le fait en interne)
     step_run = StepRun(step_name="process_data", job_run_id="job-demo-001")
@@ -146,7 +148,7 @@ def example_step_log_bridge_with_operation():
     print("6. StepLogBridge + logged_operation (combinés)")
     print("=" * 60)
 
-    from pyworkflow_engine.core.models.runtime import StepRun
+    from pyworkflow_engine.models.run import StepRun
 
     step_run = StepRun(step_name="etl_step", job_run_id="job-demo-002")
 
@@ -218,10 +220,12 @@ def example_queue_async():
     print("8. Queue Handler (async non-bloquant)")
     print("=" * 60)
 
-    configure_logging(LoggingConfig(
-        level="DEBUG",
-        enable_queue=True,
-    ))
+    configure_logging(
+        LoggingConfig(
+            level="DEBUG",
+            enable_queue=True,
+        )
+    )
     logger = get_logger("demo.queue")
 
     # Les logs sont mis en queue et écrits dans un thread séparé

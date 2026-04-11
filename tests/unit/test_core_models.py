@@ -8,35 +8,36 @@ Teste tous les modèles de base du système de workflow :
 - Validation et edge cases
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
 from dataclasses import FrozenInstanceError
+from datetime import UTC, datetime, timedelta
 
-from pyworkflow_engine.core.models import (
-    # Enums
-    TriggerType,
-    StepType,
-    ExecutorType,
-    RunStatus,
-    Priority,
-    is_terminal,
-    is_suspended,
-    is_active,
-    can_resume,
-    can_cancel,
-    TERMINAL_STATUSES,
-    SUSPENDED_STATUSES,
+import pytest
+
+from pyworkflow_engine.models import (
     ACTIVE_STATUSES,
+    SUSPENDED_STATUSES,
+    TERMINAL_STATUSES,
+    ExecutorType,
+    Job,
+    JobRun,
+    Priority,
+    RunStatus,
     # Design-time
     Step,
-    SubJob,
-    Job,
     # Runtime
     StepLog,
     StepRun,
-    JobRun,
-    utc_now,
+    StepType,
+    SubJob,
+    # Enums
+    TriggerType,
+    can_cancel,
+    can_resume,
     generate_id,
+    is_active,
+    is_suspended,
+    is_terminal,
+    utc_now,
 )
 
 
@@ -153,11 +154,11 @@ class TestStep:
         def dummy_func():
             return {"result": "ok"}
 
-        step = Step(name="test_step", step_type=StepType.FUNCTION, callable=dummy_func)
+        step = Step(name="test_step", step_type=StepType.FUNCTION, handler=dummy_func)
 
         assert step.name == "test_step"
         assert step.step_type == StepType.FUNCTION
-        assert step.callable == dummy_func
+        assert step.handler == dummy_func
         assert step.config == {}
         assert step.dependencies == []
         assert step.executor_type == ExecutorType.LOCAL
@@ -172,7 +173,7 @@ class TestStep:
         step = Step(
             name="dependent_step",
             step_type=StepType.FUNCTION,
-            callable=lambda: None,
+            handler=lambda: None,
             dependencies=["step1", "step2"],
         )
 
@@ -184,12 +185,19 @@ class TestStep:
         step = Step(name="http_step", step_type=StepType.HTTP_REQUEST, config=config)
 
         assert step.config == config
-        assert step.callable is None  # HTTP steps n'ont pas de callable
+        assert step.handler is None  # HTTP steps n'ont pas de handler
 
     def test_step_validation_function_without_callable(self):
-        """Test validation : FUNCTION step sans callable."""
-        with pytest.raises(ValueError, match="StepType.FUNCTION requires callable"):
-            Step(name="bad_step", step_type=StepType.FUNCTION, callable=None)
+        """Test validation : FUNCTION step sans callable.
+
+        Par conception, ``handler=None`` est valide à la construction pour
+        permettre la désérialisation depuis la persistence (``Step.from_dict``
+        retourne toujours ``handler=None``). La validation est différée à
+        l'exécution par le runner.
+        """
+        # La construction ne lève pas d'erreur
+        step = Step(name="bad_step", step_type=StepType.FUNCTION, handler=None)
+        assert step.handler is None
 
     def test_step_validation_negative_retry_count(self):
         """Test validation : retry_count négatif."""
@@ -197,7 +205,7 @@ class TestStep:
             Step(
                 name="bad_step",
                 step_type=StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 retry_count=-1,
             )
 
@@ -207,13 +215,13 @@ class TestStep:
             Step(
                 name="self_dep_step",
                 step_type=StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["self_dep_step"],
             )
 
     def test_step_immutability(self):
         """Test que Step est immuable."""
-        step = Step(name="test", step_type=StepType.FUNCTION, callable=lambda: None)
+        step = Step(name="test", step_type=StepType.FUNCTION, handler=lambda: None)
 
         with pytest.raises(FrozenInstanceError):
             step.name = "changed"
@@ -227,7 +235,7 @@ class TestStep:
         step = Step(
             name="conditional_step",
             step_type=StepType.FUNCTION,
-            callable=lambda: None,
+            handler=lambda: None,
             condition=condition_func,
         )
 
@@ -238,7 +246,7 @@ class TestStep:
         step = Step(
             name="timeout_step",
             step_type=StepType.FUNCTION,
-            callable=lambda: None,
+            handler=lambda: None,
             timeout=timedelta(minutes=5),
         )
 
@@ -311,9 +319,9 @@ class TestJob:
             return {"processed": True}
 
         steps = [
-            Step("step1", StepType.FUNCTION, callable=step1_func),
+            Step("step1", StepType.FUNCTION, handler=step1_func),
             Step(
-                "step2", StepType.FUNCTION, callable=step2_func, dependencies=["step1"]
+                "step2", StepType.FUNCTION, handler=step2_func, dependencies=["step1"]
             ),
         ]
 
@@ -348,8 +356,8 @@ class TestJob:
     def test_job_validation_duplicate_step_names(self):
         """Test validation : noms de steps dupliqués."""
         steps = [
-            Step("duplicate", StepType.FUNCTION, callable=lambda: None),
-            Step("duplicate", StepType.FUNCTION, callable=lambda: None),
+            Step("duplicate", StepType.FUNCTION, handler=lambda: None),
+            Step("duplicate", StepType.FUNCTION, handler=lambda: None),
         ]
 
         with pytest.raises(ValueError, match="Step names must be unique"):
@@ -358,11 +366,11 @@ class TestJob:
     def test_job_validation_missing_dependency(self):
         """Test validation : dépendance manquante."""
         steps = [
-            Step("step1", StepType.FUNCTION, callable=lambda: None),
+            Step("step1", StepType.FUNCTION, handler=lambda: None),
             Step(
                 "step2",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["nonexistent"],
             ),
         ]
@@ -377,7 +385,7 @@ class TestJob:
 
     def test_job_get_step(self):
         """Test récupération d'une step par nom."""
-        step = Step("target_step", StepType.FUNCTION, callable=lambda: None)
+        step = Step("target_step", StepType.FUNCTION, handler=lambda: None)
         job = Job(name="test_job", steps=[step])
 
         found = job.get_step("target_step")
@@ -389,17 +397,17 @@ class TestJob:
     def test_job_get_dependencies(self):
         """Test récupération des dépendances."""
         steps = [
-            Step("step1", StepType.FUNCTION, callable=lambda: None),
+            Step("step1", StepType.FUNCTION, handler=lambda: None),
             Step(
                 "step2",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step1"],
             ),
             Step(
                 "step3",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step1", "step2"],
             ),
         ]
@@ -413,17 +421,17 @@ class TestJob:
     def test_job_get_dependents(self):
         """Test récupération des dépendants."""
         steps = [
-            Step("step1", StepType.FUNCTION, callable=lambda: None),
+            Step("step1", StepType.FUNCTION, handler=lambda: None),
             Step(
                 "step2",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step1"],
             ),
             Step(
                 "step3",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step1"],
             ),
         ]
@@ -438,26 +446,25 @@ class TestJob:
     def test_job_entry_and_exit_steps(self):
         """Test identification des steps d'entrée et de sortie."""
         steps = [
-            Step("entry1", StepType.FUNCTION, callable=lambda: None),
-            Step("entry2", StepType.FUNCTION, callable=lambda: None),
+            Step("entry1", StepType.FUNCTION, handler=lambda: None),
+            Step("entry2", StepType.FUNCTION, handler=lambda: None),
             Step(
                 "middle",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["entry1"],
             ),
             Step(
                 "exit",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["middle"],
             ),
         ]
         job = Job(name="test_job", steps=steps)
 
-        entry_steps = job.get_entry_steps()
-        assert set(entry_steps) == {"entry1", "entry2"}
-
+        # get_entry_steps a été supprimé de Job (délégué au DAGResolver)
+        # On vérifie uniquement get_exit_steps qui reste sur Job
         exit_steps = job.get_exit_steps()
         assert set(exit_steps) == {"entry2", "exit"}
 
@@ -465,50 +472,60 @@ class TestJob:
         """Test détection de cycles simple."""
         # Job sans cycles
         steps = [
-            Step("step1", StepType.FUNCTION, callable=lambda: None),
+            Step("step1", StepType.FUNCTION, handler=lambda: None),
             Step(
                 "step2",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step1"],
             ),
             Step(
                 "step3",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step2"],
             ),
         ]
         job = Job(name="test_job", steps=steps)
 
-        assert not job.has_cycles()
+        # has_cycles() a été supprimé de Job, délégué à DAGResolver.
+        # Un DAG valide produit un execution_order sans erreur.
+        from pyworkflow_engine.engine.dag import DAGResolver
+        order = DAGResolver(job).get_execution_order()
+        assert set(order) == {"step1", "step2", "step3"}
 
     def test_job_has_cycles_with_cycle(self):
-        """Test détection de cycles avec cycle."""
-        # Job avec cycle : step1 -> step2 -> step3 -> step1
+        """Test détection de cycles avec cycle via la validation Job."""
+        # Job avec cycle transitif : step1 dépend de step3 qui dépend de step2 qui dépend de step1
+        # La validation dans Job.__post_init__ détecte les dépendances manquantes
+        # mais c'est DAGResolver qui détecte les cycles topologiques.
+        from pyworkflow_engine.engine.dag import DAGResolver
+        from pyworkflow_engine.exceptions import DAGValidationError
+
         steps = [
             Step(
                 "step1",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step3"],
             ),
             Step(
                 "step2",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step1"],
             ),
             Step(
                 "step3",
                 StepType.FUNCTION,
-                callable=lambda: None,
+                handler=lambda: None,
                 dependencies=["step2"],
             ),
         ]
         job = Job(name="test_job", steps=steps)
 
-        assert job.has_cycles()
+        with pytest.raises(DAGValidationError):
+            DAGResolver(job).get_execution_order()
 
     def test_job_immutability(self):
         """Test que Job est immuable."""
@@ -523,7 +540,7 @@ class TestStepLog:
 
     def test_basic_step_log_creation(self):
         """Test de création basique d'un StepLog."""
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         log = StepLog(timestamp=timestamp, level="INFO", message="Step started")
 
         assert log.timestamp == timestamp
@@ -534,7 +551,7 @@ class TestStepLog:
 
     def test_step_log_with_data(self):
         """Test StepLog avec données."""
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         data = {"duration": 100, "records_processed": 50}
         log = StepLog(
             timestamp=timestamp,
@@ -551,13 +568,13 @@ class TestStepLog:
         """Test validation : niveau de log invalide."""
         with pytest.raises(ValueError, match="Invalid log level"):
             StepLog(
-                timestamp=datetime.now(timezone.utc), level="INVALID", message="test"
+                timestamp=datetime.now(UTC), level="INVALID", message="test"
             )
 
     def test_step_log_valid_levels(self):
         """Test niveaux de log valides."""
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
 
         for level in valid_levels:
             log = StepLog(timestamp=timestamp, level=level, message="test")
@@ -589,9 +606,9 @@ class TestStepRun:
         """Test démarrage d'exécution."""
         step_run = StepRun(step_name="test_step", job_run_id="job-123")
 
-        before_start = datetime.now(timezone.utc)
+        before_start = datetime.now(UTC)
         step_run.start_execution()
-        after_start = datetime.now(timezone.utc)
+        after_start = datetime.now(UTC)
 
         assert step_run.status == RunStatus.RUNNING
         assert step_run.start_time is not None
@@ -680,7 +697,7 @@ class TestStepRun:
         step_run = StepRun(step_name="test_step", job_run_id="job-123")
         step_run.start_execution()
 
-        step_run.timeout()
+        step_run.mark_timeout()
 
         assert step_run.status == RunStatus.TIMEOUT
         assert step_run.end_time is not None
@@ -753,9 +770,9 @@ class TestJobRun:
         """Test démarrage d'exécution."""
         job_run = JobRun(job_name="test_job")
 
-        before_start = datetime.now(timezone.utc)
+        before_start = datetime.now(UTC)
         job_run.start_execution()
-        after_start = datetime.now(timezone.utc)
+        after_start = datetime.now(UTC)
 
         assert job_run.status == RunStatus.RUNNING
         assert job_run.start_time is not None
@@ -908,12 +925,12 @@ class TestUtilities:
 
     def test_utc_now(self):
         """Test fonction utc_now."""
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         now = utc_now()
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         assert before <= now <= after
-        assert now.tzinfo == timezone.utc
+        assert now.tzinfo == UTC
 
     def test_generate_id(self):
         """Test génération d'ID unique."""

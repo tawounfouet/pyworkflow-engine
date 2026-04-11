@@ -1,5 +1,5 @@
 """
-Base persistence interface for the IAS Workflow Engine.
+Base persistence interface for the PyWorkflow Engine.
 
 Defines the abstract interface that all persistence backends must implement.
 This provides a consistent API for storing and retrieving workflows regardless
@@ -9,29 +9,25 @@ of the underlying storage mechanism.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Iterator
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
-from ..core.models import JobRun, StepRun, Job
-from ..core.exceptions import WorkflowError
+if TYPE_CHECKING:
+    from ..models import Job, JobRun
+
+from ..exceptions import WorkflowError
 
 
 class PersistenceError(WorkflowError):
     """Base exception for persistence-related errors."""
 
-    pass
-
 
 class JobNotFoundError(PersistenceError):
     """Raised when a requested job/job run is not found."""
 
-    pass
-
 
 class TransactionError(PersistenceError):
     """Raised when a transaction operation fails."""
-
-    pass
 
 
 class BasePersistence(ABC):
@@ -58,10 +54,9 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the save operation fails.
         """
-        pass
 
     @abstractmethod
-    def get_job(self, job_name: str) -> Optional[Job]:
+    def get_job(self, job_name: str) -> Job | None:
         """Retrieve a job definition by name.
 
         Args:
@@ -73,10 +68,9 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the retrieval operation fails.
         """
-        pass
 
     @abstractmethod
-    def list_jobs(self, limit: Optional[int] = None, offset: int = 0) -> List[Job]:
+    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         """List all job definitions.
 
         Args:
@@ -89,7 +83,6 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the list operation fails.
         """
-        pass
 
     @abstractmethod
     def delete_job(self, job_name: str) -> bool:
@@ -104,7 +97,6 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the delete operation fails.
         """
-        pass
 
     @abstractmethod
     def save_job_run(self, job_run: JobRun) -> None:
@@ -116,10 +108,9 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the save operation fails.
         """
-        pass
 
     @abstractmethod
-    def get_job_run(self, run_id: str) -> Optional[JobRun]:
+    def get_job_run(self, run_id: str) -> JobRun | None:
         """Retrieve a job run by ID.
 
         Args:
@@ -131,17 +122,16 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the retrieval operation fails.
         """
-        pass
 
     @abstractmethod
     def list_job_runs(
         self,
-        job_name: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: Optional[int] = None,
+        job_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
         offset: int = 0,
-        since: Optional[datetime] = None,
-    ) -> List[JobRun]:
+        since: datetime | None = None,
+    ) -> list[JobRun]:
         """List job runs with optional filtering.
 
         Args:
@@ -157,7 +147,6 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the list operation fails.
         """
-        pass
 
     @abstractmethod
     def delete_job_run(self, run_id: str) -> bool:
@@ -172,7 +161,6 @@ class BasePersistence(ABC):
         Raises:
             PersistenceError: If the delete operation fails.
         """
-        pass
 
     @abstractmethod
     def update_job_run(self, job_run: JobRun) -> None:
@@ -185,9 +173,8 @@ class BasePersistence(ABC):
             JobNotFoundError: If the job run doesn't exist.
             PersistenceError: If the update operation fails.
         """
-        pass
 
-    def get_job_run_count(self, job_name: Optional[str] = None) -> int:
+    def get_job_run_count(self, job_name: str | None = None) -> int:
         """Get count of job runs.
 
         Args:
@@ -201,29 +188,26 @@ class BasePersistence(ABC):
 
     # Transaction support methods
 
-    def begin_transaction(self) -> None:
+    def begin_transaction(self) -> None:  # noqa: B027
         """Begin a transaction.
 
         Not all backends support transactions. For backends that don't,
         this method should be a no-op.
         """
-        pass
 
-    def commit_transaction(self) -> None:
+    def commit_transaction(self) -> None:  # noqa: B027
         """Commit the current transaction.
 
         Raises:
             TransactionError: If there's no active transaction or commit fails.
         """
-        pass
 
-    def rollback_transaction(self) -> None:
+    def rollback_transaction(self) -> None:  # noqa: B027
         """Rollback the current transaction.
 
         Raises:
             TransactionError: If there's no active transaction or rollback fails.
         """
-        pass
 
     # Context manager support for transactions
 
@@ -243,7 +227,7 @@ class BasePersistence(ABC):
 
     # Utility methods
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Check the health of the persistence backend.
 
         Returns:
@@ -255,7 +239,7 @@ class BasePersistence(ABC):
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about the stored data.
 
         Returns:
@@ -278,7 +262,7 @@ class BasePersistence(ABC):
                 "error": "Unable to collect statistics",
             }
 
-    def cleanup_old_runs(self, older_than: datetime, dry_run: bool = True) -> int:
+    def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
         """Clean up old job runs.
 
         Args:
@@ -327,16 +311,16 @@ class TransactionContext:
                     self.persistence.commit_transaction()
                 except Exception:
                     # If commit fails, try to rollback
-                    try:
+                    import contextlib
+
+                    with contextlib.suppress(Exception):
                         self.persistence.rollback_transaction()
-                    except Exception:
-                        pass  # Ignore rollback errors after commit failure
                     raise
             else:
                 # Exception occurred, rollback the transaction
-                try:
+                import contextlib
+
+                with contextlib.suppress(Exception):
                     self.persistence.rollback_transaction()
-                except Exception:
-                    pass  # Ignore rollback errors
 
             self._in_transaction = False

@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-10
+
+### Breaking Changes
+
+- **`core/` supprimé** — les imports `from pyworkflow_engine.core import ...` ne fonctionnent plus. Utiliser l'API publique : `from pyworkflow_engine import ...`
+- **`StepRun.timeout()` → `mark_timeout()`** — évite la collision avec le champ `Step.timeout`
+
+### Added
+
+#### 🏗️ Refactoring architectural — God Object → composants spécialisés
+
+- **`facade.py`** — `WorkflowEngine` : point d'entrée unique, compose les composants
+- **`engine/runner.py`** — `WorkflowRunner` : exécution pure des steps (pas de retry/persistence/suspension)
+- **`engine/retry.py`** — `RetryHandler` : retry unifié
+- **`engine/suspension.py`** — `SuspensionManager` : persistence-aware, fallback mémoire
+- **`engine/dag.py`** — `DAGResolver` (déplacé depuis `core/`)
+- **`engine/context.py`** — `WorkflowContext` (déplacé depuis `core/`)
+- **`exceptions.py`** — déplacé à la racine du package
+- **`executors/local.py`** — `LocalExecutor` : executor synchrone dans le même processus
+
+#### 🔀 Routing `ExecutorType`
+
+- `WorkflowRunner._resolve_executor(step)` route `step.executor_type` vers l'executor approprié :
+  - `LOCAL` → `_execute_function_step` (direct, zéro overhead)
+  - `THREAD` → `ThreadPoolStepExecutor`
+  - `PROCESS` → `ProcessPoolStepExecutor`
+  - `ASYNC` → `AsyncStepExecutor`
+  - `CUSTOM` → `ExecutorRegistry` lookup via `step.executor_name`
+- `ExecutorType.CUSTOM` ajouté à l'enum
+- Docstrings `ExecutorType` enrichis avec la sémantique de routing
+
+#### 🗂️ Restructuration des modèles
+
+- `core/models/design_time.py` → `models/step.py` + `models/job.py`
+- `core/models/runtime.py` → `models/run.py`
+- Sérialisation intégrée : `to_dict()` + `from_dict(cls)` sur chaque modèle
+- `models/__init__.py` conserve des thin wrappers (`step_to_dict`, etc.) pour la compatibilité des backends
+
+#### 📦 Persistence
+
+- `cleanup_old_runs(older_than, dry_run=False)` : contrat LSP aligné sur tous les backends
+- Tests paramétrés `dry_run=True` / `dry_run=False` ajoutés pour tous les backends
+- Tests d'intégration `tests/integration/test_persistence_roundtrip.py`
+
+#### 📝 Documentation
+
+- `run()` : docstring explicite — exécution pure, sans side-effect de persistence
+- `run_with_persistence()` : checkpoints intermédiaires (initial + par step + final), docstring explicite
+- `docs/architecture.md` mis à jour vers v0.3.0
+
+### Changed
+
+- `run_with_persistence()` effectue maintenant des **checkpoints step-by-step** (sauvegarde après chaque step) plutôt qu'une sauvegarde finale uniquement
+- `inspect.signature()` utilisé partout (remplace `co_argcount`) pour la détection de signature
+- `_suspended_workflows` dict supprimé de la façade → délégué à `SuspensionManager`
+
+### Removed
+
+- `core/` (8 fichiers) — suppression totale, rupture nette
+- `models/serialization.py` standalone — absorbé dans chaque classe
+- `serialization/`, `triggers/` (répertoires vides)
+
+### Tests
+
+- **338 passed**, 15 skipped, 0 failed, 0 errors
+- Couverture : 81% → cible 85%
+
+---
+
 ## [0.2.1] - 2026-03-11
 
 ### Added

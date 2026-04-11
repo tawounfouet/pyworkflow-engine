@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import patch
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
 
@@ -34,7 +34,6 @@ from pyworkflow_engine.logging.logger import (
     _cleanup,
     shutdown_logging,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -618,12 +617,12 @@ class TestSQLiteLogHandler:
         handler.flush()
 
         # Query with a past date should return the record
-        past = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        past = datetime(2020, 1, 1, tzinfo=UTC)
         logs = handler.query_logs(since=past)
         assert len(logs) == 1
 
         # Query with a future date should return nothing
-        future = datetime(2099, 1, 1, tzinfo=timezone.utc)
+        future = datetime(2099, 1, 1, tzinfo=UTC)
         logs = handler.query_logs(since=future)
         assert len(logs) == 0
         handler.close()

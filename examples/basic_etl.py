@@ -2,7 +2,7 @@
 Basic Example: Simple ETL Workflow
 
 This example demonstrates a basic ETL (Extract, Transform, Load) workflow
-using the IAS Workflow Engine, with integrated logging.
+using the PyWorkflow Engine, with integrated logging.
 """
 
 from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, WorkflowContext

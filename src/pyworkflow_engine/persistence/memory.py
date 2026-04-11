@@ -1,5 +1,5 @@
 """
-In-memory persistence backend for the IAS Workflow Engine.
+In-memory persistence backend for the PyWorkflow Engine.
 
 Provides fast, thread-safe storage for development and testing.
 Data is stored in memory and lost when the process exits.
@@ -8,12 +8,14 @@ Data is stored in memory and lost when the process exits.
 from __future__ import annotations
 
 import threading
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 from copy import deepcopy
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
-from .base import BasePersistence, PersistenceError, JobNotFoundError
-from ..core.models import JobRun, Job
+if TYPE_CHECKING:
+    from ..models import Job, JobRun
+
+from .base import BasePersistence, JobNotFoundError, PersistenceError
 
 
 class InMemoryPersistence(BasePersistence):
@@ -36,13 +38,13 @@ class InMemoryPersistence(BasePersistence):
 
     def __init__(self):
         """Initialize the in-memory persistence backend."""
-        self._jobs: Dict[str, Job] = {}
-        self._job_runs: Dict[str, JobRun] = {}
+        self._jobs: dict[str, Job] = {}
+        self._job_runs: dict[str, JobRun] = {}
         self._lock = threading.RLock()
 
         # Transaction support
         self._transaction_active = False
-        self._transaction_snapshots: Optional[Dict[str, Any]] = None
+        self._transaction_snapshots: dict[str, Any] | None = None
 
     def save_job(self, job: Job) -> None:
         """Save a job definition."""
@@ -50,13 +52,13 @@ class InMemoryPersistence(BasePersistence):
             # Deep copy to prevent external mutations
             self._jobs[job.name] = deepcopy(job)
 
-    def get_job(self, job_name: str) -> Optional[Job]:
+    def get_job(self, job_name: str) -> Job | None:
         """Retrieve a job definition by name."""
         with self._lock:
             job = self._jobs.get(job_name)
             return deepcopy(job) if job else None
 
-    def list_jobs(self, limit: Optional[int] = None, offset: int = 0) -> List[Job]:
+    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         """List all job definitions."""
         with self._lock:
             jobs = list(self._jobs.values())
@@ -83,7 +85,7 @@ class InMemoryPersistence(BasePersistence):
         with self._lock:
             self._job_runs[job_run.job_run_id] = deepcopy(job_run)
 
-    def get_job_run(self, run_id: str) -> Optional[JobRun]:
+    def get_job_run(self, run_id: str) -> JobRun | None:
         """Retrieve a job run by ID."""
         with self._lock:
             job_run = self._job_runs.get(run_id)
@@ -91,12 +93,12 @@ class InMemoryPersistence(BasePersistence):
 
     def list_job_runs(
         self,
-        job_name: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: Optional[int] = None,
+        job_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
         offset: int = 0,
-        since: Optional[datetime] = None,
-    ) -> List[JobRun]:
+        since: datetime | None = None,
+    ) -> list[JobRun]:
         """List job runs with optional filtering."""
         with self._lock:
             job_runs = list(self._job_runs.values())
@@ -106,15 +108,21 @@ class InMemoryPersistence(BasePersistence):
                 job_runs = [jr for jr in job_runs if jr.job_name == job_name]
 
             if status is not None:
-                job_runs = [jr for jr in job_runs if jr.status == status]
+                # Accept both string and RunStatus enum for the filter value
+                from ..models.enums import RunStatus
+
+                status_val = RunStatus(status) if isinstance(status, str) else status
+                job_runs = [jr for jr in job_runs if jr.status == status_val]
 
             if since is not None:
-                job_runs = [
-                    jr for jr in job_runs if jr.start_time and jr.start_time >= since
-                ]
+                job_runs = [jr for jr in job_runs if jr.created_at >= since]
 
-            # Sort by start time (most recent first)
-            job_runs.sort(key=lambda jr: jr.start_time or datetime.min, reverse=True)
+            # Sort by created_at descending (most recent first).
+            # Use job_run_id as a stable secondary sort key.
+            job_runs.sort(
+                key=lambda jr: (jr.created_at, jr.job_run_id),
+                reverse=True,
+            )
 
             # Apply pagination
             if offset > 0:
@@ -139,6 +147,28 @@ class InMemoryPersistence(BasePersistence):
                 raise JobNotFoundError(f"Job run {job_run.job_run_id} not found")
 
             self._job_runs[job_run.job_run_id] = deepcopy(job_run)
+
+    def get_job_run_count(self, job_name: str | None = None) -> int:
+        """Get the total number of job runs."""
+        with self._lock:
+            if job_name is not None:
+                return sum(
+                    1 for jr in self._job_runs.values() if jr.job_name == job_name
+                )
+            return len(self._job_runs)
+
+    def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
+        """Remove job runs older than the specified datetime."""
+        with self._lock:
+            to_delete = [
+                run_id
+                for run_id, jr in self._job_runs.items()
+                if jr.created_at < older_than
+            ]
+            if not dry_run:
+                for run_id in to_delete:
+                    del self._job_runs[run_id]
+            return len(to_delete)
 
     # Transaction support
 
@@ -181,7 +211,7 @@ class InMemoryPersistence(BasePersistence):
 
     # Enhanced utility methods
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get detailed statistics about stored data."""
         with self._lock:
             jobs = list(self._jobs.values())
@@ -232,20 +262,22 @@ class InMemoryPersistence(BasePersistence):
             self._jobs.clear()
             self._job_runs.clear()
 
-    def export_data(self) -> Dict[str, Any]:
+    def export_data(self) -> dict[str, Any]:
         """Export all data for backup or migration.
 
+        Note: callables on Step objects cannot be serialized and will be lost.
+
         Returns:
-            Dictionary containing all jobs and job runs.
+            Dictionary containing job names and run IDs (shallow export).
         """
         with self._lock:
             return {
-                "jobs": [job.to_dict() for job in self._jobs.values()],
-                "job_runs": [run.to_dict() for run in self._job_runs.values()],
+                "job_names": list(self._jobs.keys()),
+                "job_run_ids": list(self._job_runs.keys()),
                 "exported_at": datetime.utcnow().isoformat(),
             }
 
-    def import_data(self, data: Dict[str, Any]) -> None:
+    def import_data(self, data: dict[str, Any]) -> None:
         """Import data from backup or migration.
 
         Args:
@@ -254,27 +286,7 @@ class InMemoryPersistence(BasePersistence):
         Raises:
             PersistenceError: If data format is invalid.
         """
-        with self._lock:
-            if self._transaction_active:
-                raise PersistenceError("Cannot import data during active transaction")
-
-            try:
-                # Clear existing data
-                self._jobs.clear()
-                self._job_runs.clear()
-
-                # Import jobs
-                for job_data in data.get("jobs", []):
-                    job = Job.from_dict(job_data)
-                    self._jobs[job.name] = job
-
-                # Import job runs
-                for run_data in data.get("job_runs", []):
-                    job_run = JobRun.from_dict(run_data)
-                    self._job_runs[job_run.id] = job_run
-
-            except Exception as e:
-                # Restore empty state on error
-                self._jobs.clear()
-                self._job_runs.clear()
-                raise PersistenceError(f"Failed to import data: {e}") from e
+        raise PersistenceError(
+            "InMemoryPersistence does not support import_data. "
+            "Use a file-based backend for data migration."
+        )

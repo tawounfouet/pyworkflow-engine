@@ -66,31 +66,66 @@ class ExecutorType(Enum):
     """Types d'executors disponibles.
 
     Détermine où et comment les steps sont exécutés.
+    ``WorkflowRunner._resolve_executor()`` route chaque step vers l'executor
+    correspondant selon la priorité suivante :
+
+    1. ``step.executor_name`` non-vide → ``ExecutorRegistry`` lookup (CUSTOM)
+    2. ``ExecutorType.THREAD / PROCESS / ASYNC`` → executor dédié instancié
+       à la volée
+    3. ``ExecutorType.LOCAL`` (ou valeur par défaut) → exécution synchrone
+       directe via ``_execute_function_step``
+
+    Les types CELERY, KUBERNETES, HUMAN, EXTERNAL nécessitent un adapter
+    externe et ne sont pas routés par le core.
     """
 
     LOCAL = "local"
-    """Exécution synchrone dans le même processus."""
+    """Exécution synchrone dans le même processus (comportement par défaut).
+
+    Utilise directement ``_execute_function_step`` — aucun overhead de pool.
+    Adapté pour les steps CPU-light et les tests.
+    """
 
     THREAD = "thread"
-    """Exécution dans un ThreadPoolExecutor."""
+    """Exécution dans un ``ThreadPoolStepExecutor`` (concurrent.futures).
+
+    Idéal pour les opérations I/O-bound (réseau, base de données, fichiers).
+    Un nouvel executor est instancié par step ; pour réutiliser un pool,
+    enregistrez un ``ThreadPoolStepExecutor`` dans l'``ExecutorRegistry``.
+    """
 
     PROCESS = "process"
-    """Exécution dans un ProcessPoolExecutor."""
+    """Exécution dans un ``ProcessPoolStepExecutor`` (concurrent.futures).
+
+    Idéal pour les opérations CPU-bound. Le callable doit être picklable.
+    Le contexte est passé comme dict sérialisé (non comme objet).
+    """
 
     ASYNC = "async"
-    """Exécution asynchrone avec asyncio."""
+    """Exécution asynchrone via ``AsyncStepExecutor`` (asyncio).
+
+    Le callable doit être une coroutine (``async def``).
+    Compatible avec ``step.timeout`` via ``asyncio.wait_for``.
+    """
+
+    CUSTOM = "custom"
+    """Executor personnalisé via ``ExecutorRegistry``.
+
+    Combine avec ``step.executor_name`` pour router vers un executor
+    enregistré : ``engine.register_executor("my_exec", MyExecutor())``.
+    """
 
     CELERY = "celery"
-    """Exécution via Celery (adapter requis)."""
+    """Exécution via Celery (adapter requis : ``adapters/celery/``)."""
 
     KUBERNETES = "kubernetes"
     """Exécution sur cluster Kubernetes (adapter requis)."""
 
     HUMAN = "human"
-    """Exécution par un humain (suspension)."""
+    """Tâche humaine — déclenche une suspension du workflow."""
 
     EXTERNAL = "external"
-    """Exécution par système externe (suspension)."""
+    """Exécution par système externe — déclenche une suspension du workflow."""
 
 
 class RunStatus(Enum):

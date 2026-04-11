@@ -11,7 +11,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -22,11 +22,9 @@ from pyworkflow_engine.logging import (
     configure_logging,
     get_logger,
     logged_operation,
-    shutdown_logging,
 )
 from pyworkflow_engine.logging.logger import _cleanup
-from pyworkflow_engine.core.models.runtime import StepRun, StepLog
-
+from pyworkflow_engine.models.run import StepLog, StepRun
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -78,9 +76,11 @@ class TestLoggedOperation:
         """Vérifie que l'échec est loggé avec exc_info."""
         configure_logging(LoggingConfig(level="DEBUG"))
         logger = get_logger("test.utils")
-        with pytest.raises(ValueError, match="boom"):
-            with logged_operation(logger, "failing op"):
-                raise ValueError("boom")
+        with (
+            pytest.raises(ValueError, match="boom"),
+            logged_operation(logger, "failing op"),
+        ):
+            raise ValueError("boom")
 
         captured = capfd.readouterr()
         assert "Starting: failing op" in captured.err
@@ -91,9 +91,11 @@ class TestLoggedOperation:
         """L'exception originale est re-raised, pas swallowed."""
         configure_logging(LoggingConfig(level="DEBUG"))
         logger = get_logger("test.utils")
-        with pytest.raises(RuntimeError, match="original"):
-            with logged_operation(logger, "reraise test"):
-                raise RuntimeError("original")
+        with (
+            pytest.raises(RuntimeError, match="original"),
+            logged_operation(logger, "reraise test"),
+        ):
+            raise RuntimeError("original")
 
     def test_yields_logger(self, capfd):
         """Le context manager yield le logger pour des logs intermédiaires."""
@@ -114,7 +116,7 @@ class TestLoggedOperation:
             pass
 
         captured = capsys.readouterr()
-        lines = [l for l in captured.err.strip().split("\n") if l.strip()]
+        lines = [line for line in captured.err.strip().split("\n") if line.strip()]
         # Le premier log (Starting) devrait contenir job_id
         start_data = json.loads(lines[0])
         assert start_data["job_id"] == "abc-123"
@@ -123,9 +125,8 @@ class TestLoggedOperation:
         """Pas de log 'Completed' si l'opération échoue."""
         configure_logging(LoggingConfig(level="DEBUG"))
         logger = get_logger("test.utils")
-        with pytest.raises(Exception):
-            with logged_operation(logger, "no complete"):
-                raise Exception("fail")
+        with pytest.raises(RuntimeError), logged_operation(logger, "no complete"):
+            raise RuntimeError("fail")
 
         captured = capfd.readouterr()
         assert "Completed: no complete" not in captured.err
@@ -305,11 +306,7 @@ class TestLoggingConfigBuilder:
 
     def test_extra_fields(self):
         """Ajoute des champs additionnels."""
-        config = (
-            LoggingConfigBuilder()
-            .extra_fields(env="prod", service="etl")
-            .build()
-        )
+        config = LoggingConfigBuilder().extra_fields(env="prod", service="etl").build()
         assert config.extra_fields == {"env": "prod", "service": "etl"}
 
     def test_extra_fields_cumulative(self):
@@ -320,7 +317,11 @@ class TestLoggingConfigBuilder:
             .extra_fields(service="etl", version="1.0")
             .build()
         )
-        assert config.extra_fields == {"env": "prod", "service": "etl", "version": "1.0"}
+        assert config.extra_fields == {
+            "env": "prod",
+            "service": "etl",
+            "version": "1.0",
+        }
 
     def test_propagate(self):
         """Configure la propagation."""
@@ -360,12 +361,7 @@ class TestLoggingConfigBuilder:
 
     def test_builder_with_configure_logging(self):
         """Le builder s'intègre avec configure_logging()."""
-        config = (
-            LoggingConfigBuilder()
-            .level("DEBUG")
-            .json_output(False)
-            .build()
-        )
+        config = LoggingConfigBuilder().level("DEBUG").json_output(False).build()
         configure_logging(config)
         root = get_logger()
         assert root.level == logging.DEBUG
@@ -412,9 +408,11 @@ class TestUtilsIntegration:
         logger.setLevel(logging.DEBUG)
 
         try:
-            with pytest.raises(RuntimeError):
-                with logged_operation(logger, "doomed operation"):
-                    raise RuntimeError("kaboom")
+            with (
+                pytest.raises(RuntimeError),
+                logged_operation(logger, "doomed operation"),
+            ):
+                raise RuntimeError("kaboom")
 
             # Should have: Starting + Failed = 2
             assert len(step_run.logs) == 2

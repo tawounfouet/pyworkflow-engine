@@ -1,27 +1,28 @@
 """Tests for timeout handling and advanced executors."""
 
-import pytest
 import asyncio
 import time
 from datetime import timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
-from pyworkflow_engine import WorkflowEngine, Job, Step, StepType, RunStatus
-from pyworkflow_engine.core.exceptions import StepExecutionError
-from pyworkflow_engine.core.executors import (
-    ThreadPoolStepExecutor,
-    ProcessPoolStepExecutor,
+import pytest
+
+from pyworkflow_engine import Job, RunStatus, Step, StepType, WorkflowEngine
+from pyworkflow_engine.exceptions import StepExecutionError
+from pyworkflow_engine.executors import (
     AsyncStepExecutor,
-    RetryableExecutor,
     ExecutorRegistry,
+    ProcessPoolStepExecutor,
+    RetryableExecutor,
+    ThreadPoolStepExecutor,
 )
 
 
 # Add helper function for creating context
 def create_test_context():
     """Create a test WorkflowContext with minimal JobRun."""
-    from pyworkflow_engine.core.context import WorkflowContext
     from pyworkflow_engine import JobRun
+    from pyworkflow_engine.engine.context import WorkflowContext
 
     job_run = JobRun(job_name="test_job")
     return WorkflowContext(job_run)
@@ -64,7 +65,7 @@ class TestTimeoutHandling:
                 Step(
                     name="quick_step",
                     step_type=StepType.FUNCTION,
-                    callable=quick_function,
+                    handler=quick_function,
                     timeout=timedelta(seconds=1),  # 1 second timeout
                 )
             ],
@@ -88,7 +89,7 @@ class TestTimeoutHandling:
                 Step(
                     name="slow_step",
                     step_type=StepType.FUNCTION,
-                    callable=slow_function,
+                    handler=slow_function,
                     timeout=timedelta(milliseconds=500),  # 500ms timeout
                 )
             ],
@@ -114,7 +115,7 @@ class TestTimeoutHandling:
                 Step(
                     name="normal_step",
                     step_type=StepType.FUNCTION,
-                    callable=normal_function,
+                    handler=normal_function,
                     # No timeout specified
                 )
             ],
@@ -137,7 +138,7 @@ class TestThreadPoolExecutor:
             return {"thread_result": True}
 
         step = Step(
-            name="thread_test", step_type=StepType.FUNCTION, callable=io_function
+            name="thread_test", step_type=StepType.FUNCTION, handler=io_function
         )
 
         context = create_test_context()
@@ -158,12 +159,12 @@ class TestThreadPoolExecutor:
         step = Step(
             name="timeout_test",
             step_type=StepType.FUNCTION,
-            callable=slow_function,
+            handler=slow_function,
             timeout=timedelta(milliseconds=500),
         )
 
         context = create_test_context()
-        with pytest.raises(Exception):  # Should timeout
+        with pytest.raises(StepExecutionError):  # Should timeout
             executor.execute(step, context)
 
         executor.shutdown()
@@ -177,7 +178,7 @@ class TestThreadPoolExecutor:
             return {"context_received": context is not None}
 
         step = Step(
-            name="context_test", step_type=StepType.FUNCTION, callable=context_function
+            name="context_test", step_type=StepType.FUNCTION, handler=context_function
         )
 
         mock_context = create_test_context()
@@ -198,7 +199,7 @@ class TestProcessPoolExecutor:
         step = Step(
             name="process_test",
             step_type=StepType.FUNCTION,
-            callable=picklable_cpu_function,
+            handler=picklable_cpu_function,
         )
 
         context = create_test_context()
@@ -215,12 +216,12 @@ class TestProcessPoolExecutor:
         step = Step(
             name="cpu_timeout_test",
             step_type=StepType.FUNCTION,
-            callable=picklable_slow_cpu_function,
+            handler=picklable_slow_cpu_function,
             timeout=timedelta(milliseconds=500),
         )
 
         context = create_test_context()
-        with pytest.raises(Exception):  # Should timeout
+        with pytest.raises(StepExecutionError):  # Should timeout
             executor.execute(step, context)
 
         executor.shutdown()
@@ -239,7 +240,7 @@ class TestAsyncExecutor:
             return {"async_result": True}
 
         step = Step(
-            name="async_test", step_type=StepType.FUNCTION, callable=async_function
+            name="async_test", step_type=StepType.FUNCTION, handler=async_function
         )
 
         context = create_test_context()
@@ -258,7 +259,7 @@ class TestAsyncExecutor:
         step = Step(
             name="async_context_test",
             step_type=StepType.FUNCTION,
-            callable=async_context_function,
+            handler=async_context_function,
         )
 
         mock_context = create_test_context()
@@ -277,12 +278,12 @@ class TestAsyncExecutor:
         step = Step(
             name="async_timeout_test",
             step_type=StepType.FUNCTION,
-            callable=slow_async_function,
+            handler=slow_async_function,
             timeout=timedelta(milliseconds=500),
         )
 
         context = create_test_context()
-        with pytest.raises(Exception):  # Should timeout
+        with pytest.raises(StepExecutionError):  # Should timeout
             executor.execute(step, context)
 
     def test_non_async_function_error(self):
@@ -296,7 +297,7 @@ class TestAsyncExecutor:
         step = Step(
             name="non_async_test",
             step_type=StepType.FUNCTION,
-            callable=regular_function,
+            handler=regular_function,
         )
 
         context = create_test_context()
@@ -489,7 +490,7 @@ class TestIntegrationTimeoutAndExecutors:
         step = Step(
             name="io_test",
             step_type=StepType.FUNCTION,
-            callable=quick_io,
+            handler=quick_io,
             timeout=timedelta(seconds=1),
         )
 
@@ -511,10 +512,150 @@ class TestIntegrationTimeoutAndExecutors:
         step = Step(
             name="slow_async_test",
             step_type=StepType.FUNCTION,
-            callable=slow_async,
+            handler=slow_async,
             timeout=timedelta(milliseconds=500),
         )
 
         context = create_test_context()
-        with pytest.raises(Exception):  # Should timeout
+        with pytest.raises(StepExecutionError):  # Should timeout
             async_executor.execute(step, context)
+
+
+# ── Module-level functions for LocalExecutor testing ────────────────────────
+
+def local_no_args():
+    return {"value": "local_result"}
+
+
+def local_with_context(ctx):
+    return {"value": "local_with_ctx"}
+
+
+class TestLocalExecutor:
+    """Tests for LocalExecutor — synchronous same-process execution."""
+
+    def test_local_executor_no_args(self):
+        """LocalExecutor exécute un callable sans arguments."""
+        from pyworkflow_engine.executors.local import LocalExecutor
+
+        executor = LocalExecutor()
+        step = Step(name="s", step_type=StepType.FUNCTION, handler=local_no_args)
+        ctx = create_test_context()
+        result = executor.execute(step, ctx)
+        assert result == {"value": "local_result"}
+
+    def test_local_executor_with_context(self):
+        """LocalExecutor passe le contexte si le callable l'accepte."""
+        from pyworkflow_engine.executors.local import LocalExecutor
+
+        executor = LocalExecutor()
+        step = Step(name="s", step_type=StepType.FUNCTION, handler=local_with_context)
+        ctx = create_test_context()
+        result = executor.execute(step, ctx)
+        assert result == {"value": "local_with_ctx"}
+
+    def test_local_executor_no_callable_raises(self):
+        """LocalExecutor lève StepExecutionError si callable est None."""
+        from pyworkflow_engine.executors.local import LocalExecutor
+
+        executor = LocalExecutor()
+        step = Step(name="s", step_type=StepType.SUBPROCESS)
+        ctx = create_test_context()
+        with pytest.raises(StepExecutionError):
+            executor.execute(step, ctx)
+
+    def test_local_executor_is_exported(self):
+        """LocalExecutor est accessible depuis le package principal."""
+        from pyworkflow_engine import LocalExecutor  # noqa: F401
+
+
+class TestExecutorTypeRouting:
+    """Tests du routing ExecutorType dans WorkflowRunner._resolve_executor."""
+
+    def _make_step(self, executor_type, fn=None):
+
+        if fn is None:
+            fn = local_no_args
+        return Step(
+            name="routed",
+            step_type=StepType.FUNCTION,
+            handler=fn,
+            executor_type=executor_type,
+        )
+
+    def test_local_returns_none(self):
+        """LOCAL → None (chemin direct, pas de BaseExecutor)."""
+        from pyworkflow_engine.engine.runner import WorkflowRunner
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        runner = WorkflowRunner()
+        step = self._make_step(ExecutorType.LOCAL)
+        assert runner._resolve_executor(step) is None
+
+    def test_thread_returns_thread_pool_executor(self):
+        """THREAD → ThreadPoolStepExecutor."""
+        from pyworkflow_engine.engine.runner import WorkflowRunner
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        runner = WorkflowRunner()
+        step = self._make_step(ExecutorType.THREAD)
+        executor = runner._resolve_executor(step)
+        assert isinstance(executor, ThreadPoolStepExecutor)
+
+    def test_process_returns_process_pool_executor(self):
+        """PROCESS → ProcessPoolStepExecutor."""
+        from pyworkflow_engine.engine.runner import WorkflowRunner
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        runner = WorkflowRunner()
+        step = self._make_step(ExecutorType.PROCESS)
+        executor = runner._resolve_executor(step)
+        assert isinstance(executor, ProcessPoolStepExecutor)
+
+    def test_async_returns_async_executor(self):
+        """ASYNC → AsyncStepExecutor."""
+        from pyworkflow_engine.engine.runner import WorkflowRunner
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        runner = WorkflowRunner()
+        step = self._make_step(ExecutorType.ASYNC)
+        executor = runner._resolve_executor(step)
+        assert isinstance(executor, AsyncStepExecutor)
+
+    def test_custom_returns_none(self):
+        """CUSTOM → None (handled via executor_name / registry)."""
+        from pyworkflow_engine.engine.runner import WorkflowRunner
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        runner = WorkflowRunner()
+        step = self._make_step(ExecutorType.CUSTOM)
+        assert runner._resolve_executor(step) is None
+
+    def test_thread_routing_executes_step(self):
+        """Un step ExecutorType.THREAD s'exécute correctement end-to-end."""
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        step = self._make_step(ExecutorType.THREAD)
+        engine = WorkflowEngine()
+        job = Job(name="routing_thread", steps=[step])
+        result = engine.run(job)
+        assert result.status == RunStatus.SUCCESS
+
+    def test_async_routing_executes_step(self):
+        """Un step ExecutorType.ASYNC s'exécute correctement end-to-end."""
+        from pyworkflow_engine.models.enums import ExecutorType
+
+        async def async_fn():
+            await asyncio.sleep(0)
+            return {"ok": True}
+
+        step = Step(
+            name="async_step",
+            step_type=StepType.FUNCTION,
+            handler=async_fn,
+            executor_type=ExecutorType.ASYNC,
+        )
+        engine = WorkflowEngine()
+        job = Job(name="routing_async", steps=[step])
+        result = engine.run(job)
+        assert result.status == RunStatus.SUCCESS

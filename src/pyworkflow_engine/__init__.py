@@ -1,5 +1,5 @@
 """
-IAS Workflow Engine - Moteur d'orchestration de workflows Python pur.
+PyWorkflow Engine - Moteur d'orchestration de workflows Python pur.
 
 Un package zero-dépendance pour créer, exécuter et gérer des workflows complexes
 dans n'importe quel environnement Python.
@@ -11,7 +11,7 @@ Usage basique:
         return {"message": "Hello World!"}
 
     job = Job(name="Test", steps=[
-        Step(name="Say Hello", callable=hello_world)
+        Step(name="Say Hello", step_type=StepType.FUNCTION, handler=hello_world)
     ])
 
     engine = WorkflowEngine()
@@ -25,9 +25,9 @@ Architecture modulaire:
     - Adapters: Intégrations framework-spécifiques (Django, FastAPI, Celery, etc.)
 """
 
-__version__ = "0.1.0"
-__author__ = "IAS"
-__email__ = "dev@ias.com"
+__version__ = "0.4.0"
+__author__ = "PyWorkflow Contributors"
+__email__ = "dev@pyworkflow.dev"
 
 
 # ── Lazy imports ─────────────────────────────────────────────────────────────
@@ -40,41 +40,51 @@ __email__ = "dev@ias.com"
 def __getattr__(name: str):  # PEP 562 – module-level __getattr__
     """Import paresseux des symboles du package.
 
-    Permet ``from pyworkflow_engine import Job`` dès que le module
-    ``core.models.design_time`` existe, tout en évitant un crash si le
-    module n'a pas encore été créé.
+    Permet ``from pyworkflow_engine import Job`` sans importer tous les
+    sous-modules à l'initialisation du package. Chaque symbole est importé
+    à la première utilisation puis mis en cache dans ``globals()``.
     """
 
     _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
-        # Core models
-        "Job": (".core.models.design_time", "Job"),
-        "Step": (".core.models.design_time", "Step"),
-        "SubJob": (".core.models.design_time", "SubJob"),
-        "JobRun": (".core.models.runtime", "JobRun"),
-        "StepRun": (".core.models.runtime", "StepRun"),
-        "StepLog": (".core.models.runtime", "StepLog"),
+        # Models
+        "Job": (".models.job", "Job"),
+        "Step": (".models.step", "Step"),
+        "SubJob": (".models.step", "SubJob"),
+        "JobRun": (".models.run", "JobRun"),
+        "StepRun": (".models.run", "StepRun"),
+        "StepLog": (".models.run", "StepLog"),
         # Enums
-        "TriggerType": (".core.models.enums", "TriggerType"),
-        "StepType": (".core.models.enums", "StepType"),
-        "ExecutorType": (".core.models.enums", "ExecutorType"),
-        "RunStatus": (".core.models.enums", "RunStatus"),
-        "LogLevel": (".core.models.enums", "LogLevel"),
+        "TriggerType": (".models.enums", "TriggerType"),
+        "StepType": (".models.enums", "StepType"),
+        "ExecutorType": (".models.enums", "ExecutorType"),
+        "RunStatus": (".models.enums", "RunStatus"),
         # Engine
-        "WorkflowEngine": (".core.engine", "WorkflowEngine"),
-        "WorkflowContext": (".core.context", "WorkflowContext"),
+        "WorkflowEngine": (".facade", "WorkflowEngine"),
+        "WorkflowContext": (".engine.context", "WorkflowContext"),
         # Exceptions
-        "WorkflowError": (".core.exceptions", "WorkflowError"),
-        "WorkflowSuspended": (".core.exceptions", "WorkflowSuspended"),
-        "WorkflowFailed": (".core.exceptions", "WorkflowFailed"),
-        "StepTimeout": (".core.exceptions", "StepTimeout"),
-        "DAGCycleError": (".core.exceptions", "DAGCycleError"),
+        "WorkflowError": (".exceptions", "WorkflowError"),
+        "WorkflowSuspended": (".exceptions", "WorkflowSuspended"),
+        "WorkflowFailed": (".exceptions", "WorkflowFailed"),
+        "StepExecutionError": (".exceptions", "StepExecutionError"),
+        "DAGValidationError": (".exceptions", "DAGValidationError"),
         # Executors
-        "ThreadPoolStepExecutor": (".core.executors", "ThreadPoolStepExecutor"),
-        "ProcessPoolStepExecutor": (".core.executors", "ProcessPoolStepExecutor"),
-        "AsyncStepExecutor": (".core.executors", "AsyncStepExecutor"),
-        "RetryableExecutor": (".core.executors", "RetryableExecutor"),
-        "ExecutorRegistry": (".core.executors", "ExecutorRegistry"),
+        "ThreadPoolStepExecutor": (".executors.thread_pool", "ThreadPoolStepExecutor"),
+        "ProcessPoolStepExecutor": (
+            ".executors.thread_pool",
+            "ProcessPoolStepExecutor",
+        ),
+        "AsyncStepExecutor": (".executors.async_exec", "AsyncStepExecutor"),
+        "RetryableExecutor": (".executors.retryable", "RetryableExecutor"),
+        "ExecutorRegistry": (".executors.base", "ExecutorRegistry"),
         "LocalExecutor": (".executors.local", "LocalExecutor"),
+        # Engine — parallel runner
+        "ParallelRunner": (".engine.parallel_runner", "ParallelRunner"),
+        # Triggers
+        "BaseTrigger": (".triggers.base", "BaseTrigger"),
+        "TriggerState": (".triggers.base", "TriggerState"),
+        "ManualTrigger": (".triggers.manual", "ManualTrigger"),
+        "ScheduleTrigger": (".triggers.schedule", "ScheduleTrigger"),
+        "CronExpression": (".triggers.schedule", "CronExpression"),
         # Persistence
         "InMemoryPersistence": (".persistence.memory", "InMemoryPersistence"),
         "BasePersistence": (".persistence.base", "BasePersistence"),
@@ -110,7 +120,6 @@ __all__ = [
     "StepType",
     "ExecutorType",
     "RunStatus",
-    "LogLevel",
     # Engine
     "WorkflowEngine",
     "WorkflowContext",
@@ -118,8 +127,8 @@ __all__ = [
     "WorkflowError",
     "WorkflowSuspended",
     "WorkflowFailed",
-    "StepTimeout",
-    "DAGCycleError",
+    "StepExecutionError",
+    "DAGValidationError",
     # Built-in executors
     "LocalExecutor",
     "ExecutorRegistry",
@@ -127,6 +136,14 @@ __all__ = [
     "ProcessPoolStepExecutor",
     "AsyncStepExecutor",
     "RetryableExecutor",
+    # Engine extras
+    "ParallelRunner",
+    # Triggers
+    "BaseTrigger",
+    "TriggerState",
+    "ManualTrigger",
+    "ScheduleTrigger",
+    "CronExpression",
     # Built-in persistence
     "InMemoryPersistence",
     "BasePersistence",

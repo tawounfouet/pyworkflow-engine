@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from pyworkflow_engine import WorkflowEngine
-from pyworkflow_engine.core.models import Job, Step, StepType
+from pyworkflow_engine.models import Job, Step, StepType
 from pyworkflow_engine.persistence import (
     InMemoryPersistence,
     JSONFilePersistence,
@@ -35,35 +35,35 @@ def create_sample_job() -> Job:
     return Job(
         name="data_processing_job",
         description="A sample data processing workflow",
-        parameters={"batch_size": 1000, "timeout": 300},
         steps=[
             Step(
                 name="extract_data",
-                step_type=StepType.PYTHON_FUNCTION,
-                callable_func=lambda ctx: {"data": "raw_data_from_source"},
-                timeout=120,
+                step_type=StepType.FUNCTION,
+                handler=lambda ctx: {"data": "raw_data_from_source"},
+                timeout=timedelta(seconds=120),
             ),
             Step(
                 name="transform_data",
-                step_type=StepType.PYTHON_FUNCTION,
-                callable_func=lambda ctx: {
+                step_type=StepType.FUNCTION,
+                handler=lambda ctx: {
                     "data": f"transformed_{ctx.get('extract_data', {}).get('data', 'no_data')}"
                 },
-                depends_on={"extract_data"},
-                timeout=180,
+                dependencies=["extract_data"],
+                timeout=timedelta(seconds=180),
             ),
             Step(
                 name="load_data",
-                step_type=StepType.PYTHON_FUNCTION,
-                callable_func=lambda ctx: {"result": "data_loaded_successfully"},
-                depends_on={"transform_data"},
-                timeout=60,
+                step_type=StepType.FUNCTION,
+                handler=lambda ctx: {"result": "data_loaded_successfully"},
+                dependencies=["transform_data"],
+                timeout=timedelta(seconds=60),
             ),
         ],
         metadata={
             "version": "1.0",
             "author": "data-team",
             "tags": ["etl", "daily"],
+            "batch_size": 1000,
         },
     )
 
@@ -97,17 +97,13 @@ def demo_in_memory_persistence():
             temp_job = Job(
                 name="temp_job",
                 description="Temporary job for testing",
-                parameters={},
                 steps=[
                     Step(
                         name="temp_step",
-                        type="function",
-                        function="temp_function",
-                        parameters={},
-                        depends_on=set(),
+                        step_type=StepType.FUNCTION,
+                        handler=lambda ctx: {},
                     )
                 ],
-                metadata={},
             )
             persistence.save_job(temp_job)
             print(f"  - Saved temporary job: {temp_job.name}")
@@ -127,7 +123,7 @@ def demo_in_memory_persistence():
     stats = persistence.get_statistics()
 
     print(f"✓ Backend health: {health['status']}")
-    print(f"✓ Memory usage: {stats.get('estimated_memory_bytes', 0)} bytes")
+    print(f"✓ Memory usage: {stats.get('memory_usage_mb', 0):.3f} MB")
 
     print(f"\nInMemoryPersistence is perfect for:")
     print(f"  - Development and testing")
@@ -172,17 +168,14 @@ def demo_json_file_persistence():
             test_job = Job(
                 name=f"test_job_{i}",
                 description=f"Test job {i}",
-                parameters={"index": i},
                 steps=[
                     Step(
                         name="test_step",
-                        type="function",
-                        function="test_function",
-                        parameters={"value": i},
-                        depends_on=set(),
+                        step_type=StepType.FUNCTION,
+                        handler=lambda ctx: {},
                     )
                 ],
-                metadata={"batch": "test"},
+                metadata={"batch": "test", "index": i},
             )
             persistence.save_job(test_job)
 
@@ -202,17 +195,13 @@ def demo_json_file_persistence():
             tx_job = Job(
                 name=f"tx_job_{i}",
                 description="Transaction test job",
-                parameters={},
                 steps=[
                     Step(
                         name="tx_step",
-                        type="function",
-                        function="tx_function",
-                        parameters={},
-                        depends_on=set(),
+                        step_type=StepType.FUNCTION,
+                        handler=lambda ctx: {},
                     )
                 ],
-                metadata={},
             )
             persistence.save_job(tx_job)
 
@@ -262,26 +251,23 @@ def demo_sqlite_persistence():
         print(f"✓ Saved job: {job.name}")
 
         # Create some job runs with different statuses
-        from pyworkflow_engine.core.models import JobRun, JobRunStatus
+        from pyworkflow_engine.models import JobRun, RunStatus
 
-        statuses = [JobRunStatus.COMPLETED, JobRunStatus.FAILED, JobRunStatus.RUNNING]
-        now = datetime.utcnow()
+        statuses = [RunStatus.SUCCESS, RunStatus.FAILED, RunStatus.RUNNING]
+        now = datetime.now(tz=None)
 
         for i, status in enumerate(statuses * 3):  # 9 runs total
             job_run = JobRun(
-                id=f"run_{i:03d}",
                 job_name=job.name,
                 status=status,
                 created_at=now - timedelta(hours=i),
-                started_at=now - timedelta(hours=i),
-                completed_at=(
+                start_time=now - timedelta(hours=i),
+                end_time=(
                     now - timedelta(hours=i) + timedelta(minutes=30)
-                    if status != JobRunStatus.RUNNING
+                    if status != RunStatus.RUNNING
                     else None
                 ),
-                parameters={"run_index": i, "batch_id": f"batch_{i // 3}"},
                 metadata={"environment": "demo", "priority": i % 3},
-                step_runs=[],
             )
             persistence.save_job_run(job_run)
 
@@ -291,7 +277,7 @@ def demo_sqlite_persistence():
         print(f"\nTesting advanced querying...")
 
         # Query by status
-        completed_runs = persistence.list_job_runs(status="completed")
+        completed_runs = persistence.list_job_runs(status="success")
         failed_runs = persistence.list_job_runs(status="failed")
         running_runs = persistence.list_job_runs(status="running")
 
@@ -307,8 +293,8 @@ def demo_sqlite_persistence():
         # Test pagination
         page_1 = persistence.list_job_runs(limit=3, offset=0)
         page_2 = persistence.list_job_runs(limit=3, offset=3)
-        print(f"  - Page 1 (3 runs): {[r.id for r in page_1]}")
-        print(f"  - Page 2 (3 runs): {[r.id for r in page_2]}")
+        print(f"  - Page 1 (3 runs): {[r.job_run_id for r in page_1]}")
+        print(f"  - Page 2 (3 runs): {[r.job_run_id for r in page_2]}")
 
         # Test cleanup
         print(f"\nTesting cleanup operations...")
@@ -331,17 +317,13 @@ def demo_sqlite_persistence():
                 tx_job = Job(
                     name=f"tx_job_{i}",
                     description="Transaction test",
-                    parameters={},
                     steps=[
                         Step(
                             name="tx_step",
-                            type="function",
-                            function="tx_function",
-                            parameters={},
-                            depends_on=set(),
+                            step_type=StepType.FUNCTION,
+                            handler=lambda ctx: {},
                         )
                     ],
-                    metadata={},
                 )
                 persistence.save_job(tx_job)
 
@@ -418,24 +400,19 @@ def demo_sqlalchemy_persistence():
     persistence.save_job(job)
 
     # Create many job runs to test performance
-    from pyworkflow_engine.core.models import JobRun, JobRunStatus
+    from pyworkflow_engine.models import JobRun, RunStatus
 
     start_time = time.time()
     job_runs = []
 
     for i in range(50):
         job_run = JobRun(
-            id=f"bulk_run_{i:03d}",
             job_name=job.name,
-            status=JobRunStatus.COMPLETED,
+            status=RunStatus.SUCCESS,
             created_at=datetime.utcnow() - timedelta(minutes=i),
-            started_at=datetime.utcnow() - timedelta(minutes=i),
-            completed_at=datetime.utcnow()
-            - timedelta(minutes=i)
-            + timedelta(seconds=30),
-            parameters={"batch": i // 10, "index": i},
+            start_time=datetime.utcnow() - timedelta(minutes=i),
+            end_time=datetime.utcnow() - timedelta(minutes=i) + timedelta(seconds=30),
             metadata={"performance_test": True},
-            step_runs=[],
         )
         persistence.save_job_run(job_run)
         job_runs.append(job_run)
@@ -541,7 +518,7 @@ Use Cases:
 
 def main():
     """Run all persistence backend demonstrations."""
-    print("IAS Workflow Engine - Persistence Backends Demo")
+    print("PyWorkflow Engine - Persistence Backends Demo")
     print("=" * 80)
 
     # Run demonstrations

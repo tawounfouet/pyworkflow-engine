@@ -16,7 +16,7 @@ import logging
 import os
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 # ── Couleurs ANSI par niveau de log ──────────────────────────────────────────
@@ -53,7 +53,7 @@ class StructuredFormatter(logging.Formatter):
     """Format console lisible avec contexte structuré et couleurs ANSI.
 
     Produit des lignes comme :
-        2026-03-11 20:42:17 | INFO | core.engine | Workflow started
+        2026-03-11 20:42:17 | INFO | engine.facade | Workflow started
           job_id=abc-123
 
     Les couleurs sont activées automatiquement quand le terminal les supporte,
@@ -75,7 +75,7 @@ class StructuredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = datetime.fromtimestamp(
-            record.created, tz=timezone.utc
+            record.created, tz=UTC
         ).strftime("%Y-%m-%d %H:%M:%S")
 
         # Nom court : enlever le prefix "pyworkflow_engine."
@@ -132,7 +132,7 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log_entry: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc
+                record.created, tz=UTC
             ).isoformat(),
             "level": record.levelname,
             "logger": record.name,

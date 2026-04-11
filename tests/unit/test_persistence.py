@@ -5,42 +5,49 @@ Tests the persistence layer with all backends to ensure consistent
 behavior and API compatibility.
 """
 
-import pytest
 import tempfile
-import shutil
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Type, List, Dict, Any
 
-from pyworkflow_engine.persistence.base import (
-    BasePersistence,
-    PersistenceError,
-    JobNotFoundError,
-)
-from pyworkflow_engine.persistence.memory import InMemoryPersistence
-from pyworkflow_engine.persistence.json_file import JSONFilePersistence
-from pyworkflow_engine.persistence.sqlite import SQLitePersistence
-from pyworkflow_engine.core.models import (
+import pytest
+
+from pyworkflow_engine.models import (
     Job,
     JobRun,
-    StepRun,
-    Step,
     RunStatus,
+    Step,
+    StepRun,
     StepType,
 )
-
+from pyworkflow_engine.persistence.base import (
+    BasePersistence,
+)
+from pyworkflow_engine.persistence.json_file import JSONFilePersistence
+from pyworkflow_engine.persistence.memory import InMemoryPersistence
+from pyworkflow_engine.persistence.sqlite import SQLitePersistence
 
 # SQLAlchemy tests only run if SQLAlchemy is available
 try:
-    import sqlalchemy
+    import sqlalchemy  # noqa: F401
 
     HAS_SQLALCHEMY = True
 except ImportError:
     HAS_SQLALCHEMY = False
 
 
-class TestPersistenceBase:
-    """Base test class for all persistence backends."""
+class PersistenceBackendTests:
+    """Mixin de tests communs pour tous les backends de persistence.
+
+    Cette classe n'est **pas** collectée par pytest (absence de préfixe
+    ``Test``). Les sous-classes héritent de l'ensemble des cas de test et
+    fournissent leur propre fixture ``persistence``.
+
+    Sous-classes concrètes :
+        - ``TestInMemoryPersistence``
+        - ``TestJSONFilePersistence``
+        - ``TestSQLitePersistence``
+        - ``TestSQLAlchemyPersistence``
+    """
 
     @pytest.fixture
     def sample_job(self) -> Job:
@@ -49,7 +56,7 @@ class TestPersistenceBase:
             Step(
                 name="step1",
                 step_type=StepType.SUBPROCESS,
-                callable=None,  # No callable needed for subprocess
+                handler=None,  # No callable needed for subprocess
                 config={"command": ["echo", "hello"], "param1": "value1"},
                 dependencies=[],
                 timeout=timedelta(seconds=30),
@@ -57,7 +64,7 @@ class TestPersistenceBase:
             Step(
                 name="step2",
                 step_type=StepType.HTTP_REQUEST,
-                callable=None,  # No callable needed for HTTP request
+                handler=None,  # No callable needed for HTTP request
                 config={"url": "https://api.example.com", "param2": "value2"},
                 dependencies=["step1"],
                 timeout=timedelta(seconds=60),
@@ -78,7 +85,6 @@ class TestPersistenceBase:
     @pytest.fixture
     def sample_job_run(self, sample_job: Job) -> JobRun:
         """Create a sample job run for testing."""
-        now = datetime.utcnow()
 
         step_runs = [
             StepRun(
@@ -125,10 +131,12 @@ class TestPersistenceBase:
         assert len(retrieved_job.steps) == len(sample_job.steps)
 
         # Check steps
-        for orig_step, retr_step in zip(sample_job.steps, retrieved_job.steps):
+        for orig_step, retr_step in zip(
+            sample_job.steps, retrieved_job.steps, strict=False
+        ):
             assert orig_step.name == retr_step.name
             assert orig_step.step_type == retr_step.step_type
-            assert orig_step.callable == retr_step.callable
+            assert orig_step.handler == retr_step.handler
             assert orig_step.config == retr_step.config
             assert orig_step.dependencies == retr_step.dependencies
             assert orig_step.timeout == retr_step.timeout
@@ -163,7 +171,7 @@ class TestPersistenceBase:
                     Step(
                         name="step1",
                         step_type=StepType.SUBPROCESS,
-                        callable=None,  # No callable needed for subprocess
+                        handler=None,  # No callable needed for subprocess
                         config={"command": ["echo", f"job {i}"]},
                         dependencies=[],
                     )
@@ -228,7 +236,7 @@ class TestPersistenceBase:
         # Check step runs
         assert len(retrieved_run.step_runs) == len(sample_job_run.step_runs)
         for orig_step_run, retr_step_run in zip(
-            sample_job_run.step_runs, retrieved_run.step_runs
+            sample_job_run.step_runs, retrieved_run.step_runs, strict=False
         ):
             assert orig_step_run.step_run_id == retr_step_run.step_run_id
             assert orig_step_run.job_run_id == retr_step_run.job_run_id
@@ -270,7 +278,7 @@ class TestPersistenceBase:
         persistence.save_job(sample_job)
 
         # Create multiple job runs
-        now = datetime.now(timezone.utc)  # Use timezone-aware datetime
+        now = datetime.now(UTC)  # Use timezone-aware datetime
 
         runs_data = [
             {
@@ -325,8 +333,7 @@ class TestPersistenceBase:
         persistence.save_job(sample_job)
 
         # Create multiple job runs
-        now = datetime.now(timezone.utc)  # Use timezone-aware datetime
-        for i in range(5):
+        for i in range(5):  # noqa: B007
             job_run = JobRun(
                 job_run_id=f"run_{i}",
                 job_name=sample_job.name,
@@ -406,7 +413,7 @@ class TestPersistenceBase:
         persistence.save_job(sample_job)
 
         # Create runs with different ages
-        now = datetime.now(timezone.utc)  # Use timezone-aware datetime
+        now = datetime.now(UTC)  # Use timezone-aware datetime
         old_time = now - timedelta(days=2)
         recent_time = now - timedelta(hours=1)
 
@@ -451,6 +458,66 @@ class TestPersistenceBase:
         assert persistence.get_job_run("recent_run") is not None
         assert persistence.get_job_run("old_run") is None
 
+    # ------------------------------------------------------------------
+    # cleanup_old_runs — dry_run parametrized tests
+    # ------------------------------------------------------------------
+
+    def _make_old_run(self, job_name: str, run_id: str, age_days: int = 2) -> JobRun:
+        """Helper pour créer un JobRun avec une date passée."""
+        now = datetime.now(UTC)
+        created = now - timedelta(days=age_days)
+        return JobRun(
+            job_run_id=run_id,
+            job_name=job_name,
+            job_version="1.0.0",
+            status=RunStatus.SUCCESS,
+            created_at=created,
+            updated_at=created,
+            start_time=created,
+            end_time=created,
+        )
+
+    @pytest.mark.parametrize("dry_run", [True, False])
+    def test_cleanup_old_runs_dry_run(
+        self, persistence: BasePersistence, sample_job: Job, dry_run: bool
+    ):
+        """Test cleanup_old_runs avec dry_run=True et dry_run=False.
+
+        dry_run=True  → compte uniquement, aucune suppression.
+        dry_run=False → supprime réellement les runs éligibles.
+        """
+        persistence.save_job(sample_job)
+
+        old_run = self._make_old_run(sample_job.name, "old_dr_run", age_days=5)
+        now = datetime.now(UTC)
+        recent_run = JobRun(
+            job_run_id="recent_dr_run",
+            job_name=sample_job.name,
+            job_version="1.0.0",
+            status=RunStatus.SUCCESS,
+            created_at=now,
+            updated_at=now,
+        )
+
+        persistence.save_job_run(old_run)
+        persistence.save_job_run(recent_run)
+        assert persistence.get_job_run_count() == 2
+
+        cutoff = now - timedelta(days=1)
+        count = persistence.cleanup_old_runs(cutoff, dry_run=dry_run)
+
+        assert count == 1, f"Expected 1 old run counted, got {count}"
+
+        if dry_run:
+            # dry_run=True → rien supprimé
+            assert persistence.get_job_run_count() == 2
+            assert persistence.get_job_run("old_dr_run") is not None
+        else:
+            # dry_run=False → old_run supprimé
+            assert persistence.get_job_run_count() == 1
+            assert persistence.get_job_run("old_dr_run") is None
+            assert persistence.get_job_run("recent_dr_run") is not None
+
     def test_health_check(self, persistence: BasePersistence):
         """Test health check functionality."""
         health = persistence.health_check()
@@ -468,7 +535,7 @@ class TestPersistenceBase:
         assert "backend" in stats
 
 
-class TestInMemoryPersistence(TestPersistenceBase):
+class TestInMemoryPersistence(PersistenceBackendTests):
     """Test cases specific to InMemoryPersistence."""
 
     @pytest.fixture
@@ -477,7 +544,7 @@ class TestInMemoryPersistence(TestPersistenceBase):
         return InMemoryPersistence()
 
 
-class TestJSONFilePersistence(TestPersistenceBase):
+class TestJSONFilePersistence(PersistenceBackendTests):
     """Test cases specific to JSONFilePersistence."""
 
     @pytest.fixture
@@ -506,7 +573,7 @@ class TestJSONFilePersistence(TestPersistenceBase):
             assert data["name"] == sample_job.name
 
 
-class TestSQLitePersistence(TestPersistenceBase):
+class TestSQLitePersistence(PersistenceBackendTests):
     """Test cases specific to SQLitePersistence."""
 
     @pytest.fixture
@@ -526,7 +593,7 @@ class TestSQLitePersistence(TestPersistenceBase):
 
 # SQLAlchemy tests only run if SQLAlchemy is available
 @pytest.mark.skipif(not HAS_SQLALCHEMY, reason="SQLAlchemy not available")
-class TestSQLAlchemyPersistence(TestPersistenceBase):
+class TestSQLAlchemyPersistence(PersistenceBackendTests):
     """Test cases specific to SQLAlchemyPersistence."""
 
     @pytest.fixture
@@ -538,12 +605,11 @@ class TestSQLAlchemyPersistence(TestPersistenceBase):
 
     def test_database_initialization(self, persistence):
         """Test that database is properly initialized."""
-        # Tables should be created
+        from sqlalchemy import text
+
         with persistence.engine.connect() as conn:
             result = conn.execute(
-                persistence.metadata.bind.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                text("SELECT name FROM sqlite_master WHERE type='table'")
             )
             table_names = [row[0] for row in result.fetchall()]
 
@@ -565,13 +631,10 @@ class TestSQLAlchemyPersistence(TestPersistenceBase):
         job_runs = []
         for i in range(100):
             job_run = JobRun(
-                id=f"bulk_run_{i}",
+                job_run_id=f"bulk_run_{i}",
                 job_name=sample_job.name,
                 status=RunStatus.SUCCESS,
-                created_at=datetime.utcnow(),
-                started_at=datetime.utcnow(),
-                completed_at=datetime.utcnow(),
-                parameters={},
+                input_data={},
                 metadata={},
                 step_runs=[],
             )
@@ -595,33 +658,33 @@ class TestSQLAlchemyPersistence(TestPersistenceBase):
 
     def test_advanced_querying(self, persistence, sample_job: Job):
         """Test advanced querying capabilities."""
+
         # Save job first
         persistence.save_job(sample_job)
+
+        now = datetime.now(UTC)
 
         # Create runs with different statuses
         statuses = [RunStatus.SUCCESS, RunStatus.FAILED, RunStatus.RUNNING]
         for i, status in enumerate(statuses * 10):  # 30 runs total
             job_run = JobRun(
-                id=f"query_run_{i}",
+                job_run_id=f"query_run_{i}",
                 job_name=sample_job.name,
                 status=status,
-                created_at=datetime.utcnow() - timedelta(hours=i),
-                started_at=datetime.utcnow() - timedelta(hours=i),
-                completed_at=datetime.utcnow()
-                - timedelta(hours=i)
-                + timedelta(minutes=10),
-                parameters={},
+                input_data={},
                 metadata={},
                 step_runs=[],
+                created_at=now - timedelta(hours=i),
             )
             persistence.save_job_run(job_run)
 
         # Test status filtering
-        completed_runs = persistence.list_job_runs(status="completed")
-        assert len(completed_runs) == 10
+        success_runs = persistence.list_job_runs(status="success")
+        assert len(success_runs) == 10
 
-        # Test time filtering
-        recent_time = datetime.utcnow() - timedelta(hours=5)
+        # Test time filtering — only runs created within the last 5 hours
+        # i=0..4 → created_at within 5 hours → max 5 runs (indices 0-4)
+        recent_time = now - timedelta(hours=5)
         recent_runs = persistence.list_job_runs(since=recent_time)
         assert len(recent_runs) <= 6  # Runs from last 5 hours
 
@@ -631,7 +694,7 @@ class TestSQLAlchemyPersistence(TestPersistenceBase):
         assert persistence.engine.pool is not None
 
         # Multiple operations should work
-        for i in range(10):
+        for _ in range(10):
             health = persistence.health_check()
             assert health["status"] == "healthy"
 
@@ -650,12 +713,30 @@ class TestTransactionBehavior:
         """Parameterized fixture for different persistence backends."""
         return request.param()
 
+    @pytest.fixture
+    def sample_job(self) -> Job:
+        """Create a sample job for testing."""
+        return Job(
+            name="test_job",
+            description="A test job",
+            steps=[
+                Step(
+                    name="step1",
+                    step_type=StepType.SUBPROCESS,
+                    handler=None,
+                    config={"command": ["echo", "hello"]},
+                    dependencies=[],
+                )
+            ],
+            metadata={},
+        )
+
     def test_transaction_context_manager(
         self, persistence: BasePersistence, sample_job: Job
     ):
         """Test transaction context manager."""
         # Test successful transaction
-        with persistence.transaction() as tx:
+        with persistence.transaction():
             persistence.save_job(sample_job)
 
         # Job should be saved
@@ -663,16 +744,15 @@ class TestTransactionBehavior:
 
         # Test rollback on exception
         try:
-            with persistence.transaction() as tx:
+            with persistence.transaction() as _tx:
                 modified_job = Job(
                     name="test_rollback",
                     description="Should be rolled back",
-                    parameters={},
                     steps=[
                         Step(
                             name="step1",
                             step_type=StepType.FUNCTION,
-                            callable=lambda: {"result": "test"},
+                            handler=lambda: {"result": "test"},
                             config={},
                             dependencies=[],
                         )

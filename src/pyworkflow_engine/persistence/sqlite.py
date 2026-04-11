@@ -1,5 +1,5 @@
 """
-SQLite persistence implementation for the IAS Workflow Engine.
+SQLite persistence implementation for the PyWorkflow Engine.
 
 This persistence backend uses SQLite database for reliable storage with
 ACID transactions and SQL querying capabilities. It uses only Python's
@@ -19,17 +19,15 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Iterator
+from typing import Any
 
-from .base import BasePersistence, PersistenceError, JobNotFoundError, TransactionError
-from ..core.models import JobRun, StepRun, Job
-
+from ..models import Job, JobRun, StepRun
+from .base import BasePersistence, JobNotFoundError, PersistenceError, TransactionError
 
 # Database schema version
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # SQL Schema definitions
 SCHEMA_SQL = """
@@ -37,40 +35,52 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
     name TEXT PRIMARY KEY,
     description TEXT,
-    parameters TEXT,  -- JSON
-    steps TEXT,       -- JSON array of steps
-    metadata TEXT,    -- JSON
+    steps TEXT NOT NULL,  -- JSON array of steps
+    tags TEXT,            -- JSON array
+    metadata TEXT,        -- JSON
+    version TEXT,
+    enabled INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Job runs table
+-- Job runs table (v2: added job_version, updated_at, output_data, context, error, duration_ms, triggered_by, priority)
 CREATE TABLE IF NOT EXISTS job_runs (
-    id TEXT PRIMARY KEY,
+    job_run_id TEXT PRIMARY KEY,
     job_name TEXT NOT NULL,
+    job_version TEXT DEFAULT '1.0.0',
     status TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    parameters TEXT,  -- JSON
-    metadata TEXT,    -- JSON
+    updated_at TIMESTAMP,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_ms INTEGER,
+    triggered_by TEXT DEFAULT 'manual',
+    priority INTEGER DEFAULT 5,
+    input_data TEXT,   -- JSON
+    output_data TEXT,  -- JSON
+    context TEXT,      -- JSON
+    error TEXT,
+    metadata TEXT,     -- JSON
     FOREIGN KEY (job_name) REFERENCES jobs(name) ON DELETE CASCADE
 );
 
--- Step runs table  
+-- Step runs table (v2: added executor_type, duration_ms, retry_count)
 CREATE TABLE IF NOT EXISTS step_runs (
-    id TEXT PRIMARY KEY,
+    step_run_id TEXT PRIMARY KEY,
     job_run_id TEXT NOT NULL,
     step_name TEXT NOT NULL,
     status TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    input_data TEXT,    -- JSON
-    output_data TEXT,   -- JSON
-    error_message TEXT,
-    metadata TEXT,      -- JSON
-    FOREIGN KEY (job_run_id) REFERENCES job_runs(id) ON DELETE CASCADE
+    executor_type TEXT DEFAULT 'local',
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_ms INTEGER,
+    retry_count INTEGER DEFAULT 0,
+    input_data TEXT,   -- JSON
+    output_data TEXT,  -- JSON
+    error TEXT,
+    metadata TEXT,     -- JSON
+    FOREIGN KEY (job_run_id) REFERENCES job_runs(job_run_id) ON DELETE CASCADE
 );
 
 -- Schema version tracking
@@ -87,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_step_runs_job_run_id ON step_runs(job_run_id);
 CREATE INDEX IF NOT EXISTS idx_step_runs_status ON step_runs(status);
 
 -- Triggers to update timestamps
-CREATE TRIGGER IF NOT EXISTS update_jobs_timestamp 
+CREATE TRIGGER IF NOT EXISTS update_jobs_timestamp
     AFTER UPDATE ON jobs
     FOR EACH ROW
 BEGIN
@@ -180,155 +190,177 @@ class SQLitePersistence(BasePersistence):
             except sqlite3.Error as e:
                 raise PersistenceError(f"Failed to initialize database: {e}") from e
 
-    def _serialize_job(self, job: Job) -> Dict[str, Any]:
-        """Serialize a job for database storage."""
+    def _serialize_job(self, job: Job) -> dict[str, Any]:
+        """Serialize a job for database storage (compact SQL row format)."""
         return {
             "name": job.name,
             "description": job.description,
-            "parameters": json.dumps(job.parameters) if job.parameters else None,
-            "steps": json.dumps(
-                [
-                    {
-                        "name": step.name,
-                        "type": step.type,
-                        "function": step.function,
-                        "parameters": step.parameters,
-                        "depends_on": list(step.depends_on),
-                        "timeout": step.timeout,
-                    }
-                    for step in job.steps
-                ]
-            ),
+            "steps": json.dumps([s.to_dict() for s in job.steps]),
+            "tags": json.dumps(job.tags) if job.tags else None,
             "metadata": json.dumps(job.metadata) if job.metadata else None,
+            "version": job.version,
+            "enabled": 1 if job.enabled else 0,
         }
 
     def _deserialize_job(self, row: sqlite3.Row) -> Job:
-        """Deserialize a job from database row."""
-        from ..core.models import Step
+        """Deserialize a job from a database row."""
+        from ..models import Job, Step
 
-        steps_data = json.loads(row["steps"])
-        steps = []
-
-        for step_data in steps_data:
-            step = Step(
-                name=step_data["name"],
-                type=step_data["type"],
-                function=step_data["function"],
-                parameters=step_data.get("parameters", {}),
-                depends_on=set(step_data.get("depends_on", [])),
-                timeout=step_data.get("timeout"),
-            )
-            steps.append(step)
+        steps = [Step.from_dict(s) for s in json.loads(row["steps"])]
 
         return Job(
             name=row["name"],
             description=row["description"] or "",
-            parameters=json.loads(row["parameters"]) if row["parameters"] else {},
             steps=steps,
+            tags=json.loads(row["tags"]) if row["tags"] else [],
             metadata=json.loads(row["metadata"]) if row["metadata"] else {},
+            version=row["version"] or "1.0.0",
+            enabled=bool(row["enabled"]) if row["enabled"] is not None else True,
         )
 
-    def _serialize_job_run(self, job_run: JobRun) -> Dict[str, Any]:
-        """Serialize a job run for database storage."""
+    def _serialize_job_run(self, job_run: JobRun) -> dict[str, Any]:
+        """Serialize a job run for database storage (compact SQL row format)."""
         return {
-            "id": job_run.id,
+            "job_run_id": job_run.job_run_id,
             "job_name": job_run.job_name,
+            "job_version": job_run.job_version,
             "status": job_run.status.value,
             "created_at": job_run.created_at.isoformat(),
-            "started_at": (
-                job_run.started_at.isoformat() if job_run.started_at else None
+            "updated_at": job_run.updated_at.isoformat(),
+            "start_time": (
+                job_run.start_time.isoformat() if job_run.start_time else None
             ),
-            "completed_at": (
-                job_run.completed_at.isoformat() if job_run.completed_at else None
+            "end_time": job_run.end_time.isoformat() if job_run.end_time else None,
+            "duration_ms": job_run.duration_ms,
+            "triggered_by": job_run.triggered_by,
+            "priority": job_run.priority,
+            "input_data": (
+                json.dumps(job_run.input_data) if job_run.input_data else None
             ),
-            "parameters": (
-                json.dumps(job_run.parameters) if job_run.parameters else None
+            "output_data": (
+                json.dumps(job_run.output_data) if job_run.output_data else None
             ),
+            "context": json.dumps(job_run.context) if job_run.context else None,
+            "error": job_run.error,
             "metadata": json.dumps(job_run.metadata) if job_run.metadata else None,
         }
 
     def _deserialize_job_run(
-        self, row: sqlite3.Row, step_runs: List[StepRun] = None
+        self, row: sqlite3.Row, step_runs: list[StepRun] = None
     ) -> JobRun:
-        """Deserialize a job run from database row."""
-        from ..core.models import JobRunStatus
+        """Deserialize a job run from a database row."""
+        from ..models.enums import RunStatus
 
+        _keys = (
+            row.keys()
+        )  # sqlite3.Row: use .keys() for membership tests (SIM118/SIM401)
         return JobRun(
-            id=row["id"],
+            job_run_id=row["job_run_id"],
             job_name=row["job_name"],
-            status=JobRunStatus(row["status"]),
+            job_version=(
+                row["job_version"] if "job_version" in _keys else "1.0.0"
+            ),  # noqa: SIM401
+            status=RunStatus(row["status"]),
             created_at=datetime.fromisoformat(row["created_at"]),
-            started_at=(
-                datetime.fromisoformat(row["started_at"]) if row["started_at"] else None
+            updated_at=(
+                datetime.fromisoformat(row["updated_at"])
+                if "updated_at" in _keys and row["updated_at"]
+                else datetime.fromisoformat(row["created_at"])
             ),
-            completed_at=(
-                datetime.fromisoformat(row["completed_at"])
-                if row["completed_at"]
-                else None
+            start_time=(
+                datetime.fromisoformat(row["start_time"]) if row["start_time"] else None
             ),
-            parameters=json.loads(row["parameters"]) if row["parameters"] else {},
+            end_time=(
+                datetime.fromisoformat(row["end_time"]) if row["end_time"] else None
+            ),
+            duration_ms=(
+                row["duration_ms"] if "duration_ms" in _keys else None
+            ),  # noqa: SIM401
+            triggered_by=(
+                row["triggered_by"] if "triggered_by" in _keys else "manual"
+            ),  # noqa: SIM401
+            priority=row["priority"] if "priority" in _keys else 5,  # noqa: SIM401
+            input_data=json.loads(row["input_data"]) if row["input_data"] else {},
+            output_data=(
+                json.loads(row["output_data"])
+                if "output_data" in _keys and row["output_data"]
+                else {}
+            ),
+            context=(
+                json.loads(row["context"])
+                if "context" in _keys and row["context"]
+                else {}
+            ),
+            error=row["error"] if "error" in _keys else None,  # noqa: SIM401
             metadata=json.loads(row["metadata"]) if row["metadata"] else {},
             step_runs=step_runs or [],
         )
 
-    def _serialize_step_run(self, step_run: StepRun) -> Dict[str, Any]:
-        """Serialize a step run for database storage."""
+    def _serialize_step_run(self, step_run: StepRun) -> dict[str, Any]:
+        """Serialize a step run for database storage (compact SQL row format)."""
         return {
-            "id": step_run.id,
+            "step_run_id": step_run.step_run_id,
             "job_run_id": step_run.job_run_id,
             "step_name": step_run.step_name,
             "status": step_run.status.value,
-            "created_at": step_run.created_at.isoformat(),
-            "started_at": (
-                step_run.started_at.isoformat() if step_run.started_at else None
+            "executor_type": step_run.executor_type.value,
+            "start_time": (
+                step_run.start_time.isoformat() if step_run.start_time else None
             ),
-            "completed_at": (
-                step_run.completed_at.isoformat() if step_run.completed_at else None
-            ),
+            "end_time": step_run.end_time.isoformat() if step_run.end_time else None,
+            "duration_ms": step_run.duration_ms,
+            "retry_count": step_run.retry_count,
             "input_data": (
-                json.dumps(step_run.input_data)
-                if step_run.input_data is not None
-                else None
+                json.dumps(step_run.input_data) if step_run.input_data else None
             ),
             "output_data": (
-                json.dumps(step_run.output_data)
-                if step_run.output_data is not None
-                else None
+                json.dumps(step_run.output_data) if step_run.output_data else None
             ),
-            "error_message": step_run.error_message,
+            "error": step_run.error,
             "metadata": json.dumps(step_run.metadata) if step_run.metadata else None,
         }
 
     def _deserialize_step_run(self, row: sqlite3.Row) -> StepRun:
-        """Deserialize a step run from database row."""
-        from ..core.models import StepRunStatus
+        """Deserialize a step run from a database row."""
+        from ..models.enums import ExecutorType, RunStatus
 
+        _keys = (
+            row.keys()
+        )  # sqlite3.Row: use .keys() for membership tests (SIM118/SIM401)
         return StepRun(
-            id=row["id"],
+            step_run_id=row["step_run_id"],
             job_run_id=row["job_run_id"],
             step_name=row["step_name"],
-            status=StepRunStatus(row["status"]),
-            created_at=datetime.fromisoformat(row["created_at"]),
-            started_at=(
-                datetime.fromisoformat(row["started_at"]) if row["started_at"] else None
+            status=RunStatus(row["status"]),
+            executor_type=(
+                ExecutorType(row["executor_type"])
+                if "executor_type" in _keys and row["executor_type"]
+                else ExecutorType.LOCAL
             ),
-            completed_at=(
-                datetime.fromisoformat(row["completed_at"])
-                if row["completed_at"]
-                else None
+            start_time=(
+                datetime.fromisoformat(row["start_time"]) if row["start_time"] else None
             ),
-            input_data=json.loads(row["input_data"]) if row["input_data"] else None,
-            output_data=json.loads(row["output_data"]) if row["output_data"] else None,
-            error_message=row["error_message"],
+            end_time=(
+                datetime.fromisoformat(row["end_time"]) if row["end_time"] else None
+            ),
+            duration_ms=(
+                row["duration_ms"] if "duration_ms" in _keys else None
+            ),  # noqa: SIM401
+            retry_count=(
+                row["retry_count"] if "retry_count" in _keys else 0
+            ),  # noqa: SIM401
+            input_data=json.loads(row["input_data"]) if row["input_data"] else {},
+            output_data=json.loads(row["output_data"]) if row["output_data"] else {},
+            error=row["error"],
             metadata=json.loads(row["metadata"]) if row["metadata"] else {},
         )
 
-    def _load_step_runs(self, job_run_id: str) -> List[StepRun]:
+    def _load_step_runs(self, job_run_id: str) -> list[StepRun]:
         """Load all step runs for a job run."""
         conn = self._get_connection()
         try:
             cursor = conn.execute(
-                "SELECT * FROM step_runs WHERE job_run_id = ? ORDER BY created_at",
+                "SELECT * FROM step_runs WHERE job_run_id = ? ORDER BY step_name",
                 (job_run_id,),
             )
             return [self._deserialize_step_run(row) for row in cursor.fetchall()]
@@ -371,22 +403,25 @@ class SQLitePersistence(BasePersistence):
         try:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO jobs (name, description, parameters, steps, metadata)
-                VALUES (?, ?, ?, ?, ?)
-            """,
+                INSERT OR REPLACE INTO jobs
+                    (name, description, steps, tags, metadata, version, enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
                 (
                     data["name"],
                     data["description"],
-                    data["parameters"],
                     data["steps"],
+                    data["tags"],
                     data["metadata"],
+                    data["version"],
+                    data["enabled"],
                 ),
             )
             conn.commit()
         except sqlite3.Error as e:
             raise PersistenceError(f"Failed to save job '{job.name}': {e}") from e
 
-    def get_job(self, job_name: str) -> Optional[Job]:
+    def get_job(self, job_name: str) -> Job | None:
         """Retrieve a job definition by name."""
         conn = self._get_connection()
         try:
@@ -396,7 +431,7 @@ class SQLitePersistence(BasePersistence):
         except sqlite3.Error as e:
             raise PersistenceError(f"Failed to get job '{job_name}': {e}") from e
 
-    def list_jobs(self, limit: Optional[int] = None, offset: int = 0) -> List[Job]:
+    def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
         """List all job definitions."""
         conn = self._get_connection()
         try:
@@ -433,43 +468,61 @@ class SQLitePersistence(BasePersistence):
             run_data = self._serialize_job_run(job_run)
             conn.execute(
                 """
-                INSERT OR REPLACE INTO job_runs 
-                (id, job_name, status, created_at, started_at, completed_at, parameters, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+                INSERT OR REPLACE INTO job_runs
+                    (job_run_id, job_name, job_version, status,
+                     created_at, updated_at, start_time, end_time,
+                     duration_ms, triggered_by, priority,
+                     input_data, output_data, context, error, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
                 (
-                    run_data["id"],
+                    run_data["job_run_id"],
                     run_data["job_name"],
+                    run_data["job_version"],
                     run_data["status"],
                     run_data["created_at"],
-                    run_data["started_at"],
-                    run_data["completed_at"],
-                    run_data["parameters"],
+                    run_data["updated_at"],
+                    run_data["start_time"],
+                    run_data["end_time"],
+                    run_data["duration_ms"],
+                    run_data["triggered_by"],
+                    run_data["priority"],
+                    run_data["input_data"],
+                    run_data["output_data"],
+                    run_data["context"],
+                    run_data["error"],
                     run_data["metadata"],
                 ),
             )
 
-            # Save step runs
+            # Delete existing step runs, then insert fresh
+            conn.execute(
+                "DELETE FROM step_runs WHERE job_run_id = ?", (job_run.job_run_id,)
+            )
+
             for step_run in job_run.step_runs:
                 step_data = self._serialize_step_run(step_run)
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO step_runs 
-                    (id, job_run_id, step_name, status, created_at, started_at, 
-                     completed_at, input_data, output_data, error_message, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+                    INSERT OR REPLACE INTO step_runs
+                        (step_run_id, job_run_id, step_name, status,
+                         executor_type, start_time, end_time, duration_ms,
+                         retry_count, input_data, output_data, error, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
                     (
-                        step_data["id"],
+                        step_data["step_run_id"],
                         step_data["job_run_id"],
                         step_data["step_name"],
                         step_data["status"],
-                        step_data["created_at"],
-                        step_data["started_at"],
-                        step_data["completed_at"],
+                        step_data["executor_type"],
+                        step_data["start_time"],
+                        step_data["end_time"],
+                        step_data["duration_ms"],
+                        step_data["retry_count"],
                         step_data["input_data"],
                         step_data["output_data"],
-                        step_data["error_message"],
+                        step_data["error"],
                         step_data["metadata"],
                     ),
                 )
@@ -488,58 +541,70 @@ class SQLitePersistence(BasePersistence):
         try:
             # Check if job run exists
             cursor = conn.execute(
-                "SELECT id FROM job_runs WHERE id = ?", (job_run.job_run_id,)
+                "SELECT job_run_id FROM job_runs WHERE job_run_id = ?",
+                (job_run.job_run_id,),
             )
             if not cursor.fetchone():
                 raise JobNotFoundError(f"Job run {job_run.job_run_id} not found")
 
-            # Update job run (same as save_job_run but with explicit update)
             run_data = self._serialize_job_run(job_run)
             conn.execute(
                 """
-                UPDATE job_runs 
-                SET job_name=?, status=?, created_at=?, started_at=?, completed_at=?, 
-                    parameters=?, metadata=?
-                WHERE id=?
+                UPDATE job_runs
+                SET job_name=?, job_version=?, status=?,
+                    updated_at=?, start_time=?, end_time=?,
+                    duration_ms=?, triggered_by=?, priority=?,
+                    input_data=?, output_data=?, context=?,
+                    error=?, metadata=?
+                WHERE job_run_id=?
                 """,
                 (
                     run_data["job_name"],
+                    run_data["job_version"],
                     run_data["status"],
-                    run_data["created_at"],
-                    run_data["started_at"],
-                    run_data["completed_at"],
-                    run_data["parameters"],
+                    run_data["updated_at"],
+                    run_data["start_time"],
+                    run_data["end_time"],
+                    run_data["duration_ms"],
+                    run_data["triggered_by"],
+                    run_data["priority"],
+                    run_data["input_data"],
+                    run_data["output_data"],
+                    run_data["context"],
+                    run_data["error"],
                     run_data["metadata"],
-                    run_data["id"],
+                    run_data["job_run_id"],
                 ),
             )
 
-            # Delete existing step runs and insert new ones
+            # Replace step runs
             conn.execute(
                 "DELETE FROM step_runs WHERE job_run_id = ?", (job_run.job_run_id,)
             )
 
-            # Save step runs
             for step_run in job_run.step_runs:
                 step_data = self._serialize_step_run(step_run)
                 conn.execute(
                     """
-                    INSERT INTO step_runs 
-                    (id, job_run_id, step_name, status, created_at, started_at, 
-                     completed_at, input_data, output_data, error_message, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO step_runs
+                        (step_run_id, job_run_id, step_name, status,
+                         executor_type, start_time, end_time, duration_ms,
+                         retry_count, input_data, output_data, error, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        step_data["id"],
+                        step_data["step_run_id"],
                         step_data["job_run_id"],
                         step_data["step_name"],
                         step_data["status"],
-                        step_data["created_at"],
-                        step_data["started_at"],
-                        step_data["completed_at"],
+                        step_data["executor_type"],
+                        step_data["start_time"],
+                        step_data["end_time"],
+                        step_data["duration_ms"],
+                        step_data["retry_count"],
                         step_data["input_data"],
                         step_data["output_data"],
-                        step_data["error_message"],
+                        step_data["error"],
                         step_data["metadata"],
                     ),
                 )
@@ -551,16 +616,17 @@ class SQLitePersistence(BasePersistence):
                 f"Failed to update job run '{job_run.job_run_id}': {e}"
             ) from e
 
-    def get_job_run(self, run_id: str) -> Optional[JobRun]:
+    def get_job_run(self, run_id: str) -> JobRun | None:
         """Retrieve a job run by ID."""
         conn = self._get_connection()
         try:
-            cursor = conn.execute("SELECT * FROM job_runs WHERE id = ?", (run_id,))
+            cursor = conn.execute(
+                "SELECT * FROM job_runs WHERE job_run_id = ?", (run_id,)
+            )
             row = cursor.fetchone()
             if not row:
                 return None
 
-            # Load step runs
             step_runs = self._load_step_runs(run_id)
             return self._deserialize_job_run(row, step_runs)
 
@@ -569,12 +635,12 @@ class SQLitePersistence(BasePersistence):
 
     def list_job_runs(
         self,
-        job_name: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: Optional[int] = None,
+        job_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
         offset: int = 0,
-        since: Optional[datetime] = None,
-    ) -> List[JobRun]:
+        since: datetime | None = None,
+    ) -> list[JobRun]:
         """List job runs with optional filtering."""
         conn = self._get_connection()
         try:
@@ -603,7 +669,7 @@ class SQLitePersistence(BasePersistence):
             runs = []
 
             for row in cursor.fetchall():
-                step_runs = self._load_step_runs(row["id"])
+                step_runs = self._load_step_runs(row["job_run_id"])
                 runs.append(self._deserialize_job_run(row, step_runs))
 
             return runs
@@ -615,13 +681,15 @@ class SQLitePersistence(BasePersistence):
         """Delete a job run and its step runs."""
         conn = self._get_connection()
         try:
-            cursor = conn.execute("DELETE FROM job_runs WHERE id = ?", (run_id,))
+            cursor = conn.execute(
+                "DELETE FROM job_runs WHERE job_run_id = ?", (run_id,)
+            )
             conn.commit()
             return cursor.rowcount > 0
         except sqlite3.Error as e:
             raise PersistenceError(f"Failed to delete job run '{run_id}': {e}") from e
 
-    def get_job_run_count(self, job_name: Optional[str] = None) -> int:
+    def get_job_run_count(self, job_name: str | None = None) -> int:
         """Get the total number of job runs."""
         conn = self._get_connection()
         try:
@@ -635,10 +703,21 @@ class SQLitePersistence(BasePersistence):
         except sqlite3.Error as e:
             raise PersistenceError(f"Failed to count job runs: {e}") from e
 
-    def cleanup_old_runs(self, older_than: datetime) -> int:
-        """Remove job runs older than the specified datetime."""
+    def cleanup_old_runs(self, older_than: datetime, dry_run: bool = False) -> int:
+        """Remove job runs older than the specified datetime.
+
+        Args:
+            older_than: Delete runs created before this datetime.
+            dry_run: If True (default), only count without deleting.
+        """
         conn = self._get_connection()
         try:
+            if dry_run:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM job_runs WHERE created_at < ?",
+                    (older_than.isoformat(),),
+                )
+                return cursor.fetchone()[0]
             cursor = conn.execute(
                 "DELETE FROM job_runs WHERE created_at < ?", (older_than.isoformat(),)
             )
@@ -647,7 +726,7 @@ class SQLitePersistence(BasePersistence):
         except sqlite3.Error as e:
             raise PersistenceError(f"Failed to cleanup old runs: {e}") from e
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Check the health of the persistence backend."""
         try:
             conn = self._get_connection()
@@ -690,7 +769,7 @@ class SQLitePersistence(BasePersistence):
                 "writable": False,
             }
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get persistence backend statistics."""
         health = self.health_check()
 
@@ -703,10 +782,10 @@ class SQLitePersistence(BasePersistence):
             # Get additional statistics
             cursor = conn.execute(
                 """
-                SELECT 
+                SELECT
                     status,
                     COUNT(*) as count
-                FROM job_runs 
+                FROM job_runs
                 GROUP BY status
             """
             )
@@ -715,8 +794,8 @@ class SQLitePersistence(BasePersistence):
             # Get recent activity
             cursor = conn.execute(
                 """
-                SELECT COUNT(*) 
-                FROM job_runs 
+                SELECT COUNT(*)
+                FROM job_runs
                 WHERE created_at >= datetime('now', '-1 day')
             """
             )

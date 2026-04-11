@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple test of retry mechanisms in IAS Workflow Engine."""
+"""Simple test of retry mechanisms in PyWorkflow Engine."""
 
 import sys
 from pathlib import Path

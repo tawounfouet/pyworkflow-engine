@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Validation script pour le package IAS Workflow Engine.
+Validation script pour le package PyWorkflow Engine.
 Vérifie que tous les composants implémentés fonctionnent correctement.
 """
 
@@ -27,7 +27,7 @@ def test_core_imports():
         print("  ✅ Structlog adapter imports OK")
 
         # Test des nouveaux modèles core
-        from pyworkflow_engine.core import (
+        from pyworkflow_engine import (
             Job,
             Step,
             StepType,
@@ -153,7 +153,7 @@ def test_core_models_functionality():
     """Test la fonctionnalité de base des modèles core."""
     print("\n🧪 Testing core models functionality...")
     try:
-        from pyworkflow_engine.core import (
+        from pyworkflow_engine import (
             Job,
             Step,
             StepType,
@@ -213,7 +213,7 @@ def test_core_models_functionality():
 
 def main():
     """Run all validation tests."""
-    print("🚀 IAS Workflow Engine - Validation Suite")
+    print("🚀 PyWorkflow Engine - Validation Suite")
     print("=" * 50)
 
     tests = [
