@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from pyworkflow_engine.models import Job, JobRun, StepRun
+from pyworkflow_engine.models.pipeline.pipeline_run import PipelineRun, StageRun
 from pyworkflow_engine.ports.storage import (
     BaseStorage,
     JobNotFoundError,
@@ -23,7 +24,7 @@ from pyworkflow_engine.ports.storage import (
 )
 
 # Database schema version
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
 
 # SQL Schema definitions
 SCHEMA_SQL = """
@@ -79,6 +80,42 @@ CREATE TABLE IF NOT EXISTS step_runs (
     FOREIGN KEY (job_run_id) REFERENCES job_runs(job_run_id) ON DELETE CASCADE
 );
 
+-- Pipeline runs table (v3)
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    pipeline_run_id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    pipeline_version TEXT DEFAULT '1.0.0',
+    status TEXT NOT NULL,
+    triggered_by TEXT DEFAULT 'manual',
+    context TEXT,      -- JSON
+    error TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_ms INTEGER,
+    trigger_data TEXT, -- JSON
+    metadata TEXT,     -- JSON
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+-- Stage runs table (v3)
+CREATE TABLE IF NOT EXISTS stage_runs (
+    stage_run_id TEXT PRIMARY KEY,
+    pipeline_run_id TEXT NOT NULL,
+    job_name TEXT NOT NULL,
+    stage_index INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    skipped INTEGER DEFAULT 0,
+    skip_reason TEXT,
+    error TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_ms INTEGER,
+    metadata TEXT,     -- JSON
+    job_run_id TEXT,   -- FK → job_runs (nullable, added v5)
+    FOREIGN KEY (pipeline_run_id) REFERENCES pipeline_runs(pipeline_run_id) ON DELETE CASCADE
+);
+
 -- Schema version tracking
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY,
@@ -91,6 +128,10 @@ CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status);
 CREATE INDEX IF NOT EXISTS idx_job_runs_created_at ON job_runs(created_at);
 CREATE INDEX IF NOT EXISTS idx_step_runs_job_run_id ON step_runs(job_run_id);
 CREATE INDEX IF NOT EXISTS idx_step_runs_status ON step_runs(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_pipeline_name ON pipeline_runs(pipeline_name);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_created_at ON pipeline_runs(created_at);
+CREATE INDEX IF NOT EXISTS idx_stage_runs_pipeline_run_id ON stage_runs(pipeline_run_id);
 
 -- Triggers to update timestamps
 CREATE TRIGGER IF NOT EXISTS update_jobs_timestamp
@@ -100,6 +141,69 @@ BEGIN
     UPDATE jobs SET updated_at = CURRENT_TIMESTAMP WHERE name = NEW.name;
 END;
 """
+
+# Migration: v2 → v3 (add pipeline_runs + stage_runs to existing DBs)
+MIGRATION_V2_TO_V3 = """
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    pipeline_run_id TEXT PRIMARY KEY,
+    pipeline_name TEXT NOT NULL,
+    pipeline_version TEXT DEFAULT '1.0.0',
+    status TEXT NOT NULL,
+    triggered_by TEXT DEFAULT 'manual',
+    context TEXT,
+    error TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_ms INTEGER,
+    trigger_data TEXT,
+    metadata TEXT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS stage_runs (
+    stage_run_id TEXT PRIMARY KEY,
+    pipeline_run_id TEXT NOT NULL,
+    job_name TEXT NOT NULL,
+    stage_index INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    skipped INTEGER DEFAULT 0,
+    skip_reason TEXT,
+    error TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_ms INTEGER,
+    metadata TEXT,
+    job_run_id TEXT,
+    FOREIGN KEY (pipeline_run_id) REFERENCES pipeline_runs(pipeline_run_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_pipeline_name ON pipeline_runs(pipeline_name);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_created_at ON pipeline_runs(created_at);
+CREATE INDEX IF NOT EXISTS idx_stage_runs_pipeline_run_id ON stage_runs(pipeline_run_id);
+"""
+
+# Migration: v3 → v4 (ensure all indexes and triggers exist on upgraded DBs)
+# All statements use IF NOT EXISTS — safe to re-run on any v3 database.
+MIGRATION_V3_TO_V4 = """
+CREATE INDEX IF NOT EXISTS idx_job_runs_job_name ON job_runs(job_name);
+CREATE INDEX IF NOT EXISTS idx_job_runs_status ON job_runs(status);
+CREATE INDEX IF NOT EXISTS idx_job_runs_created_at ON job_runs(created_at);
+CREATE INDEX IF NOT EXISTS idx_step_runs_job_run_id ON step_runs(job_run_id);
+CREATE INDEX IF NOT EXISTS idx_step_runs_status ON step_runs(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_pipeline_name ON pipeline_runs(pipeline_name);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_created_at ON pipeline_runs(created_at);
+CREATE INDEX IF NOT EXISTS idx_stage_runs_pipeline_run_id ON stage_runs(pipeline_run_id);
+"""
+
+# Migration: v4 → v5 (add job_run_id to stage_runs / pl_stage_runs for step drill-down in GUI)
+# ALTER TABLE … ADD COLUMN is safe — the column is nullable and defaults to NULL.
+MIGRATION_V4_TO_V5_STEPS = [
+    "ALTER TABLE stage_runs    ADD COLUMN job_run_id TEXT",
+    "ALTER TABLE pl_stage_runs ADD COLUMN job_run_id TEXT",
+]
 
 
 class SQLiteStorage(BaseStorage):
@@ -132,8 +236,41 @@ class SQLiteStorage(BaseStorage):
         self._local = threading.local()
         self._lock = threading.RLock()
 
+        # Registry of all thread-local connections (for close())
+        self._all_connections: list[sqlite3.Connection] = []
+
         # Initialize database
         self._initialize_database()
+
+    def close(self) -> None:
+        """Ferme la connexion thread-local courante et la libère.
+
+        À appeler en fin de vie du thread (worker ASGI, thread de test…).
+        Sans cet appel les connexions thread-local restent ouvertes jusqu'à
+        la fin du processus.
+        """
+        if hasattr(self._local, "connection"):
+            try:
+                self._local.connection.close()
+            except Exception:  # noqa: BLE001
+                pass
+            del self._local.connection
+
+    def close_all(self) -> None:
+        """Ferme toutes les connexions ouvertes (à appeler au shutdown du processus)."""
+        with self._lock:
+            for conn in self._all_connections:
+                try:
+                    conn.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            self._all_connections.clear()
+
+    def __enter__(self) -> "SQLiteStorage":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get a thread-local database connection."""
@@ -153,6 +290,9 @@ class SQLiteStorage(BaseStorage):
             conn.execute("PRAGMA temp_store = MEMORY")  # Use memory for temp tables
 
             self._local.connection = conn
+            # Track so close_all() can reach every thread's connection
+            with self._lock:
+                self._all_connections.append(conn)
 
         return self._local.connection
 
@@ -176,7 +316,34 @@ class SQLiteStorage(BaseStorage):
 
                 # Apply schema if needed
                 if current_version < SCHEMA_VERSION:
-                    conn.executescript(SCHEMA_SQL)
+                    if current_version == 0:
+                        # Fresh install — apply full schema
+                        conn.executescript(SCHEMA_SQL)
+                    else:
+                        # Incremental migrations — each step is idempotent
+                        # (all DDL statements use IF NOT EXISTS).
+                        # Add a new `if current_version < N` block for each
+                        # future schema version bump.
+                        if current_version < 3:
+                            conn.executescript(MIGRATION_V2_TO_V3)
+                        if current_version < 4:
+                            conn.executescript(MIGRATION_V3_TO_V4)
+                        if current_version < 5:
+                            # ADD COLUMN is not idempotent — guard with a
+                            # column-existence check before executing.
+                            existing = {
+                                row[1]
+                                for row in conn.execute(
+                                    "PRAGMA table_info(stage_runs)"
+                                ).fetchall()
+                            }
+                            for stmt in MIGRATION_V4_TO_V5_STEPS:
+                                col = stmt.split()[-1]  # last token = column name
+                                if col not in existing:
+                                    try:
+                                        conn.execute(stmt)
+                                    except sqlite3.OperationalError:
+                                        pass  # column already exists in pl_* table
                     conn.execute(
                         "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
                         (SCHEMA_VERSION,),
@@ -637,11 +804,21 @@ class SQLiteStorage(BaseStorage):
         offset: int = 0,
         since: datetime | None = None,
     ) -> list[JobRun]:
-        """List job runs with optional filtering."""
+        """List job runs with optional filtering.
+
+        Applique ``DEFAULT_PAGE_SIZE`` (500) si ``limit`` n'est pas fourni,
+        afin d'éviter des lectures OOM sur des bases volumineuses.
+        Passer ``limit=None`` explicitement n'a **pas** d'effet ici — utiliser
+        un grand entier ou paginer via ``offset`` si vous avez besoin de plus
+        de 500 résultats.
+        """
+        # Appliquer la limite par défaut si l'appelant ne précise rien.
+        effective_limit = limit if limit is not None else self.DEFAULT_PAGE_SIZE
+
         conn = self._get_connection()
         try:
             sql = "SELECT * FROM job_runs WHERE 1=1"
-            params = []
+            params: list = []
 
             if job_name:
                 sql += " AND job_name = ?"
@@ -656,10 +833,8 @@ class SQLiteStorage(BaseStorage):
                 params.append(since.isoformat())
 
             sql += " ORDER BY created_at DESC"
-
-            if limit is not None:
-                sql += " LIMIT ? OFFSET ?"
-                params.extend([limit, offset])
+            sql += " LIMIT ? OFFSET ?"
+            params.extend([effective_limit, offset])
 
             cursor = conn.execute(sql, params)
             runs = []
@@ -716,6 +891,407 @@ class SQLiteStorage(BaseStorage):
             return cursor.rowcount
         except sqlite3.Error as e:
             raise StorageError(f"Failed to cleanup old runs: {e}") from e
+
+    # ── Pipeline run persistence (schema v3 + ADR-018 pl_* tables) ───────────
+
+    # DDL for the ADR-018 namespaced pipeline tables (created on first use
+    # if the UnifiedStorage migration has not yet run on this connection).
+    _PL_PIPELINE_RUNS_DDL = """
+        CREATE TABLE IF NOT EXISTS pl_pipeline_runs (
+            pipeline_run_id TEXT PRIMARY KEY,
+            pipeline_name   TEXT NOT NULL,
+            pipeline_version TEXT,
+            status          TEXT NOT NULL,
+            context         TEXT,
+            error           TEXT,
+            start_time      TIMESTAMP,
+            end_time        TIMESTAMP,
+            duration_ms     INTEGER,
+            triggered_by    TEXT,
+            trigger_data    TEXT,
+            metadata        TEXT,
+            created_at      TIMESTAMP NOT NULL,
+            updated_at      TIMESTAMP NOT NULL
+        )
+    """
+    _PL_STAGE_RUNS_DDL = """
+        CREATE TABLE IF NOT EXISTS pl_stage_runs (
+            stage_run_id    TEXT PRIMARY KEY,
+            pipeline_run_id TEXT NOT NULL,
+            job_name        TEXT NOT NULL,
+            stage_index     INTEGER NOT NULL,
+            status          TEXT NOT NULL,
+            skipped         INTEGER DEFAULT 0,
+            skip_reason     TEXT,
+            error           TEXT,
+            start_time      TIMESTAMP,
+            end_time        TIMESTAMP,
+            duration_ms     INTEGER,
+            metadata        TEXT,
+            job_run_id      TEXT,
+            FOREIGN KEY (pipeline_run_id)
+                REFERENCES pl_pipeline_runs(pipeline_run_id) ON DELETE CASCADE
+        )
+    """
+    _PL_IDX_DDL = [
+        "CREATE INDEX IF NOT EXISTS idx_pl_pipeline_runs_name   ON pl_pipeline_runs(pipeline_name)",
+        "CREATE INDEX IF NOT EXISTS idx_pl_pipeline_runs_status ON pl_pipeline_runs(status)",
+        "CREATE INDEX IF NOT EXISTS idx_pl_pipeline_runs_ts     ON pl_pipeline_runs(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_pl_stage_runs_run_id    ON pl_stage_runs(pipeline_run_id)",
+    ]
+
+    def _ensure_pl_tables(self, conn: sqlite3.Connection) -> None:
+        """Crée les tables ADR-018 ``pl_*`` si elles n'existent pas encore."""
+        conn.execute(self._PL_PIPELINE_RUNS_DDL)
+        conn.execute(self._PL_STAGE_RUNS_DDL)
+        for idx_sql in self._PL_IDX_DDL:
+            conn.execute(idx_sql)
+
+    # ── Pipeline definitions (pl_pipelines) ──────────────────────────────
+
+    def save_pipeline(self, pipeline: "Pipeline") -> None:  # type: ignore[name-defined]
+        """Persiste la définition d'une Pipeline dans ``pl_pipelines`` (upsert)."""
+        from pyworkflow_engine.models.pipeline.pipeline import (
+            Pipeline as _Pipeline,
+        )  # noqa: PLC0415
+
+        conn = self._get_connection()
+        try:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pl_pipelines (
+                        name, description, stages, triggers, schedule,
+                        priority, tags, metadata, version, enabled, owner
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pipeline.name,
+                        pipeline.description,
+                        json.dumps([s.model_dump() for s in pipeline.stages]),
+                        json.dumps(
+                            [
+                                t.value if hasattr(t, "value") else str(t)
+                                for t in pipeline.triggers
+                            ]
+                        ),
+                        pipeline.schedule,
+                        (
+                            pipeline.priority.value
+                            if hasattr(pipeline.priority, "value")
+                            else str(pipeline.priority)
+                        ),
+                        json.dumps(pipeline.tags),
+                        json.dumps(pipeline.metadata),
+                        pipeline.version,
+                        1 if pipeline.enabled else 0,
+                        pipeline.owner,
+                    ),
+                )
+        except sqlite3.Error as e:
+            raise StorageError(f"Failed to save pipeline '{pipeline.name}': {e}") from e
+
+    def get_pipeline(self, name: str) -> "Pipeline | None":  # type: ignore[name-defined]
+        """Récupère une Pipeline par son nom depuis ``pl_pipelines``."""
+        conn = self._get_connection()
+        try:
+            row = conn.execute(
+                "SELECT * FROM pl_pipelines WHERE name = ?", (name,)
+            ).fetchone()
+            if row is None:
+                return None
+            return self._deserialize_pipeline(row)
+        except sqlite3.Error as e:
+            raise StorageError(f"Failed to get pipeline '{name}': {e}") from e
+
+    def list_pipelines(
+        self,
+        enabled_only: bool = False,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list:
+        """Liste toutes les pipelines depuis ``pl_pipelines``."""
+        conn = self._get_connection()
+        where = "WHERE enabled = 1" if enabled_only else ""
+        limit_clause = (
+            f"LIMIT {limit} OFFSET {offset}"
+            if limit is not None
+            else f"LIMIT -1 OFFSET {offset}"
+        )
+        try:
+            rows = conn.execute(
+                f"SELECT * FROM pl_pipelines {where} ORDER BY name {limit_clause}"
+            ).fetchall()
+            return [self._deserialize_pipeline(r) for r in rows]
+        except sqlite3.Error as e:
+            raise StorageError(f"Failed to list pipelines: {e}") from e
+
+    def _deserialize_pipeline(self, row: sqlite3.Row):  # type: ignore[return]
+        """Reconstruit un objet ``Pipeline`` depuis une ligne SQLite."""
+        from pyworkflow_engine.models.enums import (
+            Priority,
+            TriggerType,
+        )  # noqa: PLC0415
+        from pyworkflow_engine.models.pipeline.pipeline import (
+            Pipeline,
+            PipelineStage,
+        )  # noqa: PLC0415
+
+        stages_raw = json.loads(row["stages"] or "[]")
+        stages = [PipelineStage(**s) for s in stages_raw]
+
+        triggers_raw = json.loads(row["triggers"] or '["manual"]')
+        triggers = []
+        for t in triggers_raw:
+            try:
+                triggers.append(TriggerType(t))
+            except ValueError:
+                triggers.append(TriggerType.MANUAL)
+
+        try:
+            priority = Priority(row["priority"])
+        except (ValueError, KeyError):
+            priority = Priority.NORMAL
+
+        return Pipeline(
+            name=row["name"],
+            description=row["description"] or "",
+            stages=stages,
+            triggers=triggers,
+            schedule=row["schedule"],
+            priority=priority,
+            tags=json.loads(row["tags"] or "[]"),
+            metadata=json.loads(row["metadata"] or "{}"),
+            version=row["version"] or "1.0.0",
+            enabled=bool(row["enabled"]),
+            owner=row["owner"] or "",
+        )
+
+    def save_pipeline_run(self, pipeline_run: PipelineRun) -> None:
+        """Persiste un PipelineRun et ses StageRuns (upsert).
+
+        Écrit dans **deux** jeux de tables :
+        - ``pipeline_runs`` / ``stage_runs``    — tables historiques (v3)
+        - ``pl_pipeline_runs`` / ``pl_stage_runs`` — tables ADR-018 (namespaced)
+
+        Les tables ADR-018 sont créées automatiquement si elles sont absentes
+        (elles existent déjà si ``UnifiedStorage.migrate()`` a été appelé).
+        """
+        conn = self._get_connection()
+
+        # Valeurs partagées entre les deux INSERT
+        pr = pipeline_run
+        run_values = (
+            pr.pipeline_run_id,
+            pr.pipeline_name,
+            pr.pipeline_version,
+            pr.status.value,
+            pr.triggered_by,
+            json.dumps(pr.context),
+            pr.error,
+            pr.start_time.isoformat() if pr.start_time else None,
+            pr.end_time.isoformat() if pr.end_time else None,
+            pr.duration_ms,
+            json.dumps(pr.trigger_data),
+            json.dumps(pr.metadata),
+            pr.created_at.isoformat(),
+            pr.updated_at.isoformat(),
+        )
+
+        try:
+            with conn:
+                self._ensure_pl_tables(conn)
+
+                # ── tables historiques (rétrocompatibilité) ───────────────
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pipeline_runs (
+                        pipeline_run_id, pipeline_name, pipeline_version,
+                        status, triggered_by, context, error,
+                        start_time, end_time, duration_ms,
+                        trigger_data, metadata, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    run_values,
+                )
+
+                # ── tables ADR-018 pl_* (namespaced, lues par l'UI/stats) ─
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pl_pipeline_runs (
+                        pipeline_run_id, pipeline_name, pipeline_version,
+                        status, triggered_by, context, error,
+                        start_time, end_time, duration_ms,
+                        trigger_data, metadata, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    run_values,
+                )
+
+                # ── stage runs ────────────────────────────────────────────
+                for sr in pr.stage_runs:
+                    job_run_id = sr.job_run.job_run_id if sr.job_run else None
+                    stage_values = (
+                        sr.stage_run_id,
+                        pr.pipeline_run_id,
+                        sr.job_name,
+                        sr.stage_index,
+                        sr.status.value,
+                        1 if sr.skipped else 0,
+                        sr.skip_reason or "",
+                        sr.error,
+                        sr.start_time.isoformat() if sr.start_time else None,
+                        sr.end_time.isoformat() if sr.end_time else None,
+                        sr.duration_ms,
+                        json.dumps(sr.metadata),
+                        job_run_id,
+                    )
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO stage_runs (
+                            stage_run_id, pipeline_run_id, job_name, stage_index,
+                            status, skipped, skip_reason, error,
+                            start_time, end_time, duration_ms, metadata, job_run_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        stage_values,
+                    )
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO pl_stage_runs (
+                            stage_run_id, pipeline_run_id, job_name, stage_index,
+                            status, skipped, skip_reason, error,
+                            start_time, end_time, duration_ms, metadata, job_run_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        stage_values,
+                    )
+        except sqlite3.Error as e:
+            raise StorageError(f"Failed to save pipeline run: {e}") from e
+
+    def get_pipeline_run(self, pipeline_run_id: str) -> PipelineRun | None:
+        """Récupère un PipelineRun complet (avec StageRuns) par son identifiant."""
+        conn = self._get_connection()
+        try:
+            row = conn.execute(
+                "SELECT * FROM pipeline_runs WHERE pipeline_run_id = ?",
+                (pipeline_run_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            stage_rows = conn.execute(
+                "SELECT * FROM stage_runs WHERE pipeline_run_id = ? ORDER BY stage_index",
+                (pipeline_run_id,),
+            ).fetchall()
+            return self._deserialize_pipeline_run(row, stage_rows)
+        except sqlite3.Error as e:
+            raise StorageError(f"Failed to get pipeline run: {e}") from e
+
+    def list_pipeline_runs(
+        self,
+        pipeline_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        since: datetime | None = None,
+    ) -> list[PipelineRun]:
+        """Liste les PipelineRuns avec filtrage optionnel."""
+        conn = self._get_connection()
+        try:
+            conditions: list[str] = []
+            params: list[Any] = []
+            if pipeline_name is not None:
+                conditions.append("pipeline_name = ?")
+                params.append(pipeline_name)
+            if status is not None:
+                conditions.append("status = ?")
+                params.append(status)
+            if since is not None:
+                conditions.append("created_at >= ?")
+                params.append(since.isoformat())
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            query = f"SELECT * FROM pipeline_runs {where} ORDER BY created_at DESC"
+            if limit is not None:
+                query += f" LIMIT {limit} OFFSET {offset}"
+            elif offset > 0:
+                query += f" LIMIT -1 OFFSET {offset}"
+            rows = conn.execute(query, params).fetchall()
+            result = []
+            for row in rows:
+                stage_rows = conn.execute(
+                    "SELECT * FROM stage_runs WHERE pipeline_run_id = ? ORDER BY stage_index",
+                    (row["pipeline_run_id"],),
+                ).fetchall()
+                result.append(self._deserialize_pipeline_run(row, stage_rows))
+            return result
+        except sqlite3.Error as e:
+            raise StorageError(f"Failed to list pipeline runs: {e}") from e
+
+    def _deserialize_pipeline_run(
+        self,
+        row: sqlite3.Row,
+        stage_rows: list[sqlite3.Row],
+    ) -> PipelineRun:
+        """Désérialise un PipelineRun depuis des lignes SQLite."""
+        from pyworkflow_engine.models.enums import RunStatus
+
+        def _ts(val: str | None) -> datetime | None:
+            return datetime.fromisoformat(val) if val else None
+
+        return PipelineRun(
+            pipeline_run_id=row["pipeline_run_id"],
+            pipeline_name=row["pipeline_name"],
+            pipeline_version=row["pipeline_version"] or "1.0.0",
+            status=RunStatus(row["status"]),
+            triggered_by=row["triggered_by"] or "manual",
+            context=json.loads(row["context"]) if row["context"] else {},
+            error=row["error"],
+            start_time=_ts(row["start_time"]),
+            end_time=_ts(row["end_time"]),
+            duration_ms=row["duration_ms"],
+            trigger_data=json.loads(row["trigger_data"]) if row["trigger_data"] else {},
+            metadata=json.loads(row["metadata"]) if row["metadata"] else {},
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+            stage_runs=[self._deserialize_stage_run(sr) for sr in stage_rows],
+        )
+
+    def _deserialize_stage_run(self, row: sqlite3.Row) -> StageRun:
+        """Désérialise un StageRun depuis une ligne SQLite.
+
+        Si ``job_run_id`` est présent dans la ligne (v5+), charge également
+        le ``JobRun`` correspondant (avec ses ``step_runs``) afin que la vue
+        GUI puisse afficher le détail des steps par stage.
+        """
+        from pyworkflow_engine.models.enums import RunStatus
+
+        def _ts(val: str | None) -> datetime | None:
+            return datetime.fromisoformat(val) if val else None
+
+        stage_run = StageRun(
+            stage_run_id=row["stage_run_id"],
+            pipeline_run_id=row["pipeline_run_id"],
+            job_name=row["job_name"],
+            stage_index=row["stage_index"],
+            status=RunStatus(row["status"]),
+            skipped=bool(row["skipped"]),
+            skip_reason=row["skip_reason"] or "",
+            error=row["error"],
+            start_time=_ts(row["start_time"]),
+            end_time=_ts(row["end_time"]),
+            duration_ms=row["duration_ms"],
+            metadata=json.loads(row["metadata"]) if row["metadata"] else {},
+        )
+
+        # Charger le JobRun sous-jacent si job_run_id est stocké (schema v5+)
+        job_run_id = row["job_run_id"] if "job_run_id" in row.keys() else None
+        if job_run_id:
+            try:
+                stage_run.job_run = self.get_job_run(job_run_id)
+            except Exception:  # noqa: BLE001
+                pass  # Ne pas casser la désérialisation si le job_run est absent
+
+        return stage_run
 
     def health_check(self) -> dict[str, Any]:
         """Check the health of the persistence backend."""

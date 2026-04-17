@@ -18,9 +18,9 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyworkflow_engine.models import Job, JobRun
+    from pyworkflow_engine.models.pipeline.pipeline_run import PipelineRun
 
 from pyworkflow_engine.exceptions import WorkflowError
-
 
 # ── Exceptions de contrat ─────────────────────────────────────────────────────
 
@@ -184,7 +184,65 @@ class BaseStorage(ABC):
             StorageError: Si la mise à jour échoue.
         """
 
+    # ── Pipeline runs ─────────────────────────────────────────────────────────
+
+    @abstractmethod
+    def save_pipeline_run(self, pipeline_run: PipelineRun) -> None:
+        """Persiste un PipelineRun (création ou mise à jour).
+
+        Args:
+            pipeline_run: Le ``PipelineRun`` à sauvegarder.
+
+        Raises:
+            StorageError: Si la sauvegarde échoue.
+        """
+
+    @abstractmethod
+    def get_pipeline_run(self, pipeline_run_id: str) -> PipelineRun | None:
+        """Récupère un PipelineRun par son identifiant.
+
+        Args:
+            pipeline_run_id: Identifiant du PipelineRun.
+
+        Returns:
+            Le ``PipelineRun`` si trouvé, ``None`` sinon.
+
+        Raises:
+            StorageError: Si la récupération échoue.
+        """
+
+    @abstractmethod
+    def list_pipeline_runs(
+        self,
+        pipeline_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        since: datetime | None = None,
+    ) -> list[PipelineRun]:
+        """Liste les PipelineRuns avec filtrage optionnel.
+
+        Args:
+            pipeline_name: Filtre par nom de pipeline.
+            status: Filtre par statut.
+            limit: Nombre maximum de runs à retourner.
+            offset: Nombre de runs à ignorer.
+            since: Ne retourner que les runs créés après cette date.
+
+        Returns:
+            Liste de ``PipelineRun`` correspondant aux critères.
+
+        Raises:
+            StorageError: Si la requête échoue.
+        """
+
     # ── Méthodes utilitaires (non-abstract) ───────────────────────────────────
+
+    # Limite par défaut appliquée par list_job_runs() quand limit=None n'est
+    # pas surchargé par l'implémentation.  Protège contre les OOM sur des
+    # bases de données de grande taille.  Les backends peuvent exposer une
+    # pagination explicite via limit/offset pour dépasser ce plafond.
+    DEFAULT_PAGE_SIZE: int = 500
 
     def get_job_run_count(self, job_name: str | None = None) -> int:
         """Retourne le nombre de job runs.
@@ -195,7 +253,8 @@ class BaseStorage(ABC):
         Returns:
             Nombre de job runs correspondant aux critères.
         """
-        runs = self.list_job_runs(job_name=job_name)
+        # Passe limit=None explicitement pour obtenir le vrai total sans plafond.
+        runs = self.list_job_runs(job_name=job_name, limit=None)
         return len(runs)
 
     # ── Support des transactions ──────────────────────────────────────────────

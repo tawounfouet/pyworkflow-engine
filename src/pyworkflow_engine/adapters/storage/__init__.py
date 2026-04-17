@@ -8,6 +8,7 @@ Backends disponibles (sans dépendances optionnelles) :
     - :class:`InMemoryStorage`  — stockage en mémoire (tests/dev)
     - :class:`JSONFileStorage`  — stockage JSON sur disque
     - :class:`SQLiteStorage`    — SQLite via stdlib ``sqlite3``
+    - :class:`UnifiedStorage`   — persistence unifiée IA (ADR-017)
 
 Backend optionnel (``pip install pyworkflow-engine[sqlalchemy]``) :
     - :class:`SQLAlchemyStorage` — PostgreSQL / MySQL / SQLite via SQLAlchemy
@@ -23,6 +24,10 @@ def __getattr__(name: str):
         "JSONFileStorage": (".json_file", "JSONFileStorage"),
         "SQLiteStorage": (".sqlite", "SQLiteStorage"),
         "SQLAlchemyStorage": (".sqlalchemy", "SQLAlchemyStorage"),
+        "UnifiedStorage": (".unified", "UnifiedStorage"),
+        "Repository": (".repository", "Repository"),
+        "SchemaGenerator": (".schema_generator", "SchemaGenerator"),
+        "ModelSerializer": (".schema_generator", "ModelSerializer"),
     }
 
     if name in _LAZY:
@@ -49,4 +54,8 @@ __all__ = [
     "JSONFileStorage",
     "SQLiteStorage",
     "SQLAlchemyStorage",
+    "UnifiedStorage",
+    "Repository",
+    "SchemaGenerator",
+    "ModelSerializer",
 ]

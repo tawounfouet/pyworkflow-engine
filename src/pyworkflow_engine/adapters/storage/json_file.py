@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from pyworkflow_engine.models import Job, JobRun, StepRun
+from pyworkflow_engine.models.pipeline.pipeline_run import PipelineRun
 from pyworkflow_engine.ports.storage import (
     BaseStorage,
     JobNotFoundError,
@@ -52,10 +53,12 @@ class JSONFileStorage(BaseStorage):
         self.storage_dir = Path(storage_dir)
         self.jobs_dir = self.storage_dir / "jobs"
         self.runs_dir = self.storage_dir / "runs"
+        self.pipeline_runs_dir = self.storage_dir / "pipeline_runs"
 
         # Ensure directories exist
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
         self.runs_dir.mkdir(parents=True, exist_ok=True)
+        self.pipeline_runs_dir.mkdir(parents=True, exist_ok=True)
 
         # Thread safety
         self._lock = threading.RLock()
@@ -79,6 +82,11 @@ class JSONFileStorage(BaseStorage):
         """Get the file path for a job run."""
         safe_id = self._safe_filename(run_id)
         return self.runs_dir / f"{safe_id}.json"
+
+    def _pipeline_run_file_path(self, pipeline_run_id: str) -> Path:
+        """Get the file path for a pipeline run."""
+        safe_id = self._safe_filename(pipeline_run_id)
+        return self.pipeline_runs_dir / f"{safe_id}.json"
 
     def _serialize_job(self, job: Job) -> dict[str, Any]:
         """Serialize a job to JSON-compatible format."""
@@ -388,6 +396,63 @@ class JSONFileStorage(BaseStorage):
                         continue
 
             return count
+
+    # Pipeline run operations
+
+    def save_pipeline_run(self, pipeline_run: PipelineRun) -> None:
+        """Save a pipeline run (create or update)."""
+        with self._lock:
+            file_path = self._pipeline_run_file_path(pipeline_run.pipeline_run_id)
+            data = pipeline_run.to_dict()
+            self._execute_operation("write", path=file_path, data=data)
+
+    def get_pipeline_run(self, pipeline_run_id: str) -> PipelineRun | None:
+        """Retrieve a pipeline run by ID."""
+        with self._lock:
+            file_path = self._pipeline_run_file_path(pipeline_run_id)
+            if self._in_transaction:
+                for operation in self._transaction_operations:
+                    if operation.get("path") == file_path:
+                        if operation["type"] == "delete":
+                            return None
+                        if operation["type"] == "write":
+                            return PipelineRun.from_dict(operation["data"])
+            data = self._read_file_atomic(file_path)
+            return PipelineRun.from_dict(data) if data else None
+
+    def list_pipeline_runs(
+        self,
+        pipeline_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        since: datetime | None = None,
+    ) -> list[PipelineRun]:
+        """List pipeline runs with optional filtering."""
+        with self._lock:
+            runs: list[PipelineRun] = []
+            if self.pipeline_runs_dir.exists():
+                for file_path in self.pipeline_runs_dir.glob("*.json"):
+                    try:
+                        data = self._read_file_atomic(file_path)
+                        if data is None:
+                            continue
+                        run = PipelineRun.from_dict(data)
+                        if pipeline_name and run.pipeline_name != pipeline_name:
+                            continue
+                        if status and run.status.value != status:
+                            continue
+                        if since and run.created_at < since:
+                            continue
+                        runs.append(run)
+                    except StorageError:
+                        continue
+            runs.sort(key=lambda r: r.created_at, reverse=True)
+            start_idx = offset
+            end_idx = start_idx + limit if limit else None
+            return runs[start_idx:end_idx]
+
+    # Utility methods
 
     def health_check(self) -> dict[str, Any]:
         """Check the health of the persistence backend."""

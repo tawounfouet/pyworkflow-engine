@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyworkflow_engine.models import Job, JobRun
+    from pyworkflow_engine.models.pipeline.pipeline_run import PipelineRun
 
 from pyworkflow_engine.ports.storage import BaseStorage, JobNotFoundError, StorageError
 
@@ -41,6 +42,7 @@ class InMemoryStorage(BaseStorage):
         """Initialize the in-memory persistence backend."""
         self._jobs: dict[str, Job] = {}
         self._job_runs: dict[str, JobRun] = {}
+        self._pipeline_runs: dict[str, PipelineRun] = {}
         self._lock = threading.RLock()
 
         # Transaction support
@@ -146,8 +148,47 @@ class InMemoryStorage(BaseStorage):
         with self._lock:
             if job_run.job_run_id not in self._job_runs:
                 raise JobNotFoundError(f"Job run {job_run.job_run_id} not found")
-
             self._job_runs[job_run.job_run_id] = deepcopy(job_run)
+
+    # ── Pipeline runs ─────────────────────────────────────────────────────────
+
+    def save_pipeline_run(self, pipeline_run: PipelineRun) -> None:
+        """Persiste un PipelineRun (création ou mise à jour)."""
+        with self._lock:
+            self._pipeline_runs[pipeline_run.pipeline_run_id] = deepcopy(pipeline_run)
+
+    def get_pipeline_run(self, pipeline_run_id: str) -> PipelineRun | None:
+        """Récupère un PipelineRun par son identifiant."""
+        with self._lock:
+            run = self._pipeline_runs.get(pipeline_run_id)
+            return deepcopy(run) if run else None
+
+    def list_pipeline_runs(
+        self,
+        pipeline_name: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        since: datetime | None = None,
+    ) -> list[PipelineRun]:
+        """Liste les PipelineRuns avec filtrage optionnel."""
+        with self._lock:
+            runs = list(self._pipeline_runs.values())
+            if pipeline_name is not None:
+                runs = [r for r in runs if r.pipeline_name == pipeline_name]
+            if status is not None:
+                from pyworkflow_engine.models.enums import RunStatus
+
+                status_val = RunStatus(status) if isinstance(status, str) else status
+                runs = [r for r in runs if r.status == status_val]
+            if since is not None:
+                runs = [r for r in runs if r.created_at >= since]
+            runs.sort(key=lambda r: (r.created_at, r.pipeline_run_id), reverse=True)
+            if offset > 0:
+                runs = runs[offset:]
+            if limit is not None:
+                runs = runs[:limit]
+            return [deepcopy(r) for r in runs]
 
     def get_job_run_count(self, job_name: str | None = None) -> int:
         """Get the total number of job runs."""
@@ -183,6 +224,7 @@ class InMemoryStorage(BaseStorage):
             self._transaction_snapshots = {
                 "jobs": deepcopy(self._jobs),
                 "job_runs": deepcopy(self._job_runs),
+                "pipeline_runs": deepcopy(self._pipeline_runs),
             }
             self._transaction_active = True
 
@@ -206,6 +248,7 @@ class InMemoryStorage(BaseStorage):
                 # Restore from snapshots
                 self._jobs = self._transaction_snapshots["jobs"]
                 self._job_runs = self._transaction_snapshots["job_runs"]
+                self._pipeline_runs = self._transaction_snapshots["pipeline_runs"]
 
             self._transaction_snapshots = None
             self._transaction_active = False
@@ -227,6 +270,7 @@ class InMemoryStorage(BaseStorage):
                 "backend": "InMemory",
                 "total_jobs": len(jobs),
                 "total_job_runs": len(job_runs),
+                "total_pipeline_runs": len(self._pipeline_runs),
                 "status_distribution": status_counts,
                 "memory_usage_mb": self._estimate_memory_usage(),
                 "transaction_active": self._transaction_active,
@@ -262,6 +306,7 @@ class InMemoryStorage(BaseStorage):
 
             self._jobs.clear()
             self._job_runs.clear()
+            self._pipeline_runs.clear()
 
     def export_data(self) -> dict[str, Any]:
         """Export all data for backup or migration.
