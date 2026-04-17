@@ -1,0 +1,92 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Source : codes.droit.org — Codes juridiques français (XML)
+# Doc    : https://codes.droit.org
+# ──────────────────────────────────────────────────────────────────────────
+
+source:
+  name: "codes_droit"
+  type: "http_xml"
+  base_url: "https://codes.droit.org/payloads"
+  description: "Codes juridiques français en XML — codes.droit.org (stdlib only)"
+  license: "Public Domain"
+  update_frequency: "weekly"
+
+# Catalogue complet des codes disponibles
+# slug        : identifiant unique (utilisé pour le partitionnage Data Lake)
+# label       : nom lisible
+# filename    : nom du fichier URL-encodé sur codes.droit.org
+codes:
+  - slug: cgi
+    label: "Code général des impôts"
+    filename: "Code%20g%C3%A9n%C3%A9ral%20des%20imp%C3%B4ts.xml"
+
+  - slug: code_civil
+    label: "Code civil"
+    filename: "Code%20civil.xml"
+
+  - slug: code_penal
+    label: "Code pénal"
+    filename: "Code%20p%C3%A9nal.xml"
+
+  - slug: code_travail
+    label: "Code du travail"
+    filename: "Code%20du%20travail.xml"
+
+  - slug: code_commerce
+    label: "Code de commerce"
+    filename: "Code%20de%20commerce.xml"
+
+  - slug: livre_procedures_fiscales
+    label: "Livre des procédures fiscales"
+    filename: "Livre%20des%20proc%C3%A9dures%20fiscales.xml"
+
+  - slug: code_procedure_civile
+    label: "Code de procédure civile"
+    filename: "Code%20de%20proc%C3%A9dure%20civile.xml"
+
+  - slug: code_procedure_penale
+    label: "Code de procédure pénale"
+    filename: "Code%20de%20proc%C3%A9dure%20p%C3%A9nale.xml"
+
+  - slug: code_assurances
+    label: "Code des assurances"
+    filename: "Code%20des%20assurances.xml"
+
+  - slug: code_monetaire
+    label: "Code monétaire et financier"
+    filename: "Code%20mon%C3%A9taire%20et%20financier.xml"
+
+  - slug: code_patrimoine
+    label: "Code du patrimoine"
+    filename: "Code%20du%20patrimoine.xml"
+
+  - slug: code_etrangers
+    label: "Code de l'entrée et du séjour des étrangers et du droit d'asile"
+    filename: "Code%20de%20l%27entr%C3%A9e%20et%20du%20s%C3%A9jour%20des%20%C3%A9trangers%20et%20du%20droit%20d%27asile.xml"
+
+  - slug: code_famille
+    label: "Code de la famille et de l'aide sociale"
+    filename: "Code%20de%20la%20famille%20et%20de%20l%27aide%20sociale.xml"
+
+  - slug: code_relations_public
+    label: "Code des relations entre le public et l'administration"
+    filename: "Code%20des%20relations%20entre%20le%20public%20et%20l%27administration.xml"
+
+env_vars:
+  CODES_DROIT_BASE_URL:
+    default: "https://codes.droit.org/payloads"
+    description: "URL de base (sans slash final)"
+  CODES_DROIT_SLUGS:
+    default: ""
+    description: "Slugs séparés par virgule — défaut: tous (ex: cgi,code_civil)"
+  CODES_DROIT_TIMEOUT:
+    default: "60"
+    description: "Timeout HTTP en secondes"
+  DATALAKE_PATH:
+    default: "./data/datalake"
+    description: "Répertoire racine du Data Lake"
+
+output:
+  datalake_path: "raw/codes_droit/{slug}/{ingest_date}/{slug}.xml"
+  format: "xml"
+  partition_key: "ingest_date"
