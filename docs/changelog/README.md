@@ -30,6 +30,19 @@ YYYY-MM-DD_adr_NNN_<slug>.md
 | [2026-04-11_adr_010_gui-adapter-nicegui.md](./2026-04-11_adr_010_gui-adapter-nicegui.md) | ADR-010 — GUI Adapter : NiceGUI dans `adapters/gui/` | 11 avril 2026 | ✅ Décision prise |
 | [2026-04-11_adr_011_api-adapter-fastapi-sqlite.md](./2026-04-11_adr_011_api-adapter-fastapi-sqlite.md) | ADR-011 — API Adapter : FastAPI + SQLite dans `adapters/api/` | 11 avril 2026 | ✅ Décision prise |
 | [2026-04-12_adr_012_rename-persistence-to-storage.md](./2026-04-12_adr_012_rename-persistence-to-storage.md) | ADR-012 — Renommage `persistence` → `storage` dans tout le codebase | 12 avril 2026 | ✅ Décision prise |
+| [2026-04-12_adr_013_ai-engine-integration-strategy.md](./2026-04-12_adr_013_ai-engine-integration-strategy.md) | ADR-013 — Intégration du package `ai_engine` dans `pyworkflow_engine` | 12 avril 2026 | 🔄 Remplacée par ADR-016 |
+| [2026-04-12_adr_014_pipeline-model-and-decorator-api.md](./2026-04-12_adr_014_pipeline-model-and-decorator-api.md) | ADR-014 — Modèle `Pipeline` et API décorateur `@pipeline`/`@stage` | 12 avril 2026 | 🔄 Remplacée par ADR-016 |
+| [2026-04-12_adr_015_unified-ai-pipeline-integration.md](./2026-04-12_adr_015_unified-ai-pipeline-integration.md) | ADR-015 — Plan d'implémentation unifié : AI Engine + Pipeline (fusionne 013+014) | 12 avril 2026 | 🔄 Remplacée par ADR-016 |
+| [2026-04-12_adr_016_master-integration-plan.md](./2026-04-12_adr_016_master-integration-plan.md) | ADR-016 — Plan maître : AI Engine + Pipeline + PyConnectors Bridge (supersède 015) | 12 avril 2026 | 🔵 Proposition |
+| [2026-04-12_adr_017_unified-persistence-layer.md](./2026-04-12_adr_017_unified-persistence-layer.md) | ADR-017 — Couche de persistence unifiée : ModelRegistry + Repository CRUD générique | 12 avril 2026 | 🔵 Proposition |
+| [2026-04-12_adr_018_models-reorganization-and-table-namespacing.md](./2026-04-12_adr_018_models-reorganization-and-table-namespacing.md) | ADR-018 — Réorganisation des modèles, namespacing SQL, et persistence unifiée du logging | 12 avril 2026 | 🔵 Proposition |
+| [2026-04-12_adr_019_agents-catalog-directory.md](./2026-04-12_adr_019_agents-catalog-directory.md) | ADR-019 — Création du catalogue `agents/` pour les agents IA concrets | 12 avril 2026 | ✅ Implémentée |
+| [2026-04-12_adr_020_agent-framework-strategy.md](./2026-04-12_adr_020_agent-framework-strategy.md) | ADR-020 — Stratégie framework IA : architecture maison vs LangChain | 12 avril 2026 | ✅ Décision prise |
+| [2026-04-12_adr_021_agent-framework-industry-comparison.md](./2026-04-12_adr_021_agent-framework-industry-comparison.md) | ADR-021 — Positionnement face aux frameworks agents 2026 (OpenAI SDK, LangGraph, AutoGen, Google ADK) | 12 avril 2026 | ✅ Décision prise |
+| [2026-04-12_adr_022_framework-adapter-integration-patterns.md](./2026-04-12_adr_022_framework-adapter-integration-patterns.md) | ADR-022 — Patterns d'intégration : OpenAI Agents SDK, LangGraph, AutoGen comme adapters | 12 avril 2026 | 📐 Blueprint |
+| [2026-04-12_adr_023_knowledge-rag-architecture.md](./2026-04-12_adr_023_knowledge-rag-architecture.md) | ADR-023 — Architecture Knowledge & RAG : ports, adapters et stratégie d'embeddings | 12 avril 2026 | ✅ Décision prise |
+| [2026-04-14_adr_024_scheduling-implementation.md](./2026-04-14_adr_024_scheduling-implementation.md) | ADR-024 — Implémentation complète du système de scheduling | 14 avril 2026 | ✅ Implémenté et validé |
+| [2026-04-16_adr_025_data-pipeline-codes-droit.md](./2026-04-16_adr_025_data-pipeline-codes-droit.md) | ADR-025 — Pipeline de données juridiques : ingestion → transformation → embedding → indexation RAG | 16 avril 2026 | ✅ Implémentée |
 
 ---
 
