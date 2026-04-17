@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
 from pyworkflow_engine.decorators.step_decorator import StepSpec
 from pyworkflow_engine.models.enums import StepType
-from pyworkflow_engine.models.job import Job
-from pyworkflow_engine.models.step import Step
+from pyworkflow_engine.models.workflow.job import Job
+from pyworkflow_engine.models.workflow.step import Step
 
 
 def job(
@@ -36,7 +36,7 @@ def job(
     version: str = "1.0.0",
     description: str = "",
     steps: list[Callable] | None = None,
-    tags: dict[str, str] | None = None,
+    tags: list[str] | None = None,
 ) -> Callable:
     """Décorateur qui compose des fonctions ``@step`` en un ``Job``.
 
@@ -51,7 +51,7 @@ def job(
         description: Description textuelle. Par défaut : docstring de la fonction.
         steps: Liste explicite de fonctions ``@step``. Si fourni, l'introspection
             bytecode est ignorée. Recommandé pour les steps importés dynamiquement.
-        tags: Métadonnées arbitraires.
+        tags: Tags pour catégorisation et recherche.
 
     Returns:
         Un ``JobBuilder`` — appelable comme la fonction originale, mais enrichi
@@ -93,7 +93,7 @@ def job(
             version=version,
             description=_description,
             explicit_steps=steps,
-            tags=dict(tags or {}),
+            tags=list(tags or []),
         )
         functools.update_wrapper(builder, fn)
         return builder
@@ -120,7 +120,7 @@ class JobBuilder:
         version: str,
         description: str,
         explicit_steps: list[Callable] | None,
-        tags: dict[str, str],
+        tags: list[str],
     ) -> None:
         self._fn = fn
         self.job_name = job_name

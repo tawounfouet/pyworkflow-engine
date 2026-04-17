@@ -1,12 +1,12 @@
 """
 pyworkflow_engine.decorators — API déclarative par décorateurs.
 
-Fournit une alternative à la construction impérative de ``Job`` / ``Step``.
-Les deux APIs coexistent sans conflit.
+Fournit une alternative à la construction impérative de ``Job`` / ``Step``
+/ ``Pipeline``. Les deux APIs coexistent sans conflit.
 
 Usage rapide ::
 
-    from pyworkflow_engine.decorators import step, job
+    from pyworkflow_engine.decorators import step, job, stage, pipeline
     from pyworkflow_engine import WorkflowEngine
 
     @step(name="fetch")
@@ -22,18 +22,37 @@ Usage rapide ::
         data = fetch_data()
         transform_data(records=data["records"])
 
-    engine = WorkflowEngine()
-    result = engine.run(etl.build())
+    @stage(job=etl)
+    def etl_stage():
+        '''ETL stage in a pipeline.'''
 
-Voir ADR-005 pour les décisions architecturales.
+    @pipeline(name="my-pipeline", schedule="0 1 * * 0")
+    def my_pipeline():
+        etl_stage()
+
+    p = my_pipeline.build()
+
+Voir ADR-005 / ADR-014 pour les décisions architecturales.
 """
 
 from pyworkflow_engine.decorators.job_decorator import JobBuilder, job
+from pyworkflow_engine.decorators.pipeline_decorator import (
+    PipelineBuilder,
+    StageSpec,
+    pipeline,
+    stage,
+)
 from pyworkflow_engine.decorators.step_decorator import StepSpec, step
 
 __all__ = [
+    # Step / Job (ADR-005)
     "step",
     "job",
     "StepSpec",
     "JobBuilder",
+    # Pipeline / Stage (ADR-014)
+    "stage",
+    "pipeline",
+    "StageSpec",
+    "PipelineBuilder",
 ]
