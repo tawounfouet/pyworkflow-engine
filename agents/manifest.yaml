@@ -1,0 +1,60 @@
+# ──────────────────────────────────────────────────────────────────────────
+# agents/manifest.yaml — Registre des agents IA de la plateforme
+#
+# Ce fichier référence tous les agents déclarés dans agents/.
+# Il sert de catalogue consultable (rôle, provider, outils) et peut être
+# utilisé par un orchestrateur ou un service de découverte d'agents.
+#
+# Architecture : ADR-019
+# ──────────────────────────────────────────────────────────────────────────
+
+agents:
+  # ── Assistants ──────────────────────────────────────────────────────
+
+  - name: general-assistant
+    module: agents.assistants.general_assistant
+    attr: general_assistant
+    role: assistant
+    provider: default-openai
+    tags: [assistant, general, conversational]
+    description: "Assistant IA polyvalent pour les tâches courantes."
+
+  # ── Researchers ─────────────────────────────────────────────────────
+
+  - name: doc-researcher
+    module: agents.researchers.doc_researcher
+    attr: doc_researcher
+    role: researcher
+    provider: default-openai
+    tags: [researcher, rag, documentation]
+    description: "Agent de recherche documentaire avec RAG."
+
+  # ── Coders ──────────────────────────────────────────────────────────
+
+  - name: code-reviewer
+    module: agents.coders.code_reviewer
+    attr: code_reviewer
+    role: coder
+    provider: default-openai
+    tags: [coder, review, quality]
+    description: "Agent de revue de code et suggestions d'amélioration."
+
+  # ── Analysts ────────────────────────────────────────────────────────
+
+  - name: data-analyst
+    module: agents.analysts.data_analyst
+    attr: data_analyst
+    role: analyst
+    provider: default-openai
+    tags: [analyst, data, sql, visualization]
+    description: "Agent d'analyse de données, SQL et visualisation."
+
+  # ── Orchestrators ───────────────────────────────────────────────────
+
+  - name: pipeline-planner
+    module: agents.orchestrators.pipeline_planner
+    attr: pipeline_planner
+    role: orchestrator
+    provider: default-openai
+    tags: [orchestrator, planner, multi-agent]
+    description: "Planificateur multi-agents pour décomposition de tâches."
