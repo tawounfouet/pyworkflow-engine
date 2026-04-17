@@ -4,21 +4,31 @@ Modèle design-time du workflow — Job.
 Représente la *définition complète* d'un workflow avec ses étapes,
 ses déclencheurs, et sa configuration. Immuable et auto-sérialisable.
 
-Utilise ``dataclasses`` de la stdlib — zéro dépendance externe.
+Migration D2 (vague 3) — ADR-018 :
+    Converti de ``dataclass(frozen=True)`` en PersistableModel Pydantic
+    (table ``wf_jobs``).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import Any, ClassVar
+
+from pydantic import Field, model_validator
 
 from pyworkflow_engine.models.enums import ExecutorType, Priority, TriggerType
-from pyworkflow_engine.models.step import Step, SubJob
+from pyworkflow_engine.models.workflow.step import Step, SubJob
+from pyworkflow_engine.ports.persistable import (
+    ColumnDef,
+    ColumnType,
+    ModelRegistry,
+    PersistableModel,
+    TableMeta,
+)
 
 
-@dataclass(frozen=True)
-class Job:
+@ModelRegistry.register
+class Job(PersistableModel):
     """Définition d'un workflow complet.
 
     Un Job représente la définition complète d'un workflow avec ses étapes,
@@ -50,23 +60,48 @@ class Job:
         >>> restored = Job.from_dict(d)  # handlers=None après désérialisation
     """
 
+    __table_meta__: ClassVar[TableMeta] = TableMeta(
+        table_name="wf_jobs",
+        columns=[
+            ColumnDef("name", ColumnType.TEXT, primary_key=True),
+            ColumnDef("description", ColumnType.TEXT),
+            ColumnDef("steps", ColumnType.JSON),
+            ColumnDef("sub_jobs", ColumnType.JSON),
+            ColumnDef("triggers", ColumnType.JSON),
+            ColumnDef("default_executor", ColumnType.TEXT),
+            ColumnDef("priority", ColumnType.TEXT),
+            ColumnDef("timeout", ColumnType.INTEGER),  # seconds, nullable
+            ColumnDef("max_concurrent_steps", ColumnType.INTEGER),
+            ColumnDef("input_schema", ColumnType.JSON),
+            ColumnDef("output_schema", ColumnType.JSON),
+            ColumnDef("tags", ColumnType.JSON),
+            ColumnDef("metadata", ColumnType.JSON),
+            ColumnDef("version", ColumnType.TEXT),
+            ColumnDef("enabled", ColumnType.BOOLEAN),
+        ],
+        indexes=[("enabled",), ("tags",)],
+    )
+
+    model_config = {"frozen": True, "arbitrary_types_allowed": True}
+
     name: str
     description: str = ""
-    steps: list[Step] = field(default_factory=list)
-    sub_jobs: list[SubJob] = field(default_factory=list)
-    triggers: list[TriggerType] = field(default_factory=lambda: [TriggerType.MANUAL])
+    steps: list[Step] = Field(default_factory=list)
+    sub_jobs: list[SubJob] = Field(default_factory=list)
+    triggers: list[TriggerType] = Field(default_factory=lambda: [TriggerType.MANUAL])
     default_executor: ExecutorType = ExecutorType.LOCAL
     priority: Priority = Priority.NORMAL
     timeout: timedelta | None = None
     max_concurrent_steps: int = 10
     input_schema: dict[str, Any] | None = None
     output_schema: dict[str, Any] | None = None
-    tags: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     version: str = "1.0.0"
     enabled: bool = True
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def _validate(self) -> Job:
         """Validation après initialisation."""
         if not self.name:
             raise ValueError("Job name cannot be empty")
@@ -85,6 +120,7 @@ class Job:
                     )
         if self.max_concurrent_steps <= 0:
             raise ValueError("max_concurrent_steps must be positive")
+        return self
 
     # ------------------------------------------------------------------
     # Graph helpers

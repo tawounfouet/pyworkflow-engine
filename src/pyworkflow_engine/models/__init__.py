@@ -7,10 +7,10 @@ Enums :
     TriggerType, StepType, ExecutorType, RunStatus, Priority
 
 Design-time (definitions) :
-    Step, SubJob, Job
+    Step, SubJob, Job, Pipeline, PipelineStage
 
 Runtime (instances d'execution) :
-    StepLog, StepRun, JobRun
+    StepLog, StepRun, JobRun, PipelineRun, StageRun
 
 Serialisation :
     Chaque classe expose to_dict() / from_dict() directement.
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .workflow.connector import ConnectorOutcome, ConnectorRef
 from .enums import (
     ACTIVE_STATUSES,
     SUSPENDED_STATUSES,
@@ -37,9 +38,11 @@ from .enums import (
     is_suspended,
     is_terminal,
 )
-from .job import Job
-from .run import JobRun, StepLog, StepRun, generate_id, utc_now
-from .step import Step, SubJob
+from .workflow.job import Job
+from .pipeline.pipeline import Pipeline, PipelineStage
+from .pipeline.pipeline_run import PipelineRun, StageRun
+from .workflow.run import JobRun, StepLog, StepRun, generate_id, utc_now
+from .workflow.step import Step, SubJob
 
 # ---------------------------------------------------------------------------
 # Thin wrapper functions -- delegate to model.to_dict() / Model.from_dict()
@@ -94,6 +97,38 @@ def dict_to_job_run(data: dict[str, Any]) -> JobRun:
     return JobRun.from_dict(data)
 
 
+def pipeline_to_dict(pipeline: Pipeline) -> dict[str, Any]:
+    return pipeline.to_dict()
+
+
+def dict_to_pipeline(data: dict[str, Any]) -> Pipeline:
+    return Pipeline.from_dict(data)
+
+
+def pipeline_stage_to_dict(stage: PipelineStage) -> dict[str, Any]:
+    return stage.to_dict()
+
+
+def dict_to_pipeline_stage(data: dict[str, Any]) -> PipelineStage:
+    return PipelineStage.from_dict(data)
+
+
+def pipeline_run_to_dict(pipeline_run: PipelineRun) -> dict[str, Any]:
+    return pipeline_run.to_dict()
+
+
+def dict_to_pipeline_run(data: dict[str, Any]) -> PipelineRun:
+    return PipelineRun.from_dict(data)
+
+
+def stage_run_to_dict(stage_run: StageRun) -> dict[str, Any]:
+    return stage_run.to_dict()
+
+
+def dict_to_stage_run(data: dict[str, Any]) -> StageRun:
+    return StageRun.from_dict(data)
+
+
 __all__ = [
     # Enums
     "TriggerType",
@@ -114,10 +149,14 @@ __all__ = [
     "Step",
     "SubJob",
     "Job",
+    "Pipeline",
+    "PipelineStage",
     # Runtime
     "StepLog",
     "StepRun",
     "JobRun",
+    "PipelineRun",
+    "StageRun",
     "utc_now",
     "generate_id",
     # Serialization wrappers
@@ -133,4 +172,15 @@ __all__ = [
     "dict_to_step_run",
     "job_run_to_dict",
     "dict_to_job_run",
+    "pipeline_to_dict",
+    "dict_to_pipeline",
+    "pipeline_stage_to_dict",
+    "dict_to_pipeline_stage",
+    "pipeline_run_to_dict",
+    "dict_to_pipeline_run",
+    "stage_run_to_dict",
+    "dict_to_stage_run",
+    # Connector (bridge pyconnectors — ADR-016)
+    "ConnectorRef",
+    "ConnectorOutcome",
 ]

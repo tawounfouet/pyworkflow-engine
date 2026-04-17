@@ -2,25 +2,26 @@
 Modèles design-time des étapes — Step et SubJob.
 
 Ces modèles représentent la *définition* des étapes d'un workflow avant
-son exécution. Ils sont immuables (frozen dataclasses) et auto-sérialisables.
+son exécution. Ils sont immuables (frozen) et auto-sérialisables.
 
-Utilise ``dataclasses`` de la stdlib — zéro dépendance externe.
+Migration D2 (vague 3) — ADR-018 :
+    Convertis de ``dataclass(frozen=True)`` en Pydantic ``BaseModel``
+    (``model_config = {"frozen": True}``).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any, ClassVar
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from pydantic import BaseModel, Field, model_validator
 
+from pyworkflow_engine.models.workflow.connector import ConnectorRef
 from pyworkflow_engine.models.enums import ExecutorType, StepType
 
 
-@dataclass(frozen=True)
-class Step:
+class Step(BaseModel):
     """Définition d'une étape de workflow.
 
     Une Step représente une unité d'exécution dans un workflow.
@@ -30,7 +31,6 @@ class Step:
         name: Nom unique de l'étape dans le workflow.
         step_type: Type d'étape déterminant le comportement d'exécution.
         handler: Fonction Python à exécuter (pour StepType.FUNCTION).
-        callable: Alias déprécié pour ``handler``. Utilisez ``handler``.
         config: Configuration spécifique au type d'étape.
         dependencies: Noms des étapes dont celle-ci dépend.
         executor_type: Type d'executor à utiliser pour l'exécution.
@@ -39,6 +39,8 @@ class Step:
         retry_delay: Délai entre les tentatives.
         condition: Fonction de condition pour exécution conditionnelle.
         metadata: Métadonnées additionnelles.
+        connector_ref: Référence au connecteur pyconnectors (uniquement si
+            ``step_type == StepType.CONNECTOR``). Voir ADR-016.
 
     Examples:
         >>> def hello():
@@ -49,24 +51,31 @@ class Step:
         >>> restored = Step.from_dict(d)  # handler=None après désérialisation
     """
 
+    model_config = {"frozen": True, "arbitrary_types_allowed": True}
+
     name: str
     step_type: StepType
-    handler: Callable | None = None
-    config: dict[str, Any] = field(default_factory=dict)
-    dependencies: list[str] = field(default_factory=list)
+    handler: Callable | None = Field(default=None, exclude=True)
+    config: dict[str, Any] = Field(default_factory=dict)
+    dependencies: list[str] = Field(default_factory=list)
     executor_type: ExecutorType = ExecutorType.LOCAL
     timeout: timedelta | None = None
     retry_count: int = 0
-    retry_delay: timedelta = field(default=timedelta(seconds=1))
-    condition: Callable[[dict[str, Any]], bool] | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    retry_delay: timedelta = Field(default_factory=lambda: timedelta(seconds=1))
+    condition: Callable[[dict[str, Any]], bool] | None = Field(
+        default=None, exclude=True
+    )
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    connector_ref: ConnectorRef | None = None
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def _validate(self) -> Step:
         """Validation après initialisation."""
         if self.retry_count < 0:
             raise ValueError(f"Step '{self.name}': retry_count must be >= 0")
         if self.name in self.dependencies:
             raise ValueError(f"Step '{self.name}': cannot depend on itself")
+        return self
 
     # ------------------------------------------------------------------
     # Sérialisation
@@ -104,6 +113,9 @@ class Step:
             "retry_count": self.retry_count,
             "retry_delay": self.retry_delay.total_seconds(),
             "metadata": dict(self.metadata),
+            "connector_ref": (
+                self.connector_ref.to_dict() if self.connector_ref is not None else None
+            ),
         }
 
     @classmethod
@@ -117,6 +129,10 @@ class Step:
         timeout_secs = data.get("timeout")
         retry_delay_secs = data.get("retry_delay", 1.0)
         handler = _restore_handler(data.get("handler"))
+        connector_ref_data = data.get("connector_ref")
+        connector_ref = (
+            ConnectorRef.from_dict(connector_ref_data) if connector_ref_data else None
+        )
         return cls(
             name=data["name"],
             step_type=StepType(data["step_type"]),
@@ -132,10 +148,11 @@ class Step:
             retry_count=data.get("retry_count", 0),
             retry_delay=timedelta(seconds=retry_delay_secs),
             metadata=data.get("metadata", {}),
+            connector_ref=connector_ref,
         )
 
 
-def _restore_handler(handler_ref: str | None) -> "Callable | None":
+def _restore_handler(handler_ref: str | None) -> Callable | None:
     """Restaure un handler depuis son nom qualifié importable.
 
     Parcourt le chemin ``"a.b.c.fn"`` en testant progressivement les préfixes
@@ -151,7 +168,11 @@ def _restore_handler(handler_ref: str | None) -> "Callable | None":
         Le callable restauré, ou ``None`` si l'import échoue (module non
         importable, lambda, script ``__main__``, etc.).
     """
-    if not handler_ref or not isinstance(handler_ref, str) or handler_ref.startswith("<"):
+    if (
+        not handler_ref
+        or not isinstance(handler_ref, str)
+        or handler_ref.startswith("<")
+    ):
         return None
 
     import importlib
@@ -177,6 +198,7 @@ def _restore_handler(handler_ref: str | None) -> "Callable | None":
             from pyworkflow_engine.decorators.job_decorator import (  # noqa: PLC0415
                 _make_context_adapter,
             )
+
             wrapped = getattr(obj, "__wrapped_fn__", obj)
             return _make_context_adapter(wrapped, step_spec)
 
@@ -185,8 +207,7 @@ def _restore_handler(handler_ref: str | None) -> "Callable | None":
     return None
 
 
-@dataclass(frozen=True)
-class SubJob:
+class SubJob(BaseModel):
     """Référence à un sous-workflow.
 
     Permet d'imbriquer des workflows pour créer des compositions complexes.
@@ -206,9 +227,11 @@ class SubJob:
         >>> sub_job.to_dict()
     """
 
+    model_config = {"frozen": True}
+
     job_name: str
-    input_mapping: dict[str, str] = field(default_factory=dict)
-    output_mapping: dict[str, str] = field(default_factory=dict)
+    input_mapping: dict[str, str] = Field(default_factory=dict)
+    output_mapping: dict[str, str] = Field(default_factory=dict)
     inherit_context: bool = True
 
     # ------------------------------------------------------------------

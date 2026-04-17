@@ -33,6 +33,9 @@ class TriggerType(Enum):
     FILE_WATCHER = "file_watcher"
     """Déclenchement par surveillance de fichier."""
 
+    AI = "ai"
+    """Déclenchement par un agent IA ou une décision autonome (ADR-013)."""
+
 
 class StepType(Enum):
     """Types de steps dans un workflow.
@@ -60,6 +63,26 @@ class StepType(Enum):
 
     SUB_WORKFLOW = "sub_workflow"
     """Exécute un sous-workflow."""
+
+    CONNECTOR = "connector"
+    """Exécute un connecteur externe via le bridge pyconnectors (ADR-016)."""
+
+    # --- Types IA (ADR-013) ---
+
+    LLM_CALL = "llm_call"
+    """Appel à un modèle de langage (LLM) via un provider IA."""
+
+    TOOL_CALL = "tool_call"
+    """Appel à un outil IA (function calling / tool use)."""
+
+    TOOL_RESULT = "tool_result"
+    """Résultat d'un appel outil IA retourné au modèle."""
+
+    AI_DECISION = "ai_decision"
+    """Décision autonome prise par un agent IA."""
+
+    SKILL_EXECUTION = "skill_execution"
+    """Exécution d'une compétence (skill) d'un agent IA."""
 
 
 class ExecutorType(Enum):

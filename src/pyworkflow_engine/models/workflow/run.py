@@ -5,17 +5,36 @@ StepLog, StepRun et JobRun représentent l'*exécution* d'un workflow.
 Ces objets sont mutables (mise à jour des états en cours d'exécution)
 et auto-sérialisables via ``to_dict()`` / ``from_dict()``.
 
-Utilise ``dataclasses`` de la stdlib — zéro dépendance externe.
+Migration D2 (vagues 1 et 2) — ADR-018 :
+    - StepLog           → Pydantic BaseModel  (embedded, vague 1)
+    - ConnectorOutcome  → Pydantic BaseModel  (embedded, vague 1 — voir connector.py)
+    - StepRun           → PersistableModel    (table wf_step_runs, vague 2)
+    - JobRun            → PersistableModel    (table wf_job_runs,  vague 2)
 """
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
+from uuid import uuid4
 
-from pyworkflow_engine.models.enums import ExecutorType, RunStatus, can_resume, is_suspended, is_terminal
+from pydantic import Field
+
+from pyworkflow_engine.models.workflow.connector import ConnectorOutcome
+from pyworkflow_engine.models.enums import (
+    ExecutorType,
+    RunStatus,
+    can_resume,
+    is_suspended,
+    is_terminal,
+)
+from pyworkflow_engine.ports.persistable import (
+    ColumnDef,
+    ColumnType,
+    ModelRegistry,
+    PersistableModel,
+    TableMeta,
+)
 
 # ---------------------------------------------------------------------------
 # Utilitaires
@@ -29,17 +48,18 @@ def utc_now() -> datetime:
 
 def generate_id() -> str:
     """Génère un identifiant UUID4 unique."""
-    return str(uuid.uuid4())
+    return str(uuid4())
 
 
 # ---------------------------------------------------------------------------
-# StepLog
+# StepLog  (vague 1 — BaseModel Pydantic, embedded dans StepRun)
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class StepLog:
+class StepLog(PersistableModel):
     """Log d'exécution d'une étape.
+
+    Embedded dans ``StepRun.logs`` — pas de table dédiée.
 
     Attributes:
         timestamp: Horodatage du log.
@@ -54,20 +74,35 @@ class StepLog:
         >>> restored = StepLog.from_dict(d)
     """
 
+    __table_meta__: ClassVar[TableMeta] = TableMeta(
+        table_name="wf_step_logs",
+        columns=[
+            ColumnDef("id", ColumnType.TEXT, primary_key=True),
+            ColumnDef("timestamp", ColumnType.TIMESTAMP, nullable=False),
+            ColumnDef("level", ColumnType.TEXT, nullable=False),
+            ColumnDef("message", ColumnType.TEXT, nullable=False),
+            ColumnDef("data", ColumnType.JSON),
+            ColumnDef("source", ColumnType.TEXT),
+        ],
+    )
+
+    _VALID_LEVELS: ClassVar[frozenset[str]] = frozenset(
+        {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    )
+
+    # Pas de champ `id` pour compatibilité avec l'usage embedded existant
     timestamp: datetime
     level: str
     message: str
-    data: dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = Field(default_factory=dict)
     source: str = "step"
 
-    _VALID_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
-
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
         if self.level not in self._VALID_LEVELS:
             raise ValueError(f"Invalid log level: {self.level!r}")
 
     # ------------------------------------------------------------------
-    # Sérialisation
+    # Compatibilité dataclass
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,12 +128,12 @@ class StepLog:
 
 
 # ---------------------------------------------------------------------------
-# StepRun
+# StepRun  (vague 2 — PersistableModel, table wf_step_runs)
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class StepRun:
+@ModelRegistry.register
+class StepRun(PersistableModel):
     """Instance d'exécution d'une étape.
 
     Représente l'exécution actuelle ou passée d'une Step dans un workflow.
@@ -120,30 +155,81 @@ class StepRun:
         executor_info: Informations sur l'executor utilisé.
         logs: Liste des logs d'exécution.
         metadata: Métadonnées additionnelles.
+        connector_outcome: Résultat structuré de l'exécution d'un connecteur
+            (uniquement si ``step_type == StepType.CONNECTOR``). Voir ADR-016.
 
     Examples:
-        >>> step_run = StepRun(step_name="process_data", job_run_id="job-123")
         >>> step_run.start_execution()
         >>> step_run.complete_success({"result": "processed"})
         >>> d = step_run.to_dict()
         >>> restored = StepRun.from_dict(d)
     """
 
-    step_run_id: str = field(default_factory=generate_id)
+    __table_meta__: ClassVar[TableMeta] = TableMeta(
+        table_name="wf_step_runs",
+        columns=[
+            ColumnDef("step_run_id", ColumnType.TEXT, primary_key=True),
+            ColumnDef("step_name", ColumnType.TEXT, nullable=False),
+            ColumnDef(
+                "job_run_id",
+                ColumnType.TEXT,
+                nullable=False,
+                foreign_key="wf_job_runs.job_run_id",
+            ),
+            ColumnDef("status", ColumnType.TEXT, nullable=False),
+            ColumnDef("executor_type", ColumnType.TEXT),
+            ColumnDef("input_data", ColumnType.JSON),
+            ColumnDef("output_data", ColumnType.JSON),
+            ColumnDef("error", ColumnType.TEXT),
+            ColumnDef("start_time", ColumnType.TIMESTAMP),
+            ColumnDef("end_time", ColumnType.TIMESTAMP),
+            ColumnDef("duration_ms", ColumnType.INTEGER),
+            ColumnDef("retry_count", ColumnType.INTEGER),
+            ColumnDef("executor_info", ColumnType.JSON),
+            ColumnDef("logs", ColumnType.JSON),
+            ColumnDef("metadata", ColumnType.JSON),
+            ColumnDef("connector_outcome", ColumnType.JSON),
+            # Champs IA (ADR-013)
+            ColumnDef("agent_id", ColumnType.TEXT),
+            ColumnDef("tool_id", ColumnType.TEXT),
+            ColumnDef("token_usage", ColumnType.JSON),
+        ],
+        indexes=[
+            ("job_run_id",),
+            ("status",),
+            ("step_name",),
+            ("job_run_id", "status"),
+        ],
+    )
+
+    step_run_id: str = Field(default_factory=generate_id)
     step_name: str = ""
     job_run_id: str = ""
     status: RunStatus = RunStatus.PENDING
     executor_type: ExecutorType = ExecutorType.LOCAL
-    input_data: dict[str, Any] = field(default_factory=dict)
-    output_data: dict[str, Any] = field(default_factory=dict)
+    input_data: dict[str, Any] = Field(default_factory=dict)
+    output_data: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
     duration_ms: int | None = None
     retry_count: int = 0
-    executor_info: dict[str, Any] = field(default_factory=dict)
-    logs: list[StepLog] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    executor_info: dict[str, Any] = Field(default_factory=dict)
+    logs: list[StepLog] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    connector_outcome: ConnectorOutcome | None = None
+
+    # ── Champs IA optionnels (ADR-013) ────────────────────────────────────────
+    agent_id: str | None = None
+    """ID de l'Agent IA ayant exécuté ce step (si step_type IA)."""
+
+    tool_id: str | None = None
+    """ID du ToolDefinition utilisé (si step_type=tool_call)."""
+
+    token_usage: dict[str, int | float] | None = None
+    """Métriques de tokens : {prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd}.
+    Stocké comme dict pour éviter la dépendance circulaire avec models.ai.message.
+    """
 
     # ------------------------------------------------------------------
     # State transitions
@@ -262,11 +348,24 @@ class StepRun:
             "executor_info": self.executor_info,
             "logs": [log.to_dict() for log in self.logs],
             "metadata": self.metadata,
+            "connector_outcome": (
+                self.connector_outcome.to_dict()
+                if self.connector_outcome is not None
+                else None
+            ),
+            # ── Champs IA (ADR-013) ──
+            "agent_id": self.agent_id,
+            "tool_id": self.tool_id,
+            "token_usage": self.token_usage,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StepRun:
         """Désérialise depuis un dict."""
+        outcome_data = data.get("connector_outcome")
+        connector_outcome = (
+            ConnectorOutcome.from_dict(outcome_data) if outcome_data else None
+        )
         return cls(
             step_run_id=data["step_run_id"],
             step_name=data["step_name"],
@@ -293,16 +392,21 @@ class StepRun:
             executor_info=data.get("executor_info", {}),
             logs=[StepLog.from_dict(log) for log in data.get("logs", [])],
             metadata=data.get("metadata", {}),
+            connector_outcome=connector_outcome,
+            # ── Champs IA (ADR-013) ──
+            agent_id=data.get("agent_id"),
+            tool_id=data.get("tool_id"),
+            token_usage=data.get("token_usage"),
         )
 
 
 # ---------------------------------------------------------------------------
-# JobRun
+# JobRun  (vague 2 — PersistableModel, table wf_job_runs)
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class JobRun:
+@ModelRegistry.register
+class JobRun(PersistableModel):
     """Instance d'exécution d'un workflow complet.
 
     Représente l'exécution actuelle ou passée d'un Job avec toutes ses étapes.
@@ -338,26 +442,58 @@ class JobRun:
         >>> restored = JobRun.from_dict(d)
     """
 
-    job_run_id: str = field(default_factory=generate_id)
-    job: Any = None  # Job definition — not serialized (callables not portable)
+    __table_meta__: ClassVar[TableMeta] = TableMeta(
+        table_name="wf_job_runs",
+        columns=[
+            ColumnDef("job_run_id", ColumnType.TEXT, primary_key=True),
+            ColumnDef("job_name", ColumnType.TEXT, nullable=False),
+            ColumnDef("job_version", ColumnType.TEXT),
+            ColumnDef("status", ColumnType.TEXT, nullable=False),
+            ColumnDef("input_data", ColumnType.JSON),
+            ColumnDef("output_data", ColumnType.JSON),
+            ColumnDef("context", ColumnType.JSON),
+            ColumnDef("error", ColumnType.TEXT),
+            ColumnDef("start_time", ColumnType.TIMESTAMP),
+            ColumnDef("end_time", ColumnType.TIMESTAMP),
+            ColumnDef("duration_ms", ColumnType.INTEGER),
+            ColumnDef("triggered_by", ColumnType.TEXT),
+            ColumnDef("trigger_data", ColumnType.JSON),
+            ColumnDef("priority", ColumnType.INTEGER),
+            ColumnDef("executor_config", ColumnType.JSON),
+            ColumnDef("metadata", ColumnType.JSON),
+            ColumnDef("created_at", ColumnType.TIMESTAMP, nullable=False),
+            ColumnDef("updated_at", ColumnType.TIMESTAMP, nullable=False),
+        ],
+        indexes=[
+            ("job_name",),
+            ("status",),
+            ("created_at",),
+            ("job_name", "status"),
+        ],
+    )
+
+    job_run_id: str = Field(default_factory=generate_id)
+    job: Any = Field(
+        default=None, exclude=True
+    )  # Not serialized — callables not portable
     job_name: str = ""
     job_version: str = "1.0.0"
     status: RunStatus = RunStatus.PENDING
-    input_data: dict[str, Any] = field(default_factory=dict)
-    output_data: dict[str, Any] = field(default_factory=dict)
-    context: dict[str, Any] = field(default_factory=dict)
-    step_runs: list[StepRun] = field(default_factory=list)
+    input_data: dict[str, Any] = Field(default_factory=dict)
+    output_data: dict[str, Any] = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict)
+    step_runs: list[StepRun] = Field(default_factory=list, exclude=True)
     error: str | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
     duration_ms: int | None = None
     triggered_by: str = "manual"
-    trigger_data: dict[str, Any] = field(default_factory=dict)
+    trigger_data: dict[str, Any] = Field(default_factory=dict)
     priority: int = 5  # Priority.NORMAL.value
-    executor_config: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
+    executor_config: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     # ------------------------------------------------------------------
     # State transitions
