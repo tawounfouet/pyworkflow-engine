@@ -21,9 +21,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import datetime
 
+    from pyworkflow_engine.models.pipeline.pipeline import Pipeline
+    from pyworkflow_engine.models.pipeline.pipeline_run import PipelineRun
+
+from pyworkflow_engine.config import WorkflowConfig
 from pyworkflow_engine.engine.context import WorkflowContext
 from pyworkflow_engine.engine.dag import DAGResolver
 from pyworkflow_engine.engine.parallel_runner import ParallelRunner
+from pyworkflow_engine.engine.pipeline_runner import PipelineRunner
 from pyworkflow_engine.engine.retry import RetryHandler
 from pyworkflow_engine.engine.runner import WorkflowRunner
 from pyworkflow_engine.engine.suspension import SuspensionManager
@@ -33,11 +38,12 @@ from pyworkflow_engine.exceptions import (
     WorkflowFailed,
     WorkflowSuspended,
 )
-from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
-from pyworkflow_engine.ports.storage import StorageError
+from pyworkflow_engine.facade.ai import AIFacade
+from pyworkflow_engine.facade.jobs import JobsFacade
 from pyworkflow_engine.logging import get_logger
 from pyworkflow_engine.models import Job, JobRun, RunStatus, StepType
-from pyworkflow_engine.config import WorkflowConfig
+from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
+
 
 _logger = get_logger("engine.facade")
 
@@ -47,18 +53,13 @@ NO_STORAGE_EXECUTION_ERROR = (
 )
 
 
-def _bootstrap_from_config(
-    config: "WorkflowConfig",
+def _bootstrap_storage(
+    config: WorkflowConfig,
     explicit_storage: Any | None,
 ) -> Any:
-    """Auto-provisionne persistence et logging depuis ``WorkflowConfig``.
+    """Auto-provisionne la persistence depuis ``WorkflowConfig``.
 
-    Appelé une seule fois dans ``WorkflowEngine.__init__``. Utilise des
-    imports lazy pour éviter les dépendances circulaires avec les adapters.
-
-    Returns:
-        Instance de persistence à utiliser (``explicit_storage`` si
-        fourni, sinon instance auto-créée depuis ``config.storage``).
+    Appelé une seule fois dans ``WorkflowEngine.__init__``.
     """
     backend = explicit_storage
 
@@ -73,52 +74,6 @@ def _bootstrap_from_config(
             "SQLiteStorage auto-configuré depuis WorkflowConfig",
             extra={"db_path": config.storage.db_path},
         )
-
-    # ── Logging ──────────────────────────────────────────────────────────
-    log_cfg = config.logging
-    needs_setup = (
-        log_cfg.level != "INFO"
-        or log_cfg.format != "text"
-        or log_cfg.log_dir is not None
-        or log_cfg.log_to_db
-    )
-    if needs_setup:
-        import logging as _stdlib_logging  # noqa: PLC0415
-        from pathlib import Path  # noqa: PLC0415
-
-        from pyworkflow_engine.logging.config import (
-            LoggingConfig as _LC,
-        )  # noqa: PLC0415
-        from pyworkflow_engine.logging.logger import configure_logging  # noqa: PLC0415
-
-        log_file: str | None = None
-        if log_cfg.log_dir:
-            log_dir = Path(log_cfg.log_dir)
-            log_dir.mkdir(parents=True, exist_ok=True)
-            log_file = str(log_dir / "pyworkflow.log")
-
-        configure_logging(
-            _LC(
-                level=log_cfg.level,
-                json_output=(log_cfg.format == "json"),
-                log_file=log_file,
-                log_file_max_bytes=log_cfg.log_file_max_mb * 1024 * 1024,
-                log_file_backup_count=log_cfg.log_file_backup_count,
-            )
-        )
-
-        if log_cfg.log_to_db and config.storage.db_path:
-            from pyworkflow_engine.logging.handlers import (
-                SQLiteLogHandler,
-            )  # noqa: PLC0415
-
-            db_handler = SQLiteLogHandler(db_path=config.storage.db_path, batch_size=1)
-            db_handler.setLevel(getattr(_stdlib_logging, log_cfg.level))
-            _stdlib_logging.getLogger("pyworkflow_engine").addHandler(db_handler)
-            _logger.debug(
-                "SQLiteLogHandler auto-configuré depuis WorkflowConfig",
-                extra={"db": config.storage.db_path, "table": "workflow_logs"},
-            )
 
     return backend
 
@@ -162,6 +117,7 @@ class WorkflowEngine:
         storage: Any | None = None,
         parallel: bool = False,
         max_workers: int | None = None,
+        configure_logging: bool = False,
     ):
         # config prend le dessus sur les paramètres directs
         _engine_cfg = config.engine if config is not None else None
@@ -170,8 +126,15 @@ class WorkflowEngine:
 
         self._config = config or WorkflowConfig()
 
-        # Auto-provision persistence + logging depuis WorkflowConfig
-        backend = _bootstrap_from_config(self._config, storage)
+        if configure_logging:
+            from pyworkflow_engine.logging.bootstrap import (
+                configure_from_workflow_config,
+            )
+
+            configure_from_workflow_config(self._config)
+
+        # Auto-provision persistence depuis WorkflowConfig
+        backend = _bootstrap_storage(self._config, storage)
 
         self._storage = backend
         self._executor_registry = executor_registry or ExecutorRegistry()
@@ -188,6 +151,21 @@ class WorkflowEngine:
         self._retry = RetryHandler()
         self._suspension = SuspensionManager(backend)
         self._job_registry: dict[str, Job] = {}  # in-memory cache preserving handlers
+
+        # ── Sub-facades ──────────────────────────────────────────────────────
+        # Accessible via engine.ai et engine.jobs.
+        # Les méthodes directes historiques (engine.save_job, engine.chat…)
+        # délèguent à ces sous-facades pour préserver la compatibilité ascendante.
+        self._jobs_facade = JobsFacade(
+            storage=self._storage,
+            job_registry=self._job_registry,
+            runner=self._runner,
+            retry=self._retry,
+            suspension=self._suspension,
+        )
+        self._ai_facade = AIFacade(
+            ai_storage=getattr(self, "_ai_storage", None),
+        )
 
     # ------------------------------------------------------------------
     # Core execution
@@ -252,6 +230,9 @@ class WorkflowEngine:
                 job_run, execution_order, context, retry_handler=self._retry
             )
             job_run.complete_success()
+            # Gel du contexte après exécution complète — toute mutation
+            # post-workflow lèvera une ContextError explicite.
+            context.freeze()
 
         except WorkflowSuspended:
             self._suspension.suspend(job_run, "Workflow suspended by step execution")
@@ -290,6 +271,7 @@ class WorkflowEngine:
             job_run.status = RunStatus.RUNNING
             self._runner.execute(job_run, remaining, context, retry_handler=self._retry)
             job_run.complete_success()
+            context.freeze()
             self._suspension.remove(run_id)
 
         except WorkflowSuspended:
@@ -372,67 +354,76 @@ class WorkflowEngine:
         }
 
     # ------------------------------------------------------------------
-    # Persistence facade
+    # Sub-facade accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def ai(self) -> AIFacade:
+        """Sous-façade IA — agents, conversations, storage IA.
+
+        Usage::
+
+            agent = engine.ai.create_agent(name="Bot", model="claude-3-5-sonnet")
+            reply = engine.ai.chat(agent.agent_id, "Bonjour !")
+        """
+        return self._ai_facade
+
+    @property
+    def jobs(self) -> JobsFacade:
+        """Sous-façade jobs — CRUD jobs/runs + exécution avec persistence.
+
+        Usage::
+
+            engine.jobs.save(my_job)
+            run = engine.jobs.run(my_job, initial_context={"env": "prod"})
+            runs = engine.jobs.list_runs(status="failed", limit=50)
+        """
+        return self._jobs_facade
+
+    # ------------------------------------------------------------------
+    # Raw storage backend (unchanged — advanced use / GUI / health checks)
     # ------------------------------------------------------------------
 
     @property
     def storage(self):
+        """Accès direct au backend de persistence brut (``BaseStorage``).
+
+        Pour les opérations de haut niveau, préférer ``engine.jobs``.
+        Ce getter est conservé pour la compatibilité et les cas d'usage avancés
+        (healthcheck, GUI, migrations).
+        """
         return self._storage
 
     @storage.setter
     def storage(self, backend):
         self._storage = backend
         self._suspension.storage = backend
+        # Propagate to sub-facade so engine.jobs stays in sync
+        self._jobs_facade._set_storage(backend)
+
+    # ------------------------------------------------------------------
+    # Persistence methods — backwards-compatible delegates to engine.jobs
+    # ------------------------------------------------------------------
 
     def save_job(self, job: Job) -> None:
-        self._job_registry[job.name] = job  # preserve handlers for run_with_storage
-        self._require_storage("save_job")
-        try:
-            self._storage.save_job(job)
-        except Exception as e:
-            raise WorkflowError(
-                f"Failed to save job '{job.name}': {e}",
-                details={"operation": "save_job", "job_name": job.name},
-            ) from e
+        """Persiste un job. Délègue à ``engine.jobs.save(job)``."""
+        self.jobs.save(job)
 
     def get_job(self, job_name: str) -> Job | None:
-        self._require_storage("get_job")
-        try:
-            return self._storage.get_job(job_name)
-        except Exception as e:
-            raise WorkflowError(
-                f"Failed to get job '{job_name}': {e}",
-                details={"operation": "get_job", "job_name": job_name},
-            ) from e
+        """Récupère un job. Délègue à ``engine.jobs.get(job_name)``."""
+        return self.jobs.get(job_name)
 
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]:
-        self._require_storage("list_jobs")
-        try:
-            return self._storage.list_jobs(limit=limit, offset=offset)
-        except Exception as e:
-            raise WorkflowError(
-                f"Failed to list jobs: {e}", details={"operation": "list_jobs"}
-            ) from e
+        """Liste les jobs. Délègue à ``engine.jobs.list(limit, offset)``."""
+        return self.jobs.list(limit=limit, offset=offset)
 
     def delete_job(self, job_name: str) -> bool:
-        self._require_storage("delete_job")
-        try:
-            return self._storage.delete_job(job_name)
-        except Exception as e:
-            raise WorkflowError(
-                f"Failed to delete job '{job_name}': {e}",
-                details={"operation": "delete_job", "job_name": job_name},
-            ) from e
+        """Supprime un job. Délègue à ``engine.jobs.delete(job_name)``."""
+        return self.jobs.delete(job_name)
 
     def get_job_run(self, run_id: str) -> JobRun | None:
-        self._require_storage("get_job_run")
-        try:
-            return self._storage.get_job_run(run_id)
-        except Exception as e:
-            raise WorkflowError(
-                f"Failed to get job run '{run_id}': {e}",
-                details={"operation": "get_job_run", "run_id": run_id},
-            ) from e
+        """Récupère un run. Délègue à ``engine.jobs.get_run(run_id)``."""
+        return self.jobs.get_run(run_id)
 
     def list_job_runs(
         self,
@@ -442,20 +433,14 @@ class WorkflowEngine:
         offset: int = 0,
         since: datetime | None = None,
     ) -> list[JobRun]:
-        self._require_storage("list_job_runs")
-        try:
-            return self._storage.list_job_runs(
-                job_name=job_name,
-                status=status,
-                limit=limit,
-                offset=offset,
-                since=since,
-            )
-        except Exception as e:
-            raise WorkflowError(
-                f"Failed to list job runs: {e}",
-                details={"operation": "list_job_runs"},
-            ) from e
+        """Liste les runs. Délègue à ``engine.jobs.list_runs(...)``."""
+        return self.jobs.list_runs(
+            job_name=job_name, status=status, limit=limit, offset=offset, since=since
+        )
+
+    def count_job_runs(self, job_name: str | None = None) -> int:
+        """Compte les runs. Délègue à ``engine.jobs.count_runs(job_name)``."""
+        return self.jobs.count_runs(job_name=job_name)
 
     def run_with_storage(
         self,
@@ -491,127 +476,174 @@ class WorkflowEngine:
                 ou si le job est introuvable par nom.
             WorkflowFailed: Si le workflow échoue.
         """
-        self._require_storage("run_with_storage")
+        return self.jobs.run(job_or_name, initial_context=initial_context, run_id=run_id)
 
-        if isinstance(job_or_name, str):
-            # Prefer in-memory registry: handlers are preserved there.
-            # Persistence round-trips lose callables (Step.from_dict sets handler=None).
-            job = self._job_registry.get(job_or_name) or self.get_job(job_or_name)
-            if not job:
-                raise WorkflowError(
-                    f"Job '{job_or_name}' not found in persistence backend",
-                    details={"job_name": job_or_name},
-                )
-        else:
-            job = job_or_name
-            # Auto-save du job si absent du backend — évite les violations FK
-            # sur SQLite/SQLAlchemy lors des checkpoints du JobRun.
-            self._ensure_job_persisted(job)
+    # ------------------------------------------------------------------
+    # Pipeline facade (ADR-014 / ADR-016)
+    # ------------------------------------------------------------------
 
-        job_run = JobRun(
-            job_run_id=run_id or str(uuid.uuid4()),
-            job=job,
-            job_name=job.name,
-            job_version=job.version,
-            status=RunStatus.PENDING,
-            input_data=initial_context or {},
+    def save_pipeline(self, pipeline: Pipeline) -> None:
+        """Persiste la définition d'une Pipeline dans le backend de storage.
+
+        Auto-appelé par :meth:`run_pipeline` — peut aussi être appelé
+        manuellement pour enregistrer une pipeline sans l'exécuter.
+
+        Requires:
+            Un backend de persistence doit être configuré.
+        """
+        self._require_storage("save_pipeline")
+        if hasattr(self._storage, "save_pipeline"):
+            self._storage.save_pipeline(pipeline)
+
+    def get_pipeline(self, name: str) -> Pipeline | None:
+        """Récupère une Pipeline par son nom depuis le backend."""
+        if self._storage is None or not hasattr(self._storage, "get_pipeline"):
+            return None
+        try:
+            return self._storage.get_pipeline(name)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def list_pipelines(
+        self,
+        enabled_only: bool = False,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Pipeline]:
+        """Liste toutes les pipelines enregistrées dans le backend."""
+        if self._storage is None or not hasattr(self._storage, "list_pipelines"):
+            return []
+        try:
+            return self._storage.list_pipelines(
+                enabled_only=enabled_only, limit=limit, offset=offset
+            )
+        except Exception:  # noqa: BLE001
+            return []
+
+    def run_pipeline(
+        self,
+        pipeline: Pipeline,
+        initial_context: dict[str, Any] | None = None,
+        triggered_by: str = "manual",
+    ) -> PipelineRun:
+        """Exécute une pipeline complète via ``PipelineRunner``.
+
+        Chaque stage est exécuté avec ``run()`` (pas de persistence
+        intermédiaire des JobRun).  Utilisez :meth:`run_pipeline_with_storage`
+        pour persister l'état de chaque job.
+
+        Args:
+            pipeline: Définition de la pipeline (``Pipeline`` ou objet
+                retourné par ``@pipeline(...).build()``).
+            initial_context: Contexte initial injecté dans le premier stage.
+            triggered_by: Source du déclenchement.
+
+        Returns:
+            ``PipelineRun`` avec le statut global et les ``StageRun``.
+        """
+        # Auto-persist the pipeline definition so the GUI can list it
+        if self._storage is not None and hasattr(self._storage, "save_pipeline"):
+            try:
+                self._storage.save_pipeline(pipeline)
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("Failed to persist pipeline definition: %s", exc)
+
+        runner = PipelineRunner(engine=self, job_registry=dict(self._job_registry))
+        pipeline_run = runner.execute(
+            pipeline,
+            initial_context=initial_context,
+            triggered_by=triggered_by,
+        )
+        if self._storage is not None:
+            try:
+                self._storage.save_pipeline_run(pipeline_run)
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("Failed to persist pipeline run: %s", exc)
+        return pipeline_run
+
+    def run_pipeline_with_storage(
+        self,
+        pipeline: Pipeline,
+        initial_context: dict[str, Any] | None = None,
+        triggered_by: str = "manual",
+    ) -> PipelineRun:
+        """Exécute une pipeline avec persistence intermédiaire des JobRun.
+
+        Identique à :meth:`run_pipeline` mais chaque stage utilise
+        ``run_with_storage()`` pour persister l'état de chaque ``JobRun``
+        avec checkpoints.
+
+        Requires:
+            Un backend de persistence doit être configuré (``storage=…``
+            ou ``config.storage.db_path``).
+
+        Raises:
+            WorkflowError: Si aucun backend de persistence n'est configuré.
+        """
+        self._require_storage("run_pipeline_with_storage")
+        return self.run_pipeline(
+            pipeline,
+            initial_context=initial_context,
+            triggered_by=triggered_by,
         )
 
-        # Checkpoint initial — état PENDING enregistré avant tout step
-        self._save_job_run_checkpoint(job_run)
+    # ------------------------------------------------------------------
+    # AI facade — méthodes optionnelles (ADR-013)
+    # Lazy-importent engine/ai/ pour éviter de forcer la dépendance IA.
+    # ------------------------------------------------------------------
 
-        try:
-            try:
-                resolver = DAGResolver(job)
-                execution_order = resolver.get_execution_order()
-            except DAGValidationError as e:
-                raise WorkflowFailed(
-                    f"Workflow validation failed: {e}",
-                    job_name=job.name,
-                    details=e.details if hasattr(e, "details") else {},
-                ) from e
+    def create_agent(self, **kwargs: Any) -> Any:
+        """Crée un agent IA. Délègue à ``engine.ai.create_agent()``."""
+        return self.ai.create_agent(**kwargs)
 
-            context = WorkflowContext(job_run)
-            if initial_context:
-                for key, value in initial_context.items():
-                    context.set(key, value)
+    def get_agent(self, agent_id: str) -> Any:
+        """Récupère un agent IA par son identifiant. Délègue à ``engine.ai.get_agent()``."""
+        return self.ai.get_agent(agent_id)
 
-            job_run.start_execution()
-            # Checkpoint : RUNNING
-            self._save_job_run_checkpoint(job_run)
+    def list_agents(self, **filters: Any) -> list[Any]:
+        """Liste les agents IA. Délègue à ``engine.ai.list_agents()``."""
+        return self.ai.list_agents(**filters)
 
-            for step_name in execution_order:
-                self._runner.execute(
-                    job_run,
-                    [step_name],
-                    context,
-                    retry_handler=self._retry,
-                )
-                # Checkpoint intermédiaire après chaque step
-                self._save_job_run_checkpoint(job_run)
+    def delete_agent(self, agent_id: str) -> bool:
+        """Supprime un agent IA. Délègue à ``engine.ai.delete_agent()``."""
+        return self.ai.delete_agent(agent_id)
 
-            job_run.complete_success()
+    def chat(
+        self,
+        agent_id: str,
+        message: str,
+        conversation_id: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Envoie un message à un agent IA. Délègue à ``engine.ai.chat()``."""
+        return self.ai.chat(
+            agent_id=agent_id,
+            message=message,
+            conversation_id=conversation_id,
+            **kwargs,
+        )
 
-        except WorkflowSuspended:
-            self._suspension.suspend(job_run, "Workflow suspended by step execution")
-
-        except Exception as e:
-            job_run.complete_failure(str(e))
-            _logger.error("WORKFLOW ERROR [%s] %s: %s", job_run.job_run_id, job.name, e)
-
-        # Sauvegarde finale (état terminal)
-        self._save_job_run_checkpoint(job_run)
-        return job_run
+    def get_conversation_history(self, conversation_id: str) -> list[Any]:
+        """Récupère l'historique d'une conversation. Délègue à ``engine.ai.get_conversation_history()``."""
+        return self.ai.get_conversation_history(conversation_id)
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
+    @property
+    def ai_storage(self) -> Any:
+        """Retourne le backend ``SQLiteAIStorage`` partagé (lazy-init).
+
+        Utilisé par les vues GUI pour lire agents / conversations / messages
+        sans passer par ``AgentService``.  Retourne ``None`` si le sous-package
+        AI n'est pas disponible.
+
+        .. deprecated::
+            Préférer ``engine.ai.storage``.
+        """
+        return self.ai.storage
+
     def _require_storage(self, operation: str) -> None:
         if not self._storage:
             raise WorkflowError(NO_STORAGE_ERROR, details={"operation": operation})
-
-    def _ensure_job_persisted(self, job: Job) -> None:
-        """Sauvegarde le job dans le backend s'il n'y est pas encore.
-
-        Appelé automatiquement par ``run_with_storage()`` pour garantir
-        que la contrainte FK (job_run → job) est satisfaite avant le premier
-        checkpoint du ``JobRun``.
-        """
-        try:
-            existing = self._storage.get_job(job.name)
-            if not existing:
-                self._storage.save_job(job)
-                _logger.debug("Auto-saved job '%s' before first checkpoint.", job.name)
-        except Exception as e:
-            _logger.warning(
-                "Could not auto-save job '%s' before checkpoint: %s — "
-                "FK constraint may fail on SQLite/SQLAlchemy backends.",
-                job.name,
-                e,
-            )
-
-    def _save_job_run_checkpoint(self, job_run: JobRun) -> None:
-        """Sauvegarde un checkpoint du JobRun dans le backend de persistence.
-
-        Ne lève jamais d'exception : les erreurs attendues (``StorageError``)
-        sont loggées en WARNING, les erreurs inattendues en ERROR. Cela garantit
-        que l'exécution du workflow n'est jamais interrompue par un échec de
-        persistence.
-        """
-        if not self._storage:
-            return
-        try:
-            self._storage.save_job_run(job_run)
-        except StorageError as e:
-            _logger.warning(
-                "Checkpoint failed for run '%s' (non-fatal): %s",
-                job_run.job_run_id,
-                e,
-            )
-        except Exception as e:
-            _logger.error(
-                "Unexpected checkpoint error for run '%s': %s",
-                job_run.job_run_id,
-                e,
-            )
