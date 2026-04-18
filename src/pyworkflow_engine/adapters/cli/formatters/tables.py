@@ -16,8 +16,8 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
-    from pyworkflow_engine.models.job import Job
-    from pyworkflow_engine.models.run import JobRun
+    from pyworkflow_engine.models.workflow.job import Job
+    from pyworkflow_engine.models.workflow.run import JobRun
 
 from pyworkflow_engine.models.enums import RunStatus
 

@@ -16,22 +16,25 @@ if TYPE_CHECKING:
 
 
 # ── Badge HTML par niveau ─────────────────────────────────────────────────────
-
-_LEVEL_STYLE: dict[str, tuple[str, str]] = {
-    "DEBUG":    ("grey-6",        "bug_report"),
-    "INFO":     ("blue-6",        "info"),
-    "WARNING":  ("warning",       "warning"),
-    "ERROR":    ("negative",      "error"),
-    "CRITICAL": ("deep-orange-9", "dangerous"),
+# INFO reste gris dans la GUI (niveau "bruit de fond") — SUCCESS et DEBUG
+# ont des couleurs distinctives pour les faire ressortir.
+_LEVEL_STYLE: dict[str, tuple[str, str, str]] = {
+    #                 bg_hex     text_hex  material-icon
+    "DEBUG": ("#5b9bd5", "#fff", "bug_report"),  # bleu ciel
+    "INFO": ("#757575", "#fff", "info"),  # gris  ← voulu
+    "SUCCESS": ("#2e7d32", "#fff", "check_circle"),  # vert vif
+    "WARNING": ("#f57c00", "#fff", "warning"),  # jaune
+    "ERROR": ("#c62828", "#fff", "error"),  # rouge
+    "CRITICAL": ("#b71c1c", "#fff", "dangerous"),  # rouge vif
 }
 
 
 def _level_badge_html(level: str) -> str:
-    color, icon = _LEVEL_STYLE.get(level.upper(), ("grey-6", "help"))
+    bg, fg, icon = _LEVEL_STYLE.get(level.upper(), ("#757575", "#fff", "help"))
     return (
         f'<span style="display:inline-flex;align-items:center;gap:3px;'
-        f"padding:1px 6px;border-radius:10px;font-size:11px;font-weight:600;"
-        f'background:var(--q-{color},#888);color:#fff;">'
+        f"padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700;"
+        f'background:{bg};color:{fg};">'
         f'<span class="material-icons" style="font-size:12px">{icon}</span>'
         f"{level}</span>"
     )
@@ -73,7 +76,9 @@ def _query_logs(
             if extra_raw:
                 try:
                     extra_str = json.dumps(
-                        json.loads(extra_raw), ensure_ascii=False, separators=(", ", ": ")
+                        json.loads(extra_raw),
+                        ensure_ascii=False,
+                        separators=(", ", ": "),
                     )
                 except Exception:
                     extra_str = str(extra_raw)
@@ -111,7 +116,15 @@ def build_logs_page(engine: WorkflowEngine, config: GUIConfig) -> None:
     with ui.card().classes("w-full q-mb-md"):
         with ui.row().classes("items-center gap-4 flex-wrap"):
             level_select = ui.select(
-                options=["", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                options=[
+                    "",
+                    "DEBUG",
+                    "INFO",
+                    "SUCCESS",
+                    "WARNING",
+                    "ERROR",
+                    "CRITICAL",
+                ],
                 value="",
                 label="Niveau",
             ).classes("min-w-[160px]")
@@ -122,9 +135,9 @@ def build_logs_page(engine: WorkflowEngine, config: GUIConfig) -> None:
             limit_input = ui.number(
                 "Limite", value=200, min=10, max=5000, step=50
             ).classes("w-28")
-            ui.button(
-                "Actualiser", icon="refresh", on_click=lambda: _refresh()
-            ).props("color=primary")
+            ui.button("Actualiser", icon="refresh", on_click=lambda: _refresh()).props(
+                "color=primary"
+            )
 
     # ── Tableau ────────────────────────────────────────────────────────────
     with ui.card().classes("w-full"):
@@ -176,7 +189,7 @@ def build_logs_page(engine: WorkflowEngine, config: GUIConfig) -> None:
                 auto_size_columns=False,
             )
             .classes("w-full")
-            .style("height: 600px")
+            .style("height: calc(100vh - 260px)")
         )
 
         if not initial_rows:

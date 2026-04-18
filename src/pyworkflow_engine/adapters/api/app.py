@@ -9,6 +9,7 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -25,6 +26,38 @@ from pyworkflow_engine.adapters.api.middleware import (
     RequestIDMiddleware,
     TimingMiddleware,
 )
+
+_logger = logging.getLogger(__name__)
+
+
+def _setup_rate_limiting(app: FastAPI, config: APIConfig) -> None:
+    """Configure slowapi si disponible et activé dans la config.
+
+    Le rate limiter est optionnel : si ``slowapi`` n'est pas installé ou si
+    ``config.rate_limit`` est None, aucune limite n'est appliquée.
+    Les routes individuelles peuvent décorer leurs handlers avec
+    ``@limiter.limit("10/minute")`` pour des limites plus fines.
+    """
+    if not config.rate_limit:
+        return
+    try:
+        from slowapi import Limiter, _rate_limit_exceeded_handler
+        from slowapi.errors import RateLimitExceeded
+        from slowapi.util import get_remote_address
+
+        limiter = Limiter(
+            key_func=get_remote_address,
+            default_limits=[config.rate_limit],
+        )
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+        _logger.info("Rate limiting enabled: %s per IP", config.rate_limit)
+    except ImportError:
+        _logger.warning(
+            "rate_limit=%r configured but 'slowapi' is not installed. "
+            "Install it with: pip install pyworkflow-engine[api]",
+            config.rate_limit,
+        )
 
 
 def create_app(
@@ -49,7 +82,22 @@ def create_app(
         # Startup — stocke engine + config dans app.state
         app.state.engine = engine
         app.state.config = config
+
+        # Avertissements de sécurité au démarrage
+        if not config.require_auth:
+            _logger.warning(
+                "PyWorkflow API running WITHOUT authentication. "
+                "Set require_auth=True and api_key=<secret> (or env PYWORKFLOW_API_KEY) "
+                "before exposing this API on a non-trusted network."
+            )
+        if config.cors_origins == ["*"]:
+            _logger.warning(
+                "CORS allow_origins=['*'] — suitable for local development only. "
+                "Set cors_origins to specific origins for production deployments."
+            )
+
         yield
+
         # Shutdown — cleanup si nécessaire
         if hasattr(engine, "shutdown_executors"):
             engine.shutdown_executors()
@@ -78,6 +126,9 @@ def create_app(
 
     # Exception handlers
     register_exception_handlers(app)
+
+    # Rate limiting (opt-in via config.rate_limit, requires slowapi)
+    _setup_rate_limiting(app, config)
 
     # Routers
     from pyworkflow_engine.adapters.api.routes import (

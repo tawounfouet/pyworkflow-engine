@@ -18,7 +18,7 @@ from pyworkflow_engine.adapters.api.schemas.runs import (
     StepRunSchema,
 )
 from pyworkflow_engine.models import Job, JobRun
-from pyworkflow_engine.models.run import StepRun
+from pyworkflow_engine.models.workflow.run import StepRun
 
 
 def job_to_summary(job: Job) -> JobSummary:

@@ -14,12 +14,15 @@ if TYPE_CHECKING:
 def job_table(
     engine: WorkflowEngine,
     on_select: Callable[[str], None] | None = None,
+    height: str = "calc(100vh - 220px)",
 ) -> ui.aggrid:
     """Crée un tableau AG Grid listant tous les jobs enregistrés.
 
     Args:
         engine: Instance du moteur de workflow.
         on_select: Callback appelé avec le nom du job quand une ligne est cliquée.
+        height: Hauteur CSS du tableau (ex: ``"300px"``, ``"calc(100vh - 220px)"``).
+            Par défaut remplit la hauteur disponible de la page.
 
     Returns:
         L'instance ``ui.aggrid`` créée (pour pouvoir la rafraîchir).
@@ -57,7 +60,7 @@ def job_table(
             auto_size_columns=False,
         )
         .classes("w-full")
-        .style("height: 300px")
+        .style(f"height: {height}")
     )
 
     if on_select:

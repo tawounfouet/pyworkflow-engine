@@ -7,14 +7,26 @@ from typing import TYPE_CHECKING
 from nicegui import ui
 
 if TYPE_CHECKING:
-    from pyworkflow_engine.models.runtime import StepRun
+    from pyworkflow_engine.models.workflow.run import StepRun
 
-# Mapping niveau de log → couleur Tailwind/Quasar
-_LEVEL_COLOR = {
-    "ERROR": "text-negative",
-    "WARNING": "text-warning",
-    "INFO": "text-positive",
-    "DEBUG": "text-grey-5",
+# Mapping niveau de log → couleur CSS hex
+# INFO reste gris dans la GUI (bruit de fond) — SUCCESS et DEBUG ressortent.
+_LEVEL_COLOR: dict[str, str] = {
+    "DEBUG": "#5b9bd5",  # bleu ciel   ≈ ANSI \033[94m
+    "INFO": "#757575",  # gris        ← voulu côté GUI
+    "SUCCESS": "#4caf50",  # vert vif    ≈ ANSI \033[32m
+    "WARNING": "#f57c00",  # jaune       ≈ ANSI \033[33m
+    "ERROR": "#c62828",  # rouge       ≈ ANSI \033[31m
+    "CRITICAL": "#b71c1c",  # rouge vif   ≈ ANSI \033[91m
+}
+
+_LEVEL_ICON: dict[str, str] = {
+    "DEBUG": "🔵",
+    "INFO": "·",  # point discret — INFO est du bruit de fond
+    "SUCCESS": "✅",
+    "WARNING": "⚠️",
+    "ERROR": "❌",
+    "CRITICAL": "🚨",
 }
 
 
@@ -60,5 +72,6 @@ def _populate_log(log: ui.log, step_runs: list[StepRun]) -> None:
 
     for ts, step_name, level, message in all_entries:
         ts_str = ts.strftime("%H:%M:%S") if ts else "??:??:??"
-        line = f"[{ts_str}] [{step_name}] [{level}] {message}"
+        icon = _LEVEL_ICON.get(level.upper(), "  ")
+        line = f"[{ts_str}] {icon} [{step_name}] {message}"
         log.push(line)

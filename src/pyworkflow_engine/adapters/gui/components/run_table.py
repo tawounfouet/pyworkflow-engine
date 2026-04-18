@@ -15,7 +15,7 @@ from pyworkflow_engine.adapters.gui.styles.theme import (
 
 if TYPE_CHECKING:
     from pyworkflow_engine.facade import WorkflowEngine
-    from pyworkflow_engine.models.runtime import JobRun
+    from pyworkflow_engine.models.workflow.run import JobRun
 
 
 def run_table(
@@ -59,7 +59,7 @@ def run_table(
             auto_size_columns=False,
         )
         .classes("w-full")
-        .style("height: 400px")
+        .style("height: calc(100vh - 260px)")
     )
 
     if on_select:

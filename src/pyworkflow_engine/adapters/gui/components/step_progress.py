@@ -16,7 +16,7 @@ from pyworkflow_engine.adapters.gui.styles.theme import (
 )
 
 if TYPE_CHECKING:
-    from pyworkflow_engine.models.runtime import StepRun
+    from pyworkflow_engine.models.workflow.run import StepRun
 
 
 def step_progress_table(step_runs: list[StepRun]) -> ui.aggrid:

@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.tree import Tree
 
 if TYPE_CHECKING:
-    from pyworkflow_engine.models.job import Job
+    from pyworkflow_engine.models.workflow.job import Job
 
 
 def render_job_tree(console: Console, job: Job) -> None:

@@ -15,15 +15,79 @@ Options globales (transmises via ``ctx.obj``) :
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
 
 from pyworkflow_engine.adapters.cli.callbacks import VERSION_OPTION
+from pyworkflow_engine.adapters.cli.commands import agent as agent_commands
 from pyworkflow_engine.adapters.cli.commands import executor as executor_commands
 from pyworkflow_engine.adapters.cli.commands import job as job_commands
 from pyworkflow_engine.adapters.cli.commands import run as run_commands
+
+
+def _bootstrap_catalog_path() -> None:
+    """Injecte la racine du projet dans sys.path pour rendre agents/ importable.
+
+    Cherche un dossier ``agents/`` en remontant depuis src/pyworkflow_engine/
+    jusqu'à la racine du dépôt.  Sans cela, ``pyworkflow agent run`` échoue
+    avec ``ModuleNotFoundError: No module named 'agents'`` car le catalogue
+    n'est pas un package installé dans le .venv.
+
+    Ordre de recherche :
+      1. Depuis ``__file__`` (src/pyworkflow_engine/adapters/cli/main.py)
+         → remonte 5 niveaux jusqu'à la racine du projet.
+      2. Depuis le répertoire courant (``Path.cwd()``).
+    """
+    candidates: list[Path] = [
+        # src/pyworkflow_engine/adapters/cli/main.py  →  5 parents  →  racine
+        Path(__file__).resolve().parents[4],
+        Path.cwd(),
+    ]
+    for candidate in candidates:
+        if (candidate / "agents").is_dir() and (
+            candidate / "agents" / "manifest.yaml"
+        ).exists():
+            root_str = str(candidate)
+            if root_str not in sys.path:
+                sys.path.insert(0, root_str)
+            return
+
+
+# Injecter le path catalog dès le démarrage du module CLI
+_bootstrap_catalog_path()
+
+
+def _load_dotenv() -> None:
+    """Charge le fichier .env le plus proche si python-dotenv est disponible.
+
+    Cherche .env en remontant depuis le répertoire courant puis depuis la
+    racine du projet déduite de sys.path — même logique que les scripts
+    examples/*.py.  Sans cela, ``OPENAI_API_KEY`` définie dans .env n'est
+    pas visible lors d'un appel CLI (``pyworkflow agent chat``).
+    """
+    try:
+        from dotenv import find_dotenv, load_dotenv
+    except ImportError:
+        return  # python-dotenv optionnel
+
+    # Priorité 1 : .env dans le CWD ou un parent
+    dotenv_path = find_dotenv(usecwd=True)
+    if dotenv_path:
+        load_dotenv(dotenv_path, override=False)
+        return
+
+    # Priorité 2 : .env à la racine du projet (parents[4] de ce fichier)
+    project_root = Path(__file__).resolve().parents[4]
+    candidate = project_root / ".env"
+    if candidate.exists():
+        load_dotenv(candidate, override=False)
+
+
+_load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Root app
@@ -42,6 +106,7 @@ app = typer.Typer(
 )
 
 # Sub-command groups
+app.add_typer(agent_commands.app, name="agent")
 app.add_typer(job_commands.app, name="job")
 app.add_typer(run_commands.app, name="run")
 app.add_typer(executor_commands.app, name="executor")

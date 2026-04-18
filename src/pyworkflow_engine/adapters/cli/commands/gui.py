@@ -35,10 +35,10 @@ def launch_gui(
     db: str = typer.Option(
         "workflow.db", "--db", help="Chemin SQLite (mode standalone)."
     ),
-    dark: bool = typer.Option(True, "--dark/--light", help="Mode sombre (défaut: activé)."),
-    reload: bool = typer.Option(
-        False, "--reload", help="Hot-reload (développement)."
+    dark: bool = typer.Option(
+        True, "--dark/--light", help="Mode sombre (défaut: activé)."
     ),
+    reload: bool = typer.Option(False, "--reload", help="Hot-reload (développement)."),
     show: bool = typer.Option(
         False, "--show/--no-show", help="Ouvrir le navigateur au démarrage."
     ),
@@ -72,11 +72,16 @@ def launch_gui(
     if app_path:
         engine = load_engine(app_path)
     else:
+        from pathlib import Path
+
         from pyworkflow_engine import WorkflowEngine
+        from pyworkflow_engine.adapters.ai.storage.sqlite import SQLiteAIStorage
         from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 
+        db_resolved = str(Path(db).expanduser().resolve())
         _engine = WorkflowEngine()
-        _engine.storage = SQLiteStorage(database_path=db)
+        _engine.storage = SQLiteStorage(database_path=db_resolved)
+        _engine._ai_storage = SQLiteAIStorage(db_resolved)
         engine = _engine
 
     # ── Bannière de démarrage ─────────────────────────────────────────────

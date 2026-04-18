@@ -141,7 +141,7 @@ def build_job_detail_page(
                 "defaultColDef": {"resizable": True, "filter": True},
             },
             auto_size_columns=False,
-        ).classes("w-full").style("height: 300px")
+        ).classes("w-full").style("height: 500px")
 
 
 def _meta_row(label: str, value: str) -> None:

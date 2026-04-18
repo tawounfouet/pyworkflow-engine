@@ -1,4 +1,4 @@
-"""dag_graph — rendu Mermaid du DAG d'un job."""
+"""dag_graph — rendu Mermaid du DAG d'un job ou d'une pipeline."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from nicegui import ui
 
 if TYPE_CHECKING:
     from pyworkflow_engine.models.design_time import Job
+    from pyworkflow_engine.models.pipeline.pipeline import Pipeline
 
 
 def dag_graph(job: Job) -> ui.mermaid:
@@ -56,3 +57,53 @@ def _build_diagram(job: Job) -> str:
 def _mid(name: str) -> str:
     """Sanitise un nom de step pour Mermaid."""
     return name.replace("-", "_").replace(" ", "_").replace(".", "_")
+
+
+# ── Pipeline-level DAG ────────────────────────────────────────────────────────
+
+
+def pipeline_dag_graph(pipeline: Pipeline) -> ui.mermaid:
+    """Affiche le DAG de séquencement des stages d'une pipeline.
+
+    Représente la chaîne linéaire des stages avec leurs noms de jobs,
+    en mettant en évidence les stages désactivés en gris.
+
+    Args:
+        pipeline: Instance ``Pipeline`` dont on veut afficher le DAG.
+
+    Returns:
+        L'instance ``ui.mermaid`` créée.
+    """
+    diagram = _build_pipeline_diagram(pipeline)
+    return ui.mermaid(diagram).classes("w-full overflow-auto")
+
+
+def _build_pipeline_diagram(pipeline: Pipeline) -> str:
+    lines = ["graph LR"]
+    stages = pipeline.stages
+
+    if not stages:
+        lines.append("    EMPTY[Aucun stage défini]")
+        return "\n".join(lines)
+
+    lines.append("    START(( ))")
+
+    for i, stage in enumerate(stages):
+        node_id = f"S{i}_{_mid(stage.job_name)}"
+        label = stage.job_name
+        if not stage.enabled:
+            lines.append(f"    {node_id}[{label}]:::disabled")
+        else:
+            lines.append(f"    {node_id}[{label}]")
+
+        if i == 0:
+            lines.append(f"    START --> {node_id}")
+        else:
+            prev_id = f"S{i - 1}_{_mid(stages[i - 1].job_name)}"
+            lines.append(f"    {prev_id} --> {node_id}")
+
+        if i == len(stages) - 1:
+            lines.append(f"    {node_id} --> END(( ))")
+
+    lines.append("    classDef disabled fill:#ccc,color:#666,stroke:#aaa")
+    return "\n".join(lines)

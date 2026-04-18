@@ -10,8 +10,8 @@ import json
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from pyworkflow_engine.models.job import Job
-    from pyworkflow_engine.models.run import JobRun
+    from pyworkflow_engine.models.workflow.job import Job
+    from pyworkflow_engine.models.workflow.run import JobRun
 
 
 def _default(obj: Any) -> Any:
