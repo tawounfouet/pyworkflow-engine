@@ -14,9 +14,6 @@ import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    pass
-
 from pyworkflow_engine.exceptions import StepExecutionError, WorkflowSuspended
 from pyworkflow_engine.models import JobRun, RunStatus, StepRun
 from pyworkflow_engine.engine.dag import DAGResolver
@@ -24,6 +21,7 @@ from pyworkflow_engine.engine.runner import WorkflowRunner
 
 if TYPE_CHECKING:
     from pyworkflow_engine.engine.context import WorkflowContext
+    from pyworkflow_engine.engine.retry import RetryHandler
 
 
 class ParallelRunner(WorkflowRunner):
@@ -64,7 +62,7 @@ class ParallelRunner(WorkflowRunner):
         job_run: JobRun,
         execution_order: list[str],
         context: WorkflowContext,
-        retry_handler: Any | None = None,
+        retry_handler: RetryHandler | None = None,
     ) -> None:
         """Exécute les steps par groupes parallèles.
 
@@ -72,6 +70,10 @@ class ParallelRunner(WorkflowRunner):
         Le paramètre ``execution_order`` est utilisé comme filtre : seuls les
         steps présents dans cette liste sont exécutés. Cela permet la reprise
         correcte après une suspension sans ré-exécuter les steps déjà terminés.
+
+        Un unique ``ThreadPoolExecutor`` est créé pour toute la durée
+        d'exécution du workflow afin d'éviter le coût de création/destruction
+        d'un pool par groupe parallèle.
 
         Args:
             job_run: Instance JobRun en cours.
@@ -92,19 +94,23 @@ class ParallelRunner(WorkflowRunner):
         # En exécution normale : tous les steps. En reprise : steps restants seulement.
         remaining = set(execution_order)
 
-        for group in parallel_groups:
-            # Filtrer le groupe aux steps qui restent à exécuter
-            filtered_group = [s for s in group if s in remaining]
-            if not filtered_group:
-                # Groupe entièrement terminé (ou hors-scope) — on passe
-                continue
-            self._execute_group(
-                job_run=job_run,
-                group=filtered_group,
-                steps_by_name=steps_by_name,
-                context=context,
-                retry_handler=retry_handler,
-            )
+        # Pool unique partagé sur tous les groupes — évite la création/destruction
+        # répétée (coût ~5-10 ms par pool) pour les workflows à nombreux groupes.
+        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+            for group in parallel_groups:
+                # Filtrer le groupe aux steps qui restent à exécuter
+                filtered_group = [s for s in group if s in remaining]
+                if not filtered_group:
+                    # Groupe entièrement terminé (ou hors-scope) — on passe
+                    continue
+                self._execute_group(
+                    job_run=job_run,
+                    group=filtered_group,
+                    steps_by_name=steps_by_name,
+                    context=context,
+                    retry_handler=retry_handler,
+                    pool=pool,
+                )
 
     # ------------------------------------------------------------------
     # Internal
@@ -116,9 +122,14 @@ class ParallelRunner(WorkflowRunner):
         group: list[str],
         steps_by_name: dict,
         context: WorkflowContext,
-        retry_handler: Any | None,
+        retry_handler: RetryHandler | None,
+        pool: ThreadPoolExecutor,
     ) -> None:
-        """Exécute un groupe de steps en parallèle et attend leur complétion."""
+        """Exécute un groupe de steps en parallèle et attend leur complétion.
+
+        Args:
+            pool: Pool de threads partagé fourni par ``execute()``.
+        """
         if len(group) == 1:
             # Optimisation : groupe singleton → exécution directe, sans overhead de pool.
             step_name = group[0]
@@ -131,24 +142,23 @@ class ParallelRunner(WorkflowRunner):
         first_suspension: WorkflowSuspended | None = None
         errors: list[StepExecutionError] = []
 
-        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
-            for step_name in group:
-                step = steps_by_name[step_name]
-                if not self._should_execute_step(step, context):
-                    continue
-                future = pool.submit(
-                    self._run_single_step, job_run, step, context, retry_handler
-                )
-                futures[future] = step_name
+        for step_name in group:
+            step = steps_by_name[step_name]
+            if not self._should_execute_step(step, context):
+                continue
+            future = pool.submit(
+                self._run_single_step, job_run, step, context, retry_handler
+            )
+            futures[future] = step_name
 
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except WorkflowSuspended as exc:
-                    if first_suspension is None:
-                        first_suspension = exc
-                except StepExecutionError as exc:
-                    errors.append(exc)
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except WorkflowSuspended as exc:
+                if first_suspension is None:
+                    first_suspension = exc
+            except StepExecutionError as exc:
+                errors.append(exc)
 
         if first_suspension is not None:
             raise first_suspension
@@ -160,7 +170,7 @@ class ParallelRunner(WorkflowRunner):
         job_run: JobRun,
         step,
         context: WorkflowContext,
-        retry_handler: Any | None,
+        retry_handler: RetryHandler | None,
     ) -> None:
         """Exécute un step individuel de manière thread-safe."""
         step_run = StepRun(

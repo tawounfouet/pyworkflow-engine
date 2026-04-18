@@ -10,6 +10,13 @@ Design :
     Le core utilise ``logging.getLogger(__name__)`` partout.
     L'utilisateur final configure le logging à son niveau (application).
     On fournit ``configure_logging()`` comme helper optionnel.
+
+    Console handler → StructuredFormatter (lisible + ANSI)
+    console_handler.setFormatter(StructuredFormatter(...))
+
+    File handler → JSONFormatter (machine-readable, pas de couleurs)
+    file_handler.setFormatter(JSONFormatter(...))
+
 """
 
 from __future__ import annotations
@@ -29,7 +36,26 @@ _root_logger = logging.getLogger(_ROOT_LOGGER_NAME)
 # PEP 282 best practice : NullHandler par défaut pour les libraries
 _root_logger.addHandler(logging.NullHandler())
 
-# État global de configuration (évite les reconfigurations multiples)
+# ── Niveau custom SUCCESS (25 — entre INFO=20 et WARNING=30) ─────────────────
+SUCCESS = 25
+logging.addLevelName(SUCCESS, "SUCCESS")
+
+
+def _success(
+    self: logging.Logger, message: str, *args: object, **kwargs: object
+) -> None:  # noqa: ANN001
+    """Émet un log de niveau SUCCESS (25).
+
+    Usage identique à ``logger.info()`` :
+        logger.success("Job ingestion-imf terminé en 23.8 s ✅")
+    """
+    if self.isEnabledFor(SUCCESS):
+        self._log(SUCCESS, message, args, **kwargs)  # type: ignore[arg-type]
+
+
+# Patch une seule fois sur la classe Logger (idempotent si déjà fait)
+if not hasattr(logging.Logger, "success"):
+    logging.Logger.success = _success  # type: ignore[attr-defined]
 _configured = False
 _queue_listener: logging.handlers.QueueListener | None = None
 
@@ -104,7 +130,14 @@ def configure_logging(config: LoggingConfig | None = None) -> None:
             backupCount=config.log_file_backup_count,
             encoding="utf-8",
         )
-        file_handler.setFormatter(JSONFormatter(extra_fields=config.extra_fields))
+        if config.json_output:
+            file_handler.setFormatter(JSONFormatter(extra_fields=config.extra_fields))
+        else:
+            # colorize=False → pas de codes ANSI dans le fichier
+            file_handler.setFormatter(
+                StructuredFormatter(extra_fields=config.extra_fields, colorize=False)
+            )
+
         target_handlers.append(file_handler)
 
     # ── Queue handler (async non-bloquant) ───────────────────────────────

@@ -18,6 +18,7 @@ from .context import WorkflowContext
 # Re-exports for convenience
 from .dag import DAGResolver
 from .parallel_runner import ParallelRunner
+from .pipeline_runner import PipelineRunner
 from .retry import RetryHandler
 from .runner import WorkflowRunner
 from .suspension import SuspensionManager
@@ -25,6 +26,7 @@ from .suspension import SuspensionManager
 __all__ = [
     "WorkflowRunner",
     "ParallelRunner",
+    "PipelineRunner",
     "RetryHandler",
     "SuspensionManager",
     "DAGResolver",

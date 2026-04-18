@@ -84,7 +84,7 @@ class StepLogBridge(logging.Handler):
         source: Préfixe source pour les StepLog (défaut: "logging").
 
     Examples:
-        >>> from pyworkflow_engine.models.run import StepRun
+        >>> from pyworkflow_engine.models.workflow.run import StepRun
         >>> step_run = StepRun(step_name="process_data", job_run_id="job-1")
         >>> bridge = StepLogBridge(step_run)
         >>> logger = logging.getLogger("my_step")

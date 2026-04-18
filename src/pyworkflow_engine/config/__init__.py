@@ -7,9 +7,11 @@ Point d'entrée public :
         WorkflowConfig, EngineConfig, ExecutorConfig,
         LoggingConfig, StorageConfig,
         Settings, settings,
+        AISettings, ai_settings,
     )
 """
 
+from pyworkflow_engine.config.ai import AISettings, ai_settings
 from pyworkflow_engine.config.base import WorkflowConfig
 from pyworkflow_engine.config.engine import EngineConfig
 from pyworkflow_engine.config.executor import ExecutorConfig
@@ -25,4 +27,6 @@ __all__ = [
     "StorageConfig",
     "Settings",
     "settings",
+    "AISettings",
+    "ai_settings",
 ]

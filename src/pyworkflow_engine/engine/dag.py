@@ -84,31 +84,60 @@ class DAGResolver:
             )
 
     def _detect_cycles(self) -> list[str]:
+        """Détecte les cycles via DFS itérative (pas de risque de RecursionError).
+
+        Algorithme : coloration 3-états (WHITE/GRAY/BLACK) sur une pile
+        explicite.  GRAY = nœud en cours de traitement sur le chemin courant ;
+        BLACK = nœud entièrement traité.  Un arc vers un nœud GRAY indique un
+        cycle.
+
+        Returns:
+            Liste de noms de steps formant le premier cycle trouvé,
+            ou liste vide s'il n'y en a pas.
+        """
         WHITE, GRAY, BLACK = 0, 1, 2
-        colors = dict.fromkeys(self._steps_by_name, WHITE)
-        path: list[str] = []
+        colors: dict[str, int] = dict.fromkeys(self._steps_by_name, WHITE)
+        # parent[node] permet de reconstruire le chemin du cycle
+        parent: dict[str, str | None] = {n: None for n in self._steps_by_name}
 
-        def dfs(node: str) -> list[str] | None:
-            if colors[node] == GRAY:
-                cycle_start = path.index(node)
-                return path[cycle_start:] + [node]
-            if colors[node] == BLACK:
-                return None
-            colors[node] = GRAY
-            path.append(node)
-            for dep in self._dependencies.get(node, []):
-                cycle = dfs(dep)
-                if cycle:
-                    return cycle
-            colors[node] = BLACK
-            path.pop()
-            return None
+        for start in self._steps_by_name:
+            if colors[start] != WHITE:
+                continue
 
-        for step in self._steps_by_name:
-            if colors[step] == WHITE:
-                cycle = dfs(step)
-                if cycle:
-                    return cycle
+            # Pile d'items (node, iterator_over_deps, entering)
+            # entering=True  → première visite du nœud (marquer GRAY)
+            # entering=False → retour de tous les enfants (marquer BLACK)
+            stack: list[tuple[str, bool]] = [(start, True)]
+
+            while stack:
+                node, entering = stack.pop()
+
+                if entering:
+                    if colors[node] == GRAY:
+                        # Cycle détecté — reconstruire le chemin
+                        cycle: list[str] = [node]
+                        cur: str | None = parent[node]
+                        while cur is not None and cur != node:
+                            cycle.append(cur)
+                            cur = parent[cur]
+                        cycle.append(node)
+                        cycle.reverse()
+                        return cycle
+
+                    if colors[node] == BLACK:
+                        continue
+
+                    colors[node] = GRAY
+                    # Planifier le marquage BLACK au retour
+                    stack.append((node, False))
+
+                    for dep in self._dependencies.get(node, []):
+                        if colors[dep] != BLACK:
+                            parent[dep] = node
+                            stack.append((dep, True))
+                else:
+                    colors[node] = BLACK
+
         return []
 
     def get_execution_order(self) -> list[str]:

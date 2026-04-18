@@ -8,11 +8,14 @@ Sinon, fallback sur un dict en mémoire (comportement v0.2).
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from pyworkflow_engine.models import JobRun, RunStatus
 from pyworkflow_engine.engine.context import WorkflowContext
 from pyworkflow_engine.engine.dag import DAGResolver
+
+_logger = logging.getLogger(__name__)
 
 
 class SuspensionManager:
@@ -75,8 +78,8 @@ class SuspensionManager:
                 if job_run and job_run.status == RunStatus.SUSPENDED:
                     self._in_memory[run_id] = job_run
                     return job_run
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("Failed to retrieve suspended run %r from storage: %s", run_id, exc)
 
         return None
 
@@ -104,8 +107,8 @@ class SuspensionManager:
             try:
                 runs = self._storage.list_job_runs(status="suspended")
                 ids.update(r.job_run_id for r in runs)
-            except Exception:
-                pass  # Fallback silencieux — le dict mémoire reste disponible
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("Failed to list suspended runs from storage: %s", exc)
 
         return list(ids)
 
@@ -117,8 +120,8 @@ class SuspensionManager:
             try:
                 job_run = self._storage.get_job_run(run_id)
                 return job_run is not None and job_run.status.value == "suspended"
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("Failed to check suspension status for run %r: %s", run_id, exc)
         return False
 
     # ------------------------------------------------------------------

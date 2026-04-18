@@ -25,15 +25,20 @@ Usage avancé avec configuration :
     ))
 """
 
+from .bootstrap import configure_from_workflow_config
 from .config import LoggingConfig
-from .logger import configure_logging, get_logger, shutdown_logging
+from .handlers import RepositoryLogHandler
+from .logger import SUCCESS, configure_logging, get_logger, shutdown_logging
 from .utils import LoggingConfigBuilder, StepLogBridge, logged_operation
 
 __all__ = [
     "get_logger",
     "configure_logging",
+    "configure_from_workflow_config",
     "shutdown_logging",
     "LoggingConfig",
+    "RepositoryLogHandler",
+    "SUCCESS",
     "logged_operation",
     "StepLogBridge",
     "LoggingConfigBuilder",

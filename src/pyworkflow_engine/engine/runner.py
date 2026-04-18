@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pyworkflow_engine.engine.context import WorkflowContext
+    from pyworkflow_engine.engine.retry import RetryHandler
 
 from pyworkflow_engine.exceptions import StepExecutionError, WorkflowSuspended
 from pyworkflow_engine.ports.executor import BaseExecutor, ExecutorRegistry
@@ -48,7 +49,7 @@ class WorkflowRunner:
         job_run: JobRun,
         execution_order: list[str],
         context: WorkflowContext,
-        retry_handler: Any | None = None,
+        retry_handler: RetryHandler | None = None,
     ) -> None:
         """Exécute une série de steps dans l'ordre donné.
 
@@ -111,7 +112,7 @@ class WorkflowRunner:
                     step_name=step.name,
                 ) from e
 
-    def execute_single(self, step: Step, context: WorkflowContext) -> Any:
+    def execute_single(self, step: Step, context: WorkflowContext) -> dict[str, Any] | None:
         """Exécute un step individuel.
 
         Le routing se fait dans cet ordre de priorité :

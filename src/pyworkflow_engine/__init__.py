@@ -52,12 +52,12 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
 
     _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
         # Models
-        "Job": (".models.job", "Job"),
-        "Step": (".models.step", "Step"),
-        "SubJob": (".models.step", "SubJob"),
-        "JobRun": (".models.run", "JobRun"),
-        "StepRun": (".models.run", "StepRun"),
-        "StepLog": (".models.run", "StepLog"),
+        "Job": (".models.workflow.job", "Job"),
+        "Step": (".models.workflow.step", "Step"),
+        "SubJob": (".models.workflow.step", "SubJob"),
+        "JobRun": (".models.workflow.run", "JobRun"),
+        "StepRun": (".models.workflow.run", "StepRun"),
+        "StepLog": (".models.workflow.run", "StepLog"),
         # Enums
         "TriggerType": (".models.enums", "TriggerType"),
         "StepType": (".models.enums", "StepType"),
@@ -66,6 +66,9 @@ def __getattr__(name: str):  # PEP 562 – module-level __getattr__
         # Engine
         "WorkflowEngine": (".facade", "WorkflowEngine"),
         "WorkflowContext": (".engine.context", "WorkflowContext"),
+        # Sub-facades (ADR-014 / P2.14)
+        "AIFacade": (".facade.ai", "AIFacade"),
+        "JobsFacade": (".facade.jobs", "JobsFacade"),
         # Exceptions
         "WorkflowError": (".exceptions", "WorkflowError"),
         "WorkflowSuspended": (".exceptions", "WorkflowSuspended"),
@@ -143,6 +146,9 @@ __all__ = [
     # Engine
     "WorkflowEngine",
     "WorkflowContext",
+    # Sub-facades
+    "AIFacade",
+    "JobsFacade",
     # Exceptions
     "WorkflowError",
     "WorkflowSuspended",

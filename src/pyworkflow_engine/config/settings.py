@@ -21,6 +21,7 @@ Surcharge programmatique (avant toute autre utilisation) :
 
 Surcharge par variables d'environnement :
 
+    PYWORKFLOW_TIMEZONE=Europe/Paris
     PYWORKFLOW_DB=prod.db
     PYWORKFLOW_LOG_LEVEL=WARNING
     PYWORKFLOW_LOG_DIR=logs
@@ -96,6 +97,9 @@ class Settings:
         GUI_STORAGE_SECRET: Clé secrète pour le stockage de session NiceGUI.
     """
 
+    # ── Timezone ─────────────────────────────────────────────────────────────
+    TIMEZONE: str = "local"  # "local" | IANA name e.g. "Europe/Paris"
+
     # ── Persistence ──────────────────────────────────────────────────────────
     DATABASE: str | None = None
 
@@ -155,6 +159,60 @@ class Settings:
             setattr(self, key, value)
 
     # ── Propriétés ────────────────────────────────────────────────────────────
+
+    @property
+    def tzinfo(self):
+        """Retourne le ``tzinfo`` correspondant à ``TIMEZONE``.
+
+        ``"local"`` (défaut) → fuseau système (``datetime.now().astimezone().tzinfo``).
+        Sinon, interprété comme nom IANA via ``zoneinfo`` (stdlib ≥ 3.9).
+
+        Returns:
+            datetime.timezone | ZoneInfo
+
+        Examples:
+            >>> settings.TIMEZONE = "Europe/Paris"
+            >>> settings.tzinfo
+            zoneinfo.ZoneInfo(key='Europe/Paris')
+        """
+        import datetime  # noqa: PLC0415
+
+        if self.TIMEZONE == "local":
+            return datetime.datetime.now().astimezone().tzinfo
+        from zoneinfo import ZoneInfo  # noqa: PLC0415
+
+        return ZoneInfo(self.TIMEZONE)
+
+    def now(self):
+        """``datetime.now()`` dans le fuseau configuré.
+
+        Remplace ``datetime.now(tz=UTC)`` dans tous les jobs.
+
+        Returns:
+            datetime.datetime: Datetime timezone-aware dans ``settings.TIMEZONE``.
+
+        Examples:
+            >>> dt = settings.now()
+            >>> dt.tzinfo is not None
+            True
+        """
+        import datetime  # noqa: PLC0415
+
+        return datetime.datetime.now(tz=self.tzinfo)
+
+    def today(self) -> str:
+        """Date du jour au format ``YYYY-MM-DD`` dans le fuseau configuré.
+
+        Remplace ``datetime.now(tz=UTC).strftime("%Y-%m-%d")`` dans tous les jobs.
+
+        Returns:
+            str: Date du jour, ex. ``"2026-04-13"``.
+
+        Examples:
+            >>> settings.today()
+            '2026-04-13'
+        """
+        return self.now().strftime("%Y-%m-%d")
 
     @property
     def workflow_config(self):
@@ -235,6 +293,10 @@ class Settings:
         """Lit les variables d'environnement PYWORKFLOW_* et met à jour les attributs."""
         _e = os.environ.get
 
+        timezone = _e("PYWORKFLOW_TIMEZONE")
+        if timezone:
+            self.TIMEZONE = timezone
+
         db = _e("PYWORKFLOW_DB")
         if db:
             self.DATABASE = db
@@ -311,6 +373,7 @@ class Settings:
 
     def __repr__(self) -> str:
         lines = [
+            f"TIMEZONE={self.TIMEZONE!r}",
             f"DATABASE={self.DATABASE!r}",
             f"LOGGING_LEVEL={self.LOGGING_LEVEL!r}",
             f"LOGGING_FORMAT={self.LOGGING_FORMAT!r}",

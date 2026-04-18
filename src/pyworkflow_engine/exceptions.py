@@ -4,6 +4,9 @@ Exceptions du système de workflow — gestion d'erreurs avancée.
 Définit toutes les exceptions spécifiques au workflow pour permettre
 une gestion d'erreur granulaire et informative.
 
+Inclut également les exceptions du sous-système IA (ADR-013), fusionnées
+depuis ai_engine/exceptions.py pour éviter la duplication.
+
 Utilise la hiérarchie d'exceptions standard Python — zero dépendance externe.
 """
 
@@ -66,14 +69,12 @@ class WorkflowValidationError(WorkflowError):
     """
 
 
-
 class WorkflowExecutionError(WorkflowError):
     """Erreur d'exécution de workflow.
 
     Erreur générale pendant l'exécution d'un workflow.
     Classe de base pour les erreurs d'exécution spécifiques.
     """
-
 
 
 class StepExecutionError(WorkflowExecutionError):
@@ -184,7 +185,6 @@ class WorkflowSuspendedHuman(WorkflowSuspended):
     """
 
 
-
 class WorkflowSuspendedExternal(WorkflowSuspended):
     """Suspension pour système externe.
 
@@ -199,7 +199,6 @@ class WorkflowSuspendedExternal(WorkflowSuspended):
         ...     step_name="api_call"
         ... )
     """
-
 
 
 class WorkflowTimeoutError(WorkflowExecutionError):
@@ -376,3 +375,205 @@ def create_validation_error(
     return WorkflowValidationError(
         message, details=details, job_name=job_name, step_name=step_name
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Exceptions IA — fusionnées depuis ai_engine/exceptions.py (ADR-013)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class AIError(WorkflowError):
+    """Exception de base pour tout le sous-système IA."""
+
+
+# ── Provider ──────────────────────────────────────────────────────────────────
+
+
+class ProviderError(AIError):
+    """Erreur liée à un provider LLM."""
+
+
+class LLMError(ProviderError):
+    """Erreur lors de l'appel à un LLM."""
+
+
+class ProviderNotFoundError(ProviderError):
+    """Provider introuvable."""
+
+    def __init__(self, provider_id: str) -> None:
+        self.provider_id = provider_id
+        super().__init__(f"Provider '{provider_id}' not found.")
+
+
+class UnsupportedProviderError(ProviderError):
+    """Type de provider non supporté."""
+
+    def __init__(self, provider_type: str, available: list[str] | None = None) -> None:
+        self.provider_type = provider_type
+        self.available = available or []
+        msg = f"Provider type '{provider_type}' is not supported."
+        if self.available:
+            msg += f" Available types: {', '.join(self.available)}"
+        super().__init__(msg)
+
+
+class APIKeyMissingError(ProviderError):
+    """Clé API manquante pour un provider."""
+
+    def __init__(self, provider_name: str, env_var: str | None = None) -> None:
+        self.provider_name = provider_name
+        self.env_var = env_var
+        msg = f"API key missing for provider '{provider_name}'."
+        if env_var:
+            msg += f" Set it via provider config or environment variable '{env_var}'."
+        super().__init__(msg)
+
+
+# ── Agent ─────────────────────────────────────────────────────────────────────
+
+
+class AgentError(AIError):
+    """Erreur liée aux agents."""
+
+
+class AgentNotFoundError(AgentError):
+    """Agent introuvable."""
+
+    def __init__(self, agent_id: str) -> None:
+        self.agent_id = agent_id
+        super().__init__(f"Agent '{agent_id}' not found.")
+
+
+class AgentDisabledError(AgentError):
+    """Agent désactivé."""
+
+    def __init__(self, identifier: str) -> None:
+        self.identifier = identifier
+        super().__init__(f"Agent '{identifier}' is disabled.")
+
+
+# ── Conversation ──────────────────────────────────────────────────────────────
+
+
+class ConversationError(AIError):
+    """Erreur liée à une conversation."""
+
+
+class ConversationNotFoundError(ConversationError):
+    """Conversation introuvable."""
+
+    def __init__(self, conversation_id: str) -> None:
+        self.conversation_id = conversation_id
+        super().__init__(f"Conversation '{conversation_id}' not found.")
+
+
+# ── Graph ─────────────────────────────────────────────────────────────────────
+
+
+class AIGraphError(AIError):
+    """Erreur liée à un graph IA."""
+
+
+class AIGraphNotFoundError(AIGraphError):
+    """Graph IA introuvable."""
+
+    def __init__(self, identifier: str) -> None:
+        self.identifier = identifier
+        super().__init__(f"AI Graph '{identifier}' not found.")
+
+
+# ── Execution IA ──────────────────────────────────────────────────────────────
+
+
+class AIExecutionError(AIError):
+    """Erreur liée à une exécution IA."""
+
+
+class AIExecutionNotFoundError(AIExecutionError):
+    """Exécution IA introuvable."""
+
+    def __init__(self, execution_id: str) -> None:
+        self.execution_id = execution_id
+        super().__init__(f"AI Execution '{execution_id}' not found.")
+
+
+# ── Tool IA ───────────────────────────────────────────────────────────────────
+
+
+class AIToolError(AIError):
+    """Erreur liée à un tool IA."""
+
+
+class AIToolNotFoundError(AIToolError):
+    """Tool IA introuvable."""
+
+    def __init__(self, identifier: str) -> None:
+        self.identifier = identifier
+        super().__init__(f"AI Tool '{identifier}' not found.")
+
+
+class AIToolExecutionError(AIToolError):
+    """Erreur lors de l'exécution d'un tool IA."""
+
+    def __init__(self, tool_name: str, detail: str) -> None:
+        self.tool_name = tool_name
+        self.detail = detail
+        super().__init__(f"Error executing AI tool '{tool_name}': {detail}")
+
+
+# ── Skill ─────────────────────────────────────────────────────────────────────
+
+
+class SkillError(AIError):
+    """Erreur liée à un skill IA."""
+
+
+class SkillNotFoundError(SkillError):
+    """Skill introuvable dans le registre."""
+
+    def __init__(self, identifier: str) -> None:
+        self.identifier = identifier
+        super().__init__(f"Skill '{identifier}' not found in registry.")
+
+
+class SkillExecutionError(SkillError):
+    """Erreur lors de l'exécution d'un skill."""
+
+    def __init__(self, skill_key: str, detail: str) -> None:
+        self.skill_key = skill_key
+        self.detail = detail
+        super().__init__(f"Error executing skill '{skill_key}': {detail}")
+
+
+class SkillConfigurationError(SkillError):
+    """Erreur de configuration d'un skill."""
+
+
+# ── Knowledge / RAG ───────────────────────────────────────────────────────────
+
+
+class KnowledgeError(AIError):
+    """Erreur liée à une source de connaissance."""
+
+
+class KnowledgeSourceNotFoundError(KnowledgeError):
+    """Source de connaissance introuvable."""
+
+    def __init__(self, identifier: str) -> None:
+        self.identifier = identifier
+        super().__init__(f"Knowledge source '{identifier}' not found.")
+
+
+# ── Dependency ────────────────────────────────────────────────────────────────
+
+
+class MissingAIDependencyError(AIError):
+    """Dépendance optionnelle IA manquante."""
+
+    def __init__(self, package: str, extra: str) -> None:
+        self.package = package
+        self.extra = extra
+        super().__init__(
+            f"Package '{package}' is required for this AI feature. "
+            f"Install it with: pip install pyworkflow-engine[{extra}]"
+        )

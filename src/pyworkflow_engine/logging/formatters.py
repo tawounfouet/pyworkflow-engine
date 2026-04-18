@@ -22,14 +22,22 @@ from typing import Any
 # ── Couleurs ANSI par niveau de log ──────────────────────────────────────────
 # Inspiré des conventions Loguru / database_logger.py
 _LEVEL_COLORS: dict[str, str] = {
-    "DEBUG": "\033[94m",     # Bleu ciel
-    "INFO": "\033[36m",      # Cyan
-    "WARNING": "\033[33m",   # Jaune
-    "ERROR": "\033[31m",     # Rouge
+    "DEBUG": "\033[94m",  # Bleu ciel
+    "INFO": "\033[36m",  # Cyan
+    "SUCCESS": "\033[32m",  # Vert vif  ← niveau custom (25)
+    "WARNING": "\033[33m",  # Jaune
+    "ERROR": "\033[31m",  # Rouge
     "CRITICAL": "\033[91m",  # Rouge vif
 }
 _RESET = "\033[0m"
 _DIM = "\033[90m"  # Gris pour le timestamp
+_BOLD = "\033[1m"  # Gras (utilisé pour SUCCESS)
+
+# Largeur fixe du champ level = longueur du niveau le plus long
+_LEVEL_WIDTH = max(len(lvl) for lvl in _LEVEL_COLORS)  # "CRITICAL" → 8
+
+# Largeur fixe du champ logger (tronqué + aligné à droite si dépassement)
+_LOGGER_WIDTH = 36
 
 
 def _supports_color(stream: Any = None) -> bool:
@@ -43,9 +51,12 @@ def _supports_color(stream: Any = None) -> bool:
     # Windows: les couleurs ANSI sont supportées depuis Windows 10 1607+
     # via VirtualTerminalLevel ou les terminaux modernes (Windows Terminal, VS Code)
     if sys.platform == "win32":
-        return os.environ.get("TERM_PROGRAM") == "vscode" or os.environ.get(
-            "WT_SESSION"
-        ) is not None or os.environ.get("ANSICON") is not None or True
+        return (
+            os.environ.get("TERM_PROGRAM") == "vscode"
+            or os.environ.get("WT_SESSION") is not None
+            or os.environ.get("ANSICON") is not None
+            or True
+        )
     return True
 
 
@@ -74,25 +85,35 @@ class StructuredFormatter(logging.Formatter):
         self._colorize = colorize if colorize is not None else _supports_color()
 
     def format(self, record: logging.LogRecord) -> str:
-        timestamp = datetime.fromtimestamp(
-            record.created, tz=UTC
-        ).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = (
+            datetime.fromtimestamp(record.created, tz=UTC)
+            .astimezone()
+            .strftime("%Y-%m-%d %H:%M:%S")
+        )
 
         # Nom court : enlever le prefix "pyworkflow_engine."
         name = record.name.removeprefix("pyworkflow_engine.")
+        # Tronquer à gauche si trop long (…abc.def), padder à droite sinon
+        if len(name) > _LOGGER_WIDTH:
+            name_padded = "…" + name[-(_LOGGER_WIDTH - 1) :]
+        else:
+            name_padded = name.ljust(_LOGGER_WIDTH)
 
         level = record.levelname
+        level_padded = record.levelname.ljust(_LEVEL_WIDTH)
 
         # Couleur selon le niveau
         if self._colorize:
             color = _LEVEL_COLORS.get(record.levelname, "")
+            # SUCCESS : gras + vert pour le distinguer visuellement d'INFO
+            bold = _BOLD if record.levelname == "SUCCESS" else ""
             line = (
                 f"{_DIM}{timestamp}{_RESET} | "
-                f"{color}{level}{_RESET} | "
-                f"{name} | {color}{record.getMessage()}{_RESET}"
+                f"{bold}{color}{level_padded}{_RESET} | "
+                f"{name_padded} | {bold}{color}{record.getMessage()}{_RESET}"
             )
         else:
-            line = f"{timestamp} | {level} | {name} | {record.getMessage()}"
+            line = f"{timestamp} | {level} | {name_padded} | {record.getMessage()}"
 
         parts = [line]
 
@@ -131,9 +152,9 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(
-                record.created, tz=UTC
-            ).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC)
+            .astimezone()
+            .isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

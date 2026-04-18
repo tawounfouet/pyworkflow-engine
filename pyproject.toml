@@ -24,7 +24,9 @@ classifiers = [
 ]
 
 # ⚠️ ZERO dépendance obligatoire pour le core
-dependencies = []
+dependencies = [
+    "pyyaml>=6.0.3",
+]
 
 [project.optional-dependencies]
 # Adapters — chaque intégration est opt-in
@@ -44,13 +46,19 @@ snowflake = ["snowflake-connector-python>=3.0"]
 cli = ["typer>=0.9", "rich>=13.0"]
 
 # API REST adapter (ADR-011)
-api = ["fastapi>=0.100", "uvicorn[standard]>=0.20", "sse-starlette>=2.0"]
+api = ["fastapi>=0.100", "uvicorn[standard]>=0.20", "sse-starlette>=2.0", "slowapi>=0.1.9"]
 
 # TUI adapter (ADR-009)
 tui = ["textual>=1.0", "rich>=13.0"]
 
 # GUI adapter (ADR-010)
 gui = ["nicegui>=2.0"]
+
+# Knowledge / RAG (ADR-023)
+knowledge = ["chromadb>=0.5"]
+knowledge-openai = ["openai>=1.0"]
+knowledge-parsers = ["PyPDF2>=3.0", "python-docx>=1.0", "beautifulsoup4>=4.12"]
+knowledge-ollama = ["ollama>=0.3"]
 
 # Data Platform (jobs + pipelines)
 dataplatform = ["duckdb>=1.0", "pyarrow>=15.0"]
@@ -92,7 +100,7 @@ packages = ["src/pyworkflow_engine"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "jobs", "pipelines"]
+pythonpath = [".", "agents", "jobs", "pipelines"]
 asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
@@ -106,7 +114,7 @@ addopts = [
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["src", "tests", "jobs", "pipelines"]
+src = ["src", "tests", "agents", "jobs", "pipelines"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "TCH", "C4", "PIE", "TID"]
@@ -117,6 +125,7 @@ ignore = ["E501"]  # Line too long (handled by formatter)
 "**/__init__.py" = ["TID252"]    # Re-exports relatifs tolérés dans les __init__.py
 "jobs/**/*" = ["S608"]           # SQL injection check relaxed for DWH queries
 "pipelines/**/*" = ["S608"]      # SQL injection check relaxed for DWH queries
+"agents/**/*" = ["S608"]         # SQL injection check relaxed for agent catalog
 
 # ADR-004 — interdire les imports relatifs hors __init__.py (ban-relative-imports = "parents")
 # Passer à "all" une fois la migration complète vers les imports absolus.
