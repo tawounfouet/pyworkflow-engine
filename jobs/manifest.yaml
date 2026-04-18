@@ -23,6 +23,102 @@ jobs:
     tags: [ingestion, books, scraping, http]
     description: "Scraping books.toscrape.com → Data Lake raw/books_toscrape/books/"
 
+  - name: ingestion-codes-droit
+    module: jobs.ingestion.codes_droit.extract_codes
+    attr: ingest_codes_droit     # API décorateurs → JobBuilder
+    schedule: "0 3 * * 0"        # Hebdomadaire dimanche 03h00 UTC
+    owner: data-team@company.com
+    tags: [ingestion, codes, droit, xml, juridique]
+    description: "codes.droit.org (XML) → Data Lake raw/codes_droit/{slug}/{date}/"
+
+  - name: transform-codes-droit
+    module: jobs.transformation.codes_droit.transform.transform_codes
+    attr: transform_codes_droit  # API décorateurs → JobBuilder
+    schedule: "30 3 * * 0"       # Hebdomadaire dimanche 03h30 UTC (après ingestion à 03h00)
+    owner: data-team@company.com
+    tags: [transformation, codes-droit, xml, parsing]
+    depends_on: [ingestion-codes-droit]
+    description: "XML bruts codes.droit.org → articles JSON structurés (curated/)"
+
+  - name: embed-codes-droit
+    module: jobs.transformation.codes_droit.embed.embed_codes
+    attr: embed_codes_droit      # API décorateurs → JobBuilder
+    schedule: "0 4 * * 0"        # Hebdomadaire dimanche 04h00 UTC
+    owner: data-team@company.com
+    tags: [embedding, openai, codes-droit, rag]
+    depends_on: [transform-codes-droit]
+    description: "Articles curated → vecteurs OpenAI normalisés (L2) → .npy + metadata.json"
+
+  - name: index-codes-droit
+    module: jobs.transformation.codes_droit.index.index_codes
+    attr: index_codes_droit      # API décorateurs → JobBuilder
+    schedule: "30 4 * * 0"       # Hebdomadaire dimanche 04h30 UTC
+    owner: data-team@company.com
+    tags: [indexation, rag, knowledge-base, codes-droit]
+    depends_on: [embed-codes-droit]
+    description: "Embeddings → KnowledgeSource / Document / Chunk (SQLite ai_*)"
+
+  - name: ingestion-restcountries
+    module: jobs.ingestion.restcountries.extract_countries
+    attr: ingest_restcountries   # API décorateurs → JobBuilder
+    schedule: "0 1 * * 0"        # Hebdomadaire dimanche 01h00 UTC
+    owner: data-team@company.com
+    tags: [ingestion, restcountries, api, http]
+    description: "REST Countries API v3.1 → Data Lake raw/restcountries/countries/"
+
+  - name: ingestion-imf
+    module: jobs.ingestion.imf.extract_imf
+    attr: ingest_imf             # API décorateurs → JobBuilder
+    schedule: "0 6 1 5,11 *"     # Semi-annuel : 1er mai et 1er novembre à 06h00 UTC
+    owner: data-team@company.com
+    tags: [ingestion, imf, api, macro, economics]
+    description: "IMF DataMapper API v1 → Data Lake raw/imf/ (indicateurs + métadonnées)"
+
+  - name: ingestion-strava
+    module: jobs.ingestion.strava.extract_strava
+    attr: ingest_strava          # API décorateurs → JobBuilder
+    schedule: "0 20 * * *"       # Quotidien à 20h00 UTC (après la journée sportive)
+    owner: data-team@company.com
+    tags: [ingestion, strava, api, sport, fitness]
+    description: "Strava API v3 → Data Lake raw/strava/ (athlete + stats + clubs + routes + activities)"
+
+  # ── LLM ──────────────────────────────────────────────────────────────
+
+  - name: llm-strava-athlete-analysis
+    module: jobs.llm.strava_athlete_analysis.analyze_athlete
+    attr: analyze_strava_athlete  # API décorateurs → JobBuilder
+    schedule: "0 21 * * *"        # Quotidien à 21h00 UTC (après ingestion Strava)
+    owner: data-team@company.com
+    tags: [llm, strava, gpt-4o, sport, coaching, analysis]
+    depends_on: [ingestion-strava]
+    description: "Analyse du profil athlète Strava via GPT-4o → Data Lake llm/strava/athlete_analysis/"
+
+  - name: ingestion-strava-daily
+    module: jobs.ingestion.strava.fetch_today_activities
+    attr: ingest_strava_daily     # API décorateurs → JobBuilder
+    schedule: "0 20 * * *"        # Quotidien à 20h00 UTC
+    owner: data-team@company.com
+    tags: [ingestion, strava, api, sport, daily]
+    description: "Activités Strava du jour → Data Lake raw/strava/daily/{date}/"
+
+  - name: llm-strava-daily-coaching
+    module: jobs.llm.strava_daily_coaching.coach_daily
+    attr: coach_strava_daily      # API décorateurs → JobBuilder
+    schedule: "30 20 * * *"       # Quotidien à 20h30 UTC (après ingestion daily)
+    owner: data-team@company.com
+    tags: [llm, strava, gpt-4o, sport, coaching, daily]
+    depends_on: [ingestion-strava-daily]
+    description: "Agent IA coach sportif — analyse séance du jour → Data Lake llm/strava/daily_coaching/{date}/"
+
+  - name: transform-stg-strava-coaching
+    module: jobs.transformation.staging.stg_strava_coaching
+    attr: transform_stg_strava_coaching  # API décorateurs → JobBuilder
+    schedule: "0 21 * * *"         # Quotidien à 21h00 UTC (après coaching LLM)
+    owner: data-team@company.com
+    tags: [transformation, staging, strava, coaching, llm]
+    depends_on: [llm-strava-daily-coaching]
+    description: "Coaching IA journalier Strava → Staging DWH (stg_strava_coaching + _acts)"
+
   # ── Transformation — Staging ─────────────────────────────────────────
 
   - name: transform-stg-payments
@@ -41,6 +137,14 @@ jobs:
     depends_on: [ingestion-books-toscrape]
     description: "Raw books → Staging DWH (nettoyage, typage, dédup sur upc)"
 
+  - name: transform-stg-restcountries
+    module: jobs.transformation.staging.stg_restcountries
+    schedule: "0 3 * * 0"        # Hebdomadaire dimanche 03h00 UTC (après ingestion)
+    owner: data-team@company.com
+    tags: [transformation, staging, restcountries, geo]
+    depends_on: [ingestion-restcountries]
+    description: "Raw restcountries → Staging DWH (nettoyage, typage, dédup)"
+
   # ── Transformation — Marts ───────────────────────────────────────────
 
   - name: transform-mart-finance-revenue
@@ -58,6 +162,24 @@ jobs:
     tags: [transformation, mart, catalog, books]
     depends_on: [transform-stg-books]
     description: "Staging books → Mart agrégé par catégorie (prix, stock, note)"
+
+  - name: transform-mart-catalog-countries
+    module: jobs.transformation.marts.catalog.mart_countries_by_region
+    schedule: "0 5 * * 0"        # Hebdomadaire dimanche 05h00 UTC (après staging)
+    owner: data-team@company.com
+    tags: [transformation, mart, catalog, countries, geo]
+    depends_on: [transform-stg-restcountries]
+    description: "Staging restcountries → Mart agrégé par région (population, superficie)"
+
+  # ── Ops ─────────────────────────────────────────────────────────────
+
+  - name: ops-heartbeat-email
+    module: jobs.ops.heartbeat_email
+    attr: heartbeat_email_job      # API décorateurs → JobBuilder
+    schedule: "*/5 * * * *"        # Toutes les 5 minutes
+    owner: data-team@company.com
+    tags: [ops, heartbeat, email, scheduling, test]
+    description: "Job de test scheduling — heartbeat e-mail toutes les 5 min → valide ScheduleTrigger + stack SMTP"
 
   # ── Quality ──────────────────────────────────────────────────────────
 
@@ -95,3 +217,35 @@ pipelines:
       - transform-mart-catalog-books
       - quality-check-completeness
     description: "Pipeline complète Books.toscrape → DataLake → Staging → Mart → QC"
+
+  - name: weekly-restcountries-to-dwh
+    schedule: "0 1 * * 0"
+    owner: data-team@company.com
+    tags: [weekly, restcountries, dwh, end-to-end]
+    jobs:
+      - ingestion-restcountries
+      - transform-stg-restcountries
+      - transform-mart-catalog-countries
+    description: "Pipeline complète REST Countries → DataLake → Staging → Mart"
+
+  - name: weekly-codes-droit-to-rag
+    schedule: "0 3 * * 0"                 # Hebdomadaire dimanche 03h00 UTC
+    owner: data-team@company.com
+    tags: [weekly, codes-droit, rag, juridique, end-to-end]
+    jobs:
+      - ingestion-codes-droit             # 03h00 — XML → raw/
+      - transform-codes-droit             # 03h30 — XML → articles JSON curated/
+      - embed-codes-droit                 # 04h00 — articles → embeddings .npy
+      - index-codes-droit                 # 04h30 — embeddings → SQLite ai_*
+    description: "Pipeline complet codes.droit.org → RAG : XML → curated → embeddings OpenAI → KnowledgeSource/Document/Chunk"
+
+  - name: daily-strava-coaching
+    module: pipelines.daily.strava_daily_coaching
+    schedule: "0 20 * * *"        # Quotidien à 20h00 UTC
+    owner: data-team@company.com
+    tags: [daily, strava, llm, coaching, sport, end-to-end]
+    jobs:
+      - ingestion-strava-daily
+      - llm-strava-daily-coaching
+      - transform-stg-strava-coaching
+    description: "Pipeline Strava Daily Coaching → API Strava → Agent IA GPT-4o → Staging DWH"

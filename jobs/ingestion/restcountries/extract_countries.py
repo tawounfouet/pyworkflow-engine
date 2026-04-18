@@ -24,6 +24,9 @@ Variables d'environnement :
     RESTCOUNTRIES_INDEPENDENT_ONLY: "true" = pays indépendants seulement (défaut : false)
     RESTCOUNTRIES_TIMEOUT         : Timeout HTTP en secondes (défaut : 30)
     DATALAKE_PATH                 : Répertoire racine du Data Lake (défaut : ./data/datalake)
+
+Usage CLI :
+    python -m jobs.ingestion.restcountries.extract_countries
 """
 
 from __future__ import annotations
@@ -60,7 +63,7 @@ def fetch_raw() -> dict[str, Any]:
     _logger.info("Démarrage du fetch — REST Countries API v3.1")
     client = RestCountriesClient.from_env()
     raw = client.fetch_raw()
-    _logger.info("Fetch terminé : %d enregistrements bruts", len(raw))
+    _logger.success("✅ fetch_raw — %d enregistrements bruts récupérés", len(raw))
     return {"raw_countries": raw, "count_raw": len(raw)}
 
 
@@ -94,7 +97,7 @@ def validate_raw(raw_countries: list[dict[str, Any]] | None = None) -> dict[str,
         _logger.error("Validation échouée : %s", msg)
         raise ValueError(msg)
 
-    _logger.info("Validation réussie : %d enregistrements valides", total)
+    _logger.success("✅ validate_raw — %d enregistrements valides", total)
     return {"status": "valid", "invalid_count": 0, "total": total}
 
 
@@ -142,8 +145,8 @@ def normalize_countries(
             _logger.warning("Erreur parsing index %d : %s", i, exc)
 
     result = list(normalized.values())
-    _logger.info(
-        "Normalisation terminée : %d pays valides, %d erreurs",
+    _logger.success(
+        "✅ normalize_countries — %d pays normalisés, %d erreurs",
         len(result),
         len(errors),
     )
@@ -190,7 +193,11 @@ def load_to_datalake(
         path,
     )
     rows_written = dl.write_json(path, countries)
-    _logger.info("Data Lake : %d lignes écrites dans %s", rows_written, path)
+    _logger.success(
+        "✅ load_to_datalake — %d lignes écrites → %s",
+        rows_written,
+        path,
+    )
 
     return {"rows_written": rows_written, "path": path, "skipped": False}
 
@@ -229,7 +236,13 @@ if __name__ == "__main__":
     from pyworkflow_engine import WorkflowEngine
     from pyworkflow_engine.adapters.storage import SQLiteStorage
 
-    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    from jobs.shared.logging import configure_platform_logging
+
+    configure_platform_logging()
+
+    from pyworkflow_engine.config.settings import settings  # noqa: PLC0415
+
+    today = settings.today()
 
     engine = WorkflowEngine(
         storage=SQLiteStorage(database_path="workflow.db"),
@@ -240,18 +253,15 @@ if __name__ == "__main__":
         initial_context={"ingest_date": today},
     )
 
-    for step_name, step_run in result.step_runs.items():
-        status_icon = (
-            "✅" if str(step_run.status) in ("SUCCESS", "RunStatus.SUCCESS") else "❌"
-        )
-        print(f"  {status_icon} {step_name}: {step_run.status}")  # noqa: T201
-        if step_run.output_data:
-            # Afficher une sélection de clés pertinentes sans le raw_data
-            summary = {
-                k: v
-                for k, v in (step_run.output_data or {}).items()
-                if k != "raw_countries"
-            }
-            print(f"     → {summary}")  # noqa: T201
+    for step_run in result.step_runs:
+        ok = str(step_run.status) in ("SUCCESS", "RunStatus.SUCCESS")
+        status_icon = "✅" if ok else "❌"
+        print(f"  {status_icon} {step_run.step_name}: {step_run.status}")  # noqa: T201
+        # if step_run.output_data:
+        #     # Afficher une sélection de clés pertinentes sans le raw_data
+        #     summary = {
+        #         k: v for k, v in step_run.output_data.items() if k != "raw_countries"
+        #     }
+        #     print(f"     → {summary}")  # noqa: T201
 
     print(f"\nStatut final : {result.status}")  # noqa: T201

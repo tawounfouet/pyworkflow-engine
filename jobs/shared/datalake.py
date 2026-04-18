@@ -43,7 +43,42 @@ class DataLake:
         base = os.environ.get("DATALAKE_PATH", "./data/datalake")
         return cls(base_path=base)
 
+    # ── Propriétés ───────────────────────────────────────────────────
+
+    @property
+    def root(self) -> Path:
+        """Chemin absolu de la racine du Data Lake."""
+        return Path(self._base)
+
     # ── Écriture ─────────────────────────────────────────────────────
+
+    def write_json_file(
+        self,
+        relative_dir: str,
+        filename: str,
+        data: dict[str, Any] | list[dict[str, Any]],
+    ) -> Path:
+        """Écrit un fichier JSON avec un nom arbitraire dans le Data Lake.
+
+        Contrairement à ``write_json``, le nom du fichier est libre
+        (pas forcément ``data.json``). Utile pour les catalogues de référence.
+
+        Args:
+            relative_dir: Répertoire relatif (ex: ``raw/imf/meta/2026-04-12``).
+            filename:      Nom du fichier (ex: ``indicators.json``).
+            data:          Dict ou liste à sérialiser.
+
+        Returns:
+            Chemin absolu du fichier écrit.
+        """
+        dest_dir = self.root / relative_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_file = dest_dir / filename
+        dest_file.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        return dest_file
 
     def write_json(self, relative_path: str, data: list[dict[str, Any]]) -> int:
         """Écrit des données brutes en JSON dans le Data Lake.

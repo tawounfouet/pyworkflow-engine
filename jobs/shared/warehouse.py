@@ -64,28 +64,31 @@ class Warehouse:
 
     # ── Écriture ─────────────────────────────────────────────────────
 
-    def upsert(self, table: str, data: list[dict[str, Any]], key: str) -> int:
-        """Upsert générique — insère ou met à jour selon la clé.
+    def upsert(
+        self,
+        table: str,
+        data: list[dict[str, Any]],
+        key: str | list[str],
+    ) -> int:
+        """Upsert générique — insère ou met à jour selon la clé (simple ou composite).
 
         Args:
             table: Nom de la table (ex: ``staging.stg_payments``).
-            data: Liste de dictionnaires à upsert.
-            key: Nom de la colonne clé pour l'upsert.
+            data:  Liste de dictionnaires à upsert.
+            key:   Colonne clé simple (``"id"``) ou liste de colonnes pour
+                   une clé composite (``["activity_id", "stream_type"]``).
 
         Returns:
             Nombre de lignes traitées.
-
-        Note:
-            Implémentation simplifiée. À adapter pour chaque backend
-            en production (INSERT ... ON CONFLICT pour Postgres, etc.).
         """
         if not data:
             return 0
 
+        keys: list[str] = [key] if isinstance(key, str) else list(key)
         conn = self._get_connection()
 
         if self._backend == "duckdb":
-            # DuckDB : CREATE IF NOT EXISTS + DELETE by key + INSERT
+            # DuckDB : CREATE IF NOT EXISTS + DELETE by key(s) + INSERT
             columns = list(data[0].keys())
             col_defs = ", ".join(f'"{c}" VARCHAR' for c in columns)
             conn.execute(
@@ -94,11 +97,15 @@ class Warehouse:
 
             placeholders = ", ".join(["?"] * len(columns))
             col_names = ", ".join(f'"{c}"' for c in columns)
+
+            # Clause WHERE pour clé simple ou composite
+            where_clause = " AND ".join(f'"{k}" = ?' for k in keys)
+
             for row in data:
-                # Delete existing row by key, then insert (DELETE + INSERT = upsert)
+                key_values = [row.get(k) for k in keys]
                 conn.execute(
-                    f'DELETE FROM {table} WHERE "{key}" = ?',  # noqa: S608
-                    [row.get(key)],
+                    f"DELETE FROM {table} WHERE {where_clause}",  # noqa: S608
+                    key_values,
                 )
                 values = [row.get(c) for c in columns]
                 conn.execute(

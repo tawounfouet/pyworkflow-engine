@@ -1,0 +1,58 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Source : IMF DataMapper API v1
+# Doc    : https://www.imf.org/external/datamapper/api/v1/
+# ──────────────────────────────────────────────────────────────────────────
+
+source:
+  name: imf
+  display_name: "IMF DataMapper API"
+  version: "v1"
+  base_url: "https://www.imf.org/external/datamapper/api/v1"
+  documentation: "https://www.imf.org/external/datamapper/api/v1/"
+  license: "Public Domain"
+  update_frequency: "semi-annual"  # WEO publié en avril et octobre
+
+endpoints:
+  indicators:       "/indicators"
+  countries:        "/countries"
+  data_all:         "/{INDICATOR}"
+  data_by_country:  "/{INDICATOR}/{ISO3}"
+
+env_vars:
+  IMF_BASE_URL:
+    default: "https://www.imf.org/external/datamapper/api/v1"
+    description: "URL de base de l'API IMF DataMapper"
+  IMF_TIMEOUT:
+    default: "60"
+    description: "Timeout HTTP en secondes (l'API peut être lente)"
+  IMF_INDICATORS:
+    default: "NGDP_RPCH,PCPIPCH,LUR,BCA_NGDPD,GGXCNL_NGDP,GGXWDG_NGDP"
+    description: "Codes indicateurs séparés par virgule"
+  IMF_YEAR_FROM:
+    default: "2000"
+    description: "Année de début incluse"
+  IMF_YEAR_TO:
+    default: ""
+    description: "Année de fin incluse (défaut : année en cours)"
+  DATALAKE_PATH:
+    default: "./data/datalake"
+    description: "Répertoire racine du Data Lake"
+
+indicators_default:
+  - code: NGDP_RPCH
+    label: "Croissance du PIB réel (%)"
+  - code: PCPIPCH
+    label: "Inflation — prix à la consommation (%)"
+  - code: LUR
+    label: "Taux de chômage (% population active)"
+  - code: BCA_NGDPD
+    label: "Solde courant (% du PIB)"
+  - code: GGXCNL_NGDP
+    label: "Solde budgétaire net (% du PIB)"
+  - code: GGXWDG_NGDP
+    label: "Dette publique brute (% du PIB)"
+
+output:
+  datalake_path: "raw/imf/indicators/{ingest_date}/"
+  format: json
+  partitioning: date

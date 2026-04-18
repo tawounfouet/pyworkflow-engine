@@ -1,6 +1,14 @@
 """
 PipelineRunner — Orchestration séquentielle de jobs.
 
+.. deprecated::
+    Cette implémentation est conservée pour rétrocompatibilité.
+    La logique d'orchestration a été promue dans
+    ``pyworkflow_engine.engine.pipeline_runner.PipelineRunner`` (ADR-014/ADR-016).
+
+    Préférez utiliser l'API déclarative ``@pipeline`` / ``@stage`` +
+    ``WorkflowEngine.run_pipeline()`` pour les nouveaux pipelines.
+
 Exécute une séquence de jobs ``pyworkflow_engine.models.Job`` dans l'ordre,
 propage le contexte entre les étapes et collecte les résultats.
 
@@ -26,8 +34,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pyworkflow_engine import WorkflowEngine
-from pyworkflow_engine.models import Job, RunStatus
 from pyworkflow_engine.logging import get_logger
+from pyworkflow_engine.models import Job, RunStatus
 
 _logger = get_logger("pipelines.shared.runner")
 
@@ -118,6 +126,32 @@ class PipelineRunner:
         except Exception:  # noqa: BLE001
             return WorkflowEngine()
 
+    # ── Pipeline definition export ────────────────────────────────────
+
+    def to_pipeline(self) -> Any:
+        """Retourne un objet ``Pipeline`` (ADR-014) décrivant cette pipeline.
+
+        Permet d'enregistrer la définition dans le backend de persistence
+        (``pl_pipelines``) sans exécuter la pipeline.
+
+        Returns:
+            Instance ``Pipeline`` avec un ``PipelineStage`` par job.
+        """
+        from pyworkflow_engine.models.pipeline.pipeline import (
+            Pipeline,
+            PipelineStage,
+        )  # noqa: PLC0415
+
+        stages = [
+            PipelineStage(
+                job_name=entry.job.name,
+                initial_context=entry.initial_context or {},
+                context_mapping=entry.context_mapping or {},
+            )
+            for entry in self._jobs
+        ]
+        return Pipeline(name=self.name, stages=stages)
+
     # ── Registration ─────────────────────────────────────────────────
 
     def add_job(
@@ -151,11 +185,11 @@ class PipelineRunner:
     def _run_job(self, job: Job, ctx: dict[str, Any]):  # type: ignore[return]
         """Exécute un job avec persistence si disponible, sinon en mémoire.
 
-        Utilise ``run_with_storage()`` quand un backend SQLite est
+        Utilise ``run_with_storage()`` quand un backend de stockage est
         configuré (jobs + runs visibles dans la GUI / workflow.db).
         Retombe sur ``run()`` si aucune persistence n'est disponible.
         """
-        if self._engine._persistence is not None:
+        if getattr(self._engine, "_storage", None) is not None:
             _logger.debug("Exécution avec persistence : %s", job.name)
             return self._engine.run_with_storage(job, initial_context=ctx)
         _logger.debug("Exécution sans persistence : %s", job.name)
@@ -228,3 +262,50 @@ class PipelineRunner:
             total_duration_s=total_duration,
             job_results=job_results,
         )
+
+
+# ---------------------------------------------------------------------------
+# Bridge vers engine/pipeline_runner.py (ADR-014 / ADR-016)
+# ---------------------------------------------------------------------------
+
+
+def run_pipeline(
+    pipeline: Any,
+    initial_context: dict | None = None,
+    engine: Any | None = None,
+    triggered_by: str = "manual",
+) -> Any:
+    """Exécute une ``Pipeline`` (objet ADR-014) via le ``PipelineRunner`` engine.
+
+    Pont de rétrocompatibilité : délègue à
+    ``pyworkflow_engine.engine.pipeline_runner.PipelineRunner``.
+
+    Préférez appeler directement ``WorkflowEngine.run_pipeline()`` dans
+    les nouveaux pipelines.
+
+    Args:
+        pipeline: Instance ``Pipeline`` ou résultat de ``@pipeline.build()``.
+        initial_context: Contexte initial.
+        engine: Instance ``WorkflowEngine``. Crée un engine par défaut si
+            non fourni.
+        triggered_by: Source du déclenchement.
+
+    Returns:
+        ``PipelineRun`` (ADR-014) avec le statut global et les ``StageRun``.
+    """
+    if engine is None:
+        try:
+            from jobs.shared.logging import get_engine  # noqa: PLC0415
+
+            engine = get_engine()
+        except Exception:  # noqa: BLE001
+            from pyworkflow_engine import WorkflowEngine  # noqa: PLC0415
+
+            engine = WorkflowEngine()
+
+    # Délègue à WorkflowEngine.run_pipeline() — c'est lui qui appelle
+    # _storage.save_pipeline_run() après l'exécution, ce qui persiste
+    # le PipelineRun dans pl_pipeline_runs + pl_stage_runs.
+    return engine.run_pipeline(
+        pipeline, initial_context=initial_context, triggered_by=triggered_by
+    )

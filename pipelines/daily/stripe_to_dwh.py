@@ -44,7 +44,9 @@ def build_pipeline(date: str | None = None) -> PipelineRunner:
     Returns:
         ``PipelineRunner`` prêt à exécuter.
     """
-    target_date = date or datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    from pyworkflow_engine.config.settings import settings  # noqa: PLC0415
+
+    target_date = date or settings.today()
 
     runner = PipelineRunner("daily-stripe-to-dwh")
 

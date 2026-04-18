@@ -11,6 +11,10 @@ Variables d'environnement :
     BOOKS_MAX_PAGES      : Nombre max de pages par catégorie (0 = illimité)
     BOOKS_CATEGORIES     : Catégories à scraper, séparées par virgule (vide = toutes)
     DATALAKE_PATH        : Répertoire racine du Data Lake
+
+Use CLI :
+python -m jobs.ingestion.books_toscrape.extract_books
+
 """
 
 from __future__ import annotations
@@ -133,7 +137,28 @@ if __name__ == "__main__":
     from datetime import UTC, datetime
 
     from pyworkflow_engine import WorkflowEngine
+    from pyworkflow_engine.adapters.storage import SQLiteStorage
 
-    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
-    result = WorkflowEngine().run(job, initial_context={"ingest_date": today})
-    print(f"Terminé : {result.status}")  # noqa: T201
+    from jobs.shared.logging import configure_platform_logging
+
+    configure_platform_logging()
+
+    from pyworkflow_engine.config.settings import settings  # noqa: PLC0415
+
+    today = settings.today()
+
+    engine = WorkflowEngine(
+        storage=SQLiteStorage(database_path="workflow.db"),
+    )
+
+    result = engine.run_with_storage(
+        job,
+        initial_context={"ingest_date": today},
+    )
+
+    for step_run in result.step_runs:
+        ok = str(step_run.status) in ("SUCCESS", "RunStatus.SUCCESS")
+        status_icon = "✅" if ok else "❌"
+        print(f"  {status_icon} {step_run.step_name}: {step_run.status}")  # noqa: T201
+
+    print(f"\nStatut final : {result.status}")  # noqa: T201

@@ -88,9 +88,8 @@ def _apply_logging_from_settings() -> None:
     L'engine jetable n'est pas conservé — seul l'effet de bord sur le
     logger racine ``pyworkflow_engine`` compte.
     """
-    # Même pattern que gui_decorator_demo.py :
-    #   WorkflowEngine(config=settings.workflow_config)
-    WorkflowEngine(config=settings.workflow_config)
+    # configure_logging=True déclenche configure_from_workflow_config() dans __init__
+    WorkflowEngine(config=settings.workflow_config, configure_logging=True)
 
 
 def get_engine() -> WorkflowEngine:

@@ -7,4 +7,6 @@ Fournit les abstractions communes :
 - ``connections``   — Factories de connexions (DB, API, SFTP…)
 - ``validators``    — Validations de données communes
 - ``notifications`` — Alertes (Slack, email, Teams…)
+- ``loader``        — Chargement dynamique des jobs depuis manifest.yaml
+- ``persistence``   — Synchronisation du catalogue jobs → workflow.db
 """

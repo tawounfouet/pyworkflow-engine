@@ -1,0 +1,58 @@
+# Configuration de la source Strava API v3
+# Documentation : https://developers.strava.com/docs/reference/
+
+source:
+  name: "strava"
+  type: "http_api"
+  base_url: "https://www.strava.com/api/v3"
+  auth: "oauth2_refresh_token"
+  description: "Strava API v3 — historique sportif complet (activités, athlète, clubs, routes)"
+
+entities:
+  - name: "athlete"
+    endpoint: "/athlete"
+    description: "Profil complet de l'athlète"
+
+  - name: "stats"
+    endpoint: "/athletes/{athlete_id}/stats"
+    description: "Statistiques globales all-time"
+
+  - name: "clubs"
+    endpoint: "/athlete/clubs"
+    description: "Clubs rejoints par l'athlète"
+
+  - name: "routes"
+    endpoint: "/athletes/{athlete_id}/routes"
+    description: "Routes créées par l'athlète"
+
+  - name: "activities"
+    endpoint: "/athlete/activities"
+    description: "Liste paginée des activités (résumés)"
+    pagination:
+      type: "page"
+      page_size: 200          # Maximum autorisé par l'API Strava
+      start_page: 1
+
+# Validation minimale
+validation:
+  activities:
+    required_fields: ["id", "sport_type", "start_date_local"]
+
+# Rate limiting Strava
+rate_limit:
+  requests_per_15min: 200
+  requests_per_day: 2000
+  pause_between_pages_s: 2
+  retry_on_429: true
+  max_retries: 3
+
+# Variables d'environnement requises
+env_vars:
+  STRAVA_CLIENT_ID: "Client ID de l'application Strava"
+  STRAVA_CLIENT_SECRET: "Client Secret de l'application Strava"
+  STRAVA_REFRESH_TOKEN: "Refresh token OAuth2 (généré par setup_auth.py)"
+
+output:
+  datalake_path: "raw/strava/{entity}/{ingest_date}/"
+  format: "json"
+  partition_key: "ingest_date"
