@@ -1,0 +1,419 @@
+# ──────────────────────────────────────────────────────────────────────────
+# connectors/manifest.yaml — Registre des connecteurs pyconnectors
+#
+# Ce fichier référence tous les connecteurs déclarés dans connectors/.
+# Il sert de catalogue consultable (type, auth, tags) et peut être
+# utilisé par un CLI, un orchestrateur ou un service de découverte.
+#
+# Architecture : ADR-002
+# ──────────────────────────────────────────────────────────────────────────
+
+connectors:
+
+  # ── Auth ─────────────────────────────────────────────────────────────
+
+  - name: jwt
+    module: pyconnectors.connectors.auth.jwt_auth
+    attr: JWTConnector
+    type: auth
+    auth: [bearer]
+    tags: [auth, jwt, token]
+    status: stable
+    description: "Connecteur d'authentification JWT (génération et validation de tokens)."
+
+  - name: oauth2
+    module: pyconnectors.connectors.auth.oauth2
+    attr: OAuth2Connector
+    type: auth
+    auth: [oauth2]
+    tags: [auth, oauth2, token]
+    status: stable
+    description: "Connecteur OAuth 2.0 (Authorization Code, Client Credentials, PKCE)."
+
+  - name: oidc
+    module: pyconnectors.connectors.auth.oidc
+    attr: OIDCConnector
+    type: auth
+    auth: [oauth2, oidc]
+    tags: [auth, oidc, openid, token]
+    status: stable
+    description: "Connecteur OpenID Connect pour l'authentification fédérée."
+
+  - name: saml
+    module: pyconnectors.connectors.auth.saml
+    attr: SAMLConnector
+    type: auth
+    auth: [saml]
+    tags: [auth, saml, sso, enterprise]
+    status: stable
+    description: "Connecteur SAML 2.0 pour le SSO enterprise."
+
+  # ── Database ─────────────────────────────────────────────────────────
+
+  - name: postgresql
+    module: pyconnectors.connectors.database.postgresql
+    attr: PostgreSQLConnector
+    type: database
+    auth: [user_password, iam]
+    tags: [database, sql, postgres, relational]
+    status: stable
+    description: "Connecteur PostgreSQL (sync + async via psycopg2/asyncpg)."
+
+  - name: mysql
+    module: pyconnectors.connectors.database.mysql
+    attr: MySQLConnector
+    type: database
+    auth: [user_password]
+    tags: [database, sql, mysql, relational]
+    status: stable
+    description: "Connecteur MySQL / MariaDB."
+
+  - name: sqlite
+    module: pyconnectors.connectors.database.sqlite
+    attr: SQLiteConnector
+    type: database
+    auth: [none]
+    tags: [database, sql, sqlite, embedded]
+    status: stable
+    description: "Connecteur SQLite embarqué (fichier local ou mémoire)."
+
+  - name: mongodb
+    module: pyconnectors.connectors.database.mongodb
+    attr: MongoDBConnector
+    type: database
+    auth: [user_password, x509]
+    tags: [database, nosql, mongodb, document]
+    status: stable
+    description: "Connecteur MongoDB (pymongo)."
+
+  - name: redis
+    module: pyconnectors.connectors.database.redis
+    attr: RedisConnector
+    type: database
+    auth: [none, user_password]
+    tags: [database, cache, redis, key-value]
+    status: stable
+    description: "Connecteur Redis (cache, pub/sub, queues)."
+
+  # ── Email ─────────────────────────────────────────────────────────────
+
+  - name: smtp
+    module: pyconnectors.connectors.email.smtp
+    attr: SMTPConnector
+    type: email
+    auth: [user_password, tls]
+    tags: [email, smtp, send]
+    status: stable
+    description: "Connecteur SMTP générique pour l'envoi d'e-mails."
+
+  - name: imap
+    module: pyconnectors.connectors.email.imap
+    attr: IMAPConnector
+    type: email
+    auth: [user_password, oauth2]
+    tags: [email, imap, receive]
+    status: stable
+    description: "Connecteur IMAP pour la lecture et la gestion de boîtes mail."
+
+  - name: pop3
+    module: pyconnectors.connectors.email.pop3
+    attr: POP3Connector
+    type: email
+    auth: [user_password]
+    tags: [email, pop3, receive]
+    status: stable
+    description: "Connecteur POP3 pour la récupération d'e-mails."
+
+  - name: gmail
+    module: pyconnectors.connectors.email.gmail
+    attr: GmailConnector
+    type: email
+    auth: [oauth2]
+    tags: [email, gmail, google, send, receive]
+    status: stable
+    description: "Connecteur Gmail via l'API Google (envoi + lecture)."
+
+  - name: outlook
+    module: pyconnectors.connectors.email.outlook
+    attr: OutlookConnector
+    type: email
+    auth: [oauth2]
+    tags: [email, outlook, microsoft, send, receive]
+    status: stable
+    description: "Connecteur Outlook / Microsoft 365 via Microsoft Graph API."
+
+  - name: yahoo
+    module: pyconnectors.connectors.email.yahoo
+    attr: YahooConnector
+    type: email
+    auth: [oauth2]
+    tags: [email, yahoo, send, receive]
+    status: stable
+    description: "Connecteur Yahoo Mail."
+
+  - name: ses
+    module: pyconnectors.connectors.email.ses
+    attr: SESConnector
+    type: email
+    auth: [aws_credentials, iam_role]
+    tags: [email, ses, aws, transactional]
+    status: stable
+    description: "Connecteur Amazon SES pour l'envoi d'e-mails transactionnels."
+
+  - name: mailgun
+    module: pyconnectors.connectors.email.mailgun
+    attr: MailgunConnector
+    type: email
+    auth: [api_key]
+    tags: [email, mailgun, transactional, api]
+    status: stable
+    description: "Connecteur Mailgun via son API REST."
+
+  - name: mailersend
+    module: pyconnectors.connectors.email.mailersend
+    attr: MailerSendConnector
+    type: email
+    auth: [api_key]
+    tags: [email, mailersend, transactional, api]
+    status: stable
+    description: "Connecteur MailerSend via son API REST."
+
+  - name: resend
+    module: pyconnectors.connectors.email.resend
+    attr: ResendConnector
+    type: email
+    auth: [api_key]
+    tags: [email, resend, transactional, api]
+    status: stable
+    description: "Connecteur Resend via son API REST."
+
+  - name: brevo
+    module: pyconnectors.connectors.email.brevo
+    attr: BrevoConnector
+    type: email
+    auth: [api_key]
+    tags: [email, brevo, sendinblue, marketing, transactional]
+    status: stable
+    description: "Connecteur Brevo (ex-Sendinblue) pour e-mails marketing et transactionnels."
+
+  - name: mailchimp
+    module: pyconnectors.connectors.email.mailchimp
+    attr: MailchimpConnector
+    type: email
+    auth: [api_key, oauth2]
+    tags: [email, mailchimp, marketing, newsletter]
+    status: stable
+    description: "Connecteur Mailchimp pour les campagnes e-mail marketing."
+
+  # ── Fitness ───────────────────────────────────────────────────────────
+
+  - name: strava
+    module: pyconnectors.connectors.apps.fitness.strava
+    attr: StravaConnector
+    type: fitness
+    auth: [oauth2]
+    tags: [fitness, strava, sport, activities, api]
+    status: stable
+    description: "Connecteur Strava API v3 (athlete, activities, clubs, routes, stats)."
+
+  # ── HTTP ──────────────────────────────────────────────────────────────
+
+  - name: http-rest
+    module: pyconnectors.connectors.http.rest
+    attr: RestConnector
+    type: http
+    auth: [none, api_key, bearer, basic]
+    tags: [http, rest, api, generic]
+    status: stable
+    description: "Connecteur HTTP générique pour les APIs REST."
+
+  - name: http-oauth2
+    module: pyconnectors.connectors.http.oauth2
+    attr: OAuth2RestConnector
+    type: http
+    auth: [oauth2]
+    tags: [http, rest, oauth2, api]
+    status: stable
+    description: "Connecteur HTTP REST avec gestion automatique du flux OAuth 2.0."
+
+  # ── Messaging ─────────────────────────────────────────────────────────
+  # (aucun connecteur implémenté — répertoire réservé)
+
+  # ── Payment ───────────────────────────────────────────────────────────
+
+  - name: stripe
+    module: pyconnectors.connectors.apps.payment.stripe_api
+    attr: StripeConnector
+    type: payment
+    auth: [api_key]
+    tags: [payment, stripe, billing, charges]
+    status: stable
+    description: "Connecteur Stripe API (charges, customers, subscriptions, webhooks)."
+
+  - name: paypal
+    module: pyconnectors.connectors.apps.payment.paypal
+    attr: PayPalConnector
+    type: payment
+    auth: [oauth2, client_credentials]
+    tags: [payment, paypal, billing]
+    status: stable
+    description: "Connecteur PayPal REST API (orders, payments, webhooks)."
+
+  # ── Social ────────────────────────────────────────────────────────────
+
+  - name: slack
+    module: pyconnectors.connectors.apps.social.slack
+    attr: SlackConnector
+    type: social
+    auth: [oauth2, bot_token]
+    tags: [social, slack, messaging, notifications]
+    status: stable
+    description: "Connecteur Slack API (messages, channels, webhooks)."
+
+  - name: twitter
+    module: pyconnectors.connectors.apps.social.twitter
+    attr: TwitterConnector
+    type: social
+    auth: [oauth2, api_key]
+    tags: [social, twitter, x, posts, api]
+    status: stable
+    description: "Connecteur Twitter / X API v2 (tweets, timelines, search)."
+
+  - name: linkedin
+    module: pyconnectors.connectors.apps.social.linkedin
+    attr: LinkedInConnector
+    type: social
+    auth: [oauth2]
+    tags: [social, linkedin, posts, profile]
+    status: stable
+    description: "Connecteur LinkedIn API (posts, profil, company pages)."
+
+  - name: facebook
+    module: pyconnectors.connectors.apps.social.facebook
+    attr: FacebookConnector
+    type: social
+    auth: [oauth2, api_key]
+    tags: [social, facebook, meta, posts, pages]
+    status: stable
+    description: "Connecteur Facebook Graph API (pages, posts, insights)."
+
+  - name: instagram
+    module: pyconnectors.connectors.apps.social.instagram
+    attr: InstagramConnector
+    type: social
+    auth: [oauth2]
+    tags: [social, instagram, meta, posts, media]
+    status: stable
+    description: "Connecteur Instagram Graph API (médias, insights, stories)."
+
+  - name: tiktok
+    module: pyconnectors.connectors.apps.social.tiktok
+    attr: TikTokConnector
+    type: social
+    auth: [oauth2]
+    tags: [social, tiktok, videos, creator]
+    status: stable
+    description: "Connecteur TikTok API (videos, creator info, insights)."
+
+  - name: whatsapp
+    module: pyconnectors.connectors.apps.social.whatsapp
+    attr: WhatsAppConnector
+    type: social
+    auth: [api_key, bearer]
+    tags: [social, whatsapp, meta, messaging, notifications]
+    status: stable
+    description: "Connecteur WhatsApp Business Cloud API (messages, templates, webhooks)."
+
+  # ── Storage ───────────────────────────────────────────────────────────
+
+  # ·· S3 & compatibles ·················································
+
+  - name: s3
+    module: pyconnectors.connectors.storage.s3.s3
+    attr: S3Connector
+    type: storage
+    auth: [aws_credentials, iam_role]
+    tags: [storage, s3, aws, object-store]
+    status: stable
+    description: "Connecteur AWS S3 pour lecture/écriture d'objets (boto3)."
+
+  - name: minio
+    module: pyconnectors.connectors.storage.s3.minio
+    attr: MinioConnector
+    type: storage
+    auth: [access_key]
+    tags: [storage, minio, s3-compatible, self-hosted]
+    status: stable
+    description: "Connecteur MinIO (API compatible S3, self-hosted)."
+
+  - name: digitalocean-spaces
+    module: pyconnectors.connectors.storage.s3.digitalocean
+    attr: DigitalOceanSpaceConnector
+    type: storage
+    auth: [access_key]
+    tags: [storage, digitalocean, spaces, s3-compatible]
+    status: stable
+    description: "Connecteur DigitalOcean Spaces (API compatible S3)."
+
+  - name: hetzner
+    module: pyconnectors.connectors.storage.s3.hetzner
+    attr: HetznerConnector
+    type: storage
+    auth: [access_key]
+    tags: [storage, hetzner, s3-compatible, self-hosted]
+    status: stable
+    description: "Connecteur Hetzner Object Storage (API compatible S3)."
+
+  - name: ovh
+    module: pyconnectors.connectors.storage.s3.ovh
+    attr: OVHConnector
+    type: storage
+    auth: [access_key, keystone]
+    tags: [storage, ovh, openstack, swift, s3-compatible]
+    status: stable
+    description: "Connecteur OVHcloud Object Storage (Swift / S3 compatible)."
+
+  # ·· Azure ·····························································
+
+  - name: azure-blob
+    module: pyconnectors.connectors.storage.azure.azure_blob
+    attr: AzureBlobConnector
+    type: storage
+    auth: [connection_string, service_principal, managed_identity]
+    tags: [storage, azure, blob, object-store]
+    status: stable
+    description: "Connecteur Azure Blob Storage (azure-storage-blob)."
+
+  - name: adls
+    module: pyconnectors.connectors.storage.azure.adls
+    attr: ADLSConnector
+    type: storage
+    auth: [service_principal, managed_identity]
+    tags: [storage, azure, adls, data-lake]
+    status: stable
+    description: "Connecteur Azure Data Lake Storage Gen2 (azure-storage-file-datalake)."
+
+  # ·· GCP ·······························································
+
+  - name: gcs
+    module: pyconnectors.connectors.storage.gcp.gcs
+    attr: GCSConnector
+    type: storage
+    auth: [service_account, adc]
+    tags: [storage, gcs, gcp, object-store]
+    status: stable
+    description: "Connecteur Google Cloud Storage (google-cloud-storage)."
+
+  # ·· Media ·····························································
+
+  - name: cloudinary
+    module: pyconnectors.connectors.storage.media.cloudinary
+    attr: CloudinaryConnector
+    type: storage
+    auth: [api_key]
+    tags: [storage, cloudinary, media, cdn, images, video]
+    status: stable
+    description: "Connecteur Cloudinary pour la gestion et la transformation de médias."
+
+  # ·· FTP ·······························································
+  # (aucun connecteur implémenté — répertoire réservé)
