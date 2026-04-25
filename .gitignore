@@ -68,6 +68,11 @@ tmp/
 
 _archives/
 
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
 # Data Platform — local Data Lake, Warehouse, Exports
 # Les .gitkeep sont versionnés pour conserver la structure de dossiers.
 data/
