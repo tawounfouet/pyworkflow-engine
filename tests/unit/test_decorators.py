@@ -19,8 +19,8 @@ import pytest
 from pyworkflow_engine.decorators import JobBuilder, StepSpec, job, step
 from pyworkflow_engine.decorators.job_decorator import _make_context_adapter
 from pyworkflow_engine.models.enums import StepType
-from pyworkflow_engine.models.job import Job
-from pyworkflow_engine.models.step import Step
+from pyworkflow_engine.models.workflow.job import Job
+from pyworkflow_engine.models.workflow.step import Step
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -396,12 +396,12 @@ class TestJobDecorator:
         @step(name="s")
         def fn(): ...
 
-        @job(name="j", tags={"owner": "team-data"})
+        @job(name="j", tags=["owner:team-data"])
         def workflow():
             fn()
 
         built = workflow.build()
-        assert built.tags == {"owner": "team-data"}
+        assert built.tags == ["owner:team-data"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

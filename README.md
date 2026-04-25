@@ -37,6 +37,8 @@ Most workflow libraries force you into a framework. PyWorkflow Engine takes the 
 ### Installation
 
 ```bash
+source .venv/bin/activate  # optional but recommended       
+pyworkflow gui
 pip install pyworkflow-engine     
 
 

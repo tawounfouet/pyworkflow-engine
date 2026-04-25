@@ -24,7 +24,7 @@ from pyworkflow_engine.logging import (
     logged_operation,
 )
 from pyworkflow_engine.logging.logger import _cleanup
-from pyworkflow_engine.models.run import StepLog, StepRun
+from pyworkflow_engine.models.workflow.run import StepLog, StepRun
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 

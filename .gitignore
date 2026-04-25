@@ -70,6 +70,7 @@ _archives/
 
 # Data Platform — local Data Lake, Warehouse, Exports
 # Les .gitkeep sont versionnés pour conserver la structure de dossiers.
+data/
 data/datalake/raw/
 data/warehouse/*.duckdb
 data/warehouse/*.duckdb.*

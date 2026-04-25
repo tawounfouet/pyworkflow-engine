@@ -37,7 +37,7 @@ from pyworkflow_engine.models import (
     step_to_dict,
     sub_job_to_dict,
 )
-from pyworkflow_engine.models.step import SubJob
+from pyworkflow_engine.models.workflow.step import SubJob
 from pyworkflow_engine.ports.storage import (
     JobNotFoundError,
     StorageError,
@@ -106,9 +106,6 @@ class TestModelsWrapperFunctions:
 
 
 # --- persistence/__init__.py lazy imports ---
-
-
-
 
 
 # --- persistence/base.py utilities ---
@@ -574,9 +571,6 @@ class TestBaseStorageDeeper:
 # --- persistence/__init__.py — ImportError branch for SQLAlchemy ---
 
 
-
-
-
 # --- persistence/json_file.py — list_job_runs limit/offset, delete_job_run ---
 
 
@@ -644,11 +638,13 @@ class TestJSONFileStorageExtra:
 
 # --- exceptions.py — cover uncovered __init__ and __str__ methods ---
 
+
 class TestExceptionsDeepCoverage:
     """Cover the uncovered exception constructors and __str__ methods."""
 
     def test_step_execution_error_with_all_fields(self):
         from pyworkflow_engine.exceptions import StepExecutionError
+
         orig = ValueError("root cause")
         e = StepExecutionError(
             "step failed",
@@ -665,6 +661,7 @@ class TestExceptionsDeepCoverage:
 
     def test_workflow_timeout_error(self):
         from pyworkflow_engine.exceptions import WorkflowTimeoutError
+
         e = WorkflowTimeoutError(
             "timed out",
             timeout_seconds=30.0,
@@ -676,6 +673,7 @@ class TestExceptionsDeepCoverage:
 
     def test_workflow_cancelled(self):
         from pyworkflow_engine.exceptions import WorkflowCancelled
+
         e = WorkflowCancelled(
             "cancelled",
             cancelled_by="operator",
@@ -686,6 +684,7 @@ class TestExceptionsDeepCoverage:
 
     def test_executor_error(self):
         from pyworkflow_engine.exceptions import ExecutorError
+
         e = ExecutorError(
             "executor failed",
             executor_type="thread",
@@ -696,6 +695,7 @@ class TestExceptionsDeepCoverage:
 
     def test_persistence_error_class(self):
         from pyworkflow_engine.exceptions import StorageError
+
         e = StorageError(
             "save failed",
             operation="save",
@@ -706,6 +706,7 @@ class TestExceptionsDeepCoverage:
 
     def test_context_error(self):
         from pyworkflow_engine.exceptions import ContextError
+
         e = ContextError(
             "ctx error",
             context_key="my_key",
@@ -716,6 +717,7 @@ class TestExceptionsDeepCoverage:
 
     def test_create_step_failed_error(self):
         from pyworkflow_engine.exceptions import create_step_failed_error
+
         e = create_step_failed_error(
             job_name="j",
             step_name="s",
@@ -725,6 +727,7 @@ class TestExceptionsDeepCoverage:
 
     def test_create_timeout_error(self):
         from pyworkflow_engine.exceptions import create_timeout_error
+
         e = create_timeout_error(
             entity_name="s",
             entity_type="step",
@@ -737,6 +740,7 @@ class TestExceptionsDeepCoverage:
 
     def test_create_validation_error(self):
         from pyworkflow_engine.exceptions import create_validation_error
+
         e = create_validation_error(
             message="invalid field",
         )

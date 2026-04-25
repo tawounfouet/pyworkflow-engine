@@ -28,7 +28,9 @@ from pyworkflow_engine.adapters.storage.sqlite import SQLiteStorage
 # SQLAlchemy — optional
 # ---------------------------------------------------------------------------
 try:
-    from pyworkflow_engine.adapters.storage.sqlalchemy import SQLAlchemyStorage  # noqa: F401
+    from pyworkflow_engine.adapters.storage.sqlalchemy import (
+        SQLAlchemyStorage,
+    )  # noqa: F401
 
     HAS_SQLALCHEMY = True
 except ImportError:
@@ -190,9 +192,7 @@ class TestJobRoundTrip:
         backend.save_job(job)
 
         # Overwrite with a different description
-        from dataclasses import replace
-
-        updated = replace(job, description="Updated description")
+        updated = job.model_copy(update={"description": "Updated description"})
         backend.save_job(updated)
 
         retrieved = backend.get_job(job.name)
